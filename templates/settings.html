@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Settings - Project Health Check{% endblock %}
+
+{% block content %}
+<h2>Project Settings</h2>
+
+<form method="post" action="/settings/project">
+    <div class="grid">
+        <label>
+            Project Name
+            <input type="text" name="name" value="{{ project.name }}" required>
+        </label>
+        <label>
+            Team Size
+            <input type="number" name="team_size" value="{{ project.team_size }}" min="1" required>
+        </label>
+    </div>
+    <div class="grid">
+        <label>
+            Start Date
+            <input type="date" name="start_date" value="{{ project.start_date }}">
+        </label>
+        <label>
+            As-of Date
+            <input type="date" name="as_of_date" value="{{ project.as_of_date }}">
+        </label>
+    </div>
+    <div class="grid">
+        <label>
+            Initial Budget ($)
+            <input type="number" name="initial_budget" value="{{ project.initial_budget }}" step="0.01" min="0">
+        </label>
+        <label>
+            Actual Spend to Date ($)
+            <input type="number" name="actual_spend" value="{{ project.actual_spend }}" step="0.01" min="0">
+        </label>
+    </div>
+    <label>
+        Default Role
+        <select name="default_role_id">
+            {% for role in roles %}
+            <option value="{{ role.id }}" {% if role.id == project.default_role_id %}selected{% endif %}>
+                {{ role.name }} ({{ role.day_rate | currency }}/day)
+            </option>
+            {% endfor %}
+        </select>
+    </label>
+    <button type="submit">Save Project Settings</button>
+</form>
+
+<hr>
+
+<h3>Roles</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Day Rate</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for role in roles %}
+        <tr>
+            <form method="post" action="/settings/roles/{{ role.id }}/update">
+                <td><input type="text" name="name" value="{{ role.name }}" required></td>
+                <td><input type="number" name="day_rate" value="{{ role.day_rate }}" step="0.01" min="0" required></td>
+                <td class="actions">
+                    <button type="submit" class="btn-small outline">Save</button>
+                    <button type="submit" formaction="/settings/roles/{{ role.id }}/delete" class="btn-small outline secondary">Delete</button>
+                </td>
+            </form>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<details>
+    <summary>Add Role</summary>
+    <form method="post" action="/settings/roles/add">
+        <div class="grid">
+            <label>
+                Name
+                <input type="text" name="name" placeholder="e.g., Senior Developer" required>
+            </label>
+            <label>
+                Day Rate ($)
+                <input type="number" name="day_rate" placeholder="1435" step="0.01" min="0" required>
+            </label>
+        </div>
+        <button type="submit" class="outline">Add Role</button>
+    </form>
+</details>
+
+<hr>
+
+<h3>Budget Adjustments</h3>
+{% if adjustments %}
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Description</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for adj in adjustments %}
+        <tr>
+            <td>{{ adj.date }}</td>
+            <td>{{ adj.amount | currency }}</td>
+            <td>{{ adj.description }}</td>
+            <td>
+                <form method="post" action="/settings/adjustments/{{ adj.id }}/delete" style="margin:0">
+                    <button type="submit" class="btn-small outline secondary">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">No budget adjustments yet.</p>
+{% endif %}
+
+<details>
+    <summary>Add Budget Adjustment</summary>
+    <form method="post" action="/settings/adjustments/add">
+        <div class="grid">
+            <label>
+                Date
+                <input type="date" name="date" required>
+            </label>
+            <label>
+                Amount ($)
+                <input type="number" name="amount" placeholder="100000" step="0.01" required>
+            </label>
+        </div>
+        <label>
+            Description
+            <input type="text" name="description" placeholder="e.g., +100k for visualisations">
+        </label>
+        <button type="submit" class="outline">Add Adjustment</button>
+    </form>
+</details>
+{% endblock %}

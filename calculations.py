@@ -1,0 +1,144 @@
+from datetime import date, timedelta
+
+
+def business_days_between(start: date, end: date) -> int:
+    if start >= end:
+        return 0
+    days = 0
+    current = start
+    while current < end:
+        if current.weekday() < 5:
+            days += 1
+        current += timedelta(days=1)
+    return days
+
+
+def parse_date(s: str) -> date | None:
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def remaining_days(budget_days: float, percent_complete: int) -> float:
+    return budget_days * (1 - percent_complete / 100)
+
+
+def budget_dollars(budget_days: float, day_rate: float) -> float:
+    return budget_days * day_rate
+
+
+def remaining_dollars(budget_days: float, percent_complete: int, day_rate: float) -> float:
+    return remaining_days(budget_days, percent_complete) * day_rate
+
+
+def deliverable_summary(d: dict, day_rate: float) -> dict:
+    bd = d["budget_days"]
+    pc = d["percent_complete"]
+    return {
+        **d,
+        "budget_dollars": budget_dollars(bd, day_rate),
+        "remaining_days": remaining_days(bd, pc),
+        "remaining_dollars": remaining_dollars(bd, pc, day_rate),
+    }
+
+
+def requirement_summary(req: dict, deliverables: list[dict], day_rate: float) -> dict:
+    total_days = sum(d["budget_days"] for d in deliverables)
+    total_dollars = sum(d["budget_dollars"] for d in deliverables)
+    total_remaining_days = sum(d["remaining_days"] for d in deliverables)
+    total_remaining_dollars = sum(d["remaining_dollars"] for d in deliverables)
+    if total_days > 0:
+        weighted_completion = sum(
+            d["budget_days"] * d["percent_complete"] for d in deliverables
+        ) / total_days
+    else:
+        weighted_completion = 0
+    return {
+        **req,
+        "deliverables": deliverables,
+        "total_days": total_days,
+        "total_dollars": total_dollars,
+        "remaining_days": total_remaining_days,
+        "remaining_dollars": total_remaining_dollars,
+        "weighted_completion": weighted_completion,
+    }
+
+
+def feature_summary(feature: dict, requirements: list[dict]) -> dict:
+    total_days = sum(r["total_days"] for r in requirements)
+    total_dollars = sum(r["total_dollars"] for r in requirements)
+    total_remaining_days = sum(r["remaining_days"] for r in requirements)
+    total_remaining_dollars = sum(r["remaining_dollars"] for r in requirements)
+    if total_days > 0:
+        weighted_completion = sum(
+            r["total_days"] * r["weighted_completion"] for r in requirements
+        ) / total_days
+    else:
+        weighted_completion = 0
+    return {
+        **feature,
+        "requirements": requirements,
+        "total_days": total_days,
+        "total_dollars": total_dollars,
+        "remaining_days": total_remaining_days,
+        "remaining_dollars": total_remaining_dollars,
+        "weighted_completion": weighted_completion,
+    }
+
+
+def project_summary(
+    project: dict,
+    features: list[dict],
+    adjustments: list[dict],
+    default_day_rate: float,
+) -> dict:
+    total_adj = sum(a["amount"] for a in adjustments)
+    current_budget = project["initial_budget"] + total_adj
+
+    start = parse_date(project["start_date"])
+    as_of = parse_date(project["as_of_date"])
+    elapsed_days = business_days_between(start, as_of) if start and as_of else 0
+
+    daily_burn = project["team_size"] * default_day_rate
+    expected_spend = daily_burn * elapsed_days
+    expected_burn_pct = (expected_spend / current_budget * 100) if current_budget else 0
+    current_burn_pct = (project["actual_spend"] / current_budget * 100) if current_budget else 0
+    burn_delta = project["actual_spend"] - expected_spend
+
+    allocated_days = sum(f["total_days"] for f in features)
+    allocated_dollars = sum(f["total_dollars"] for f in features)
+    total_remaining_days = sum(f["remaining_days"] for f in features)
+    total_remaining_dollars = sum(f["remaining_dollars"] for f in features)
+
+    if allocated_days > 0:
+        overall_completion = sum(
+            f["total_days"] * f["weighted_completion"] for f in features
+        ) / allocated_days
+    else:
+        overall_completion = 0
+
+    unallocated_budget = current_budget - allocated_dollars
+    budget_days_remaining = (current_budget - project["actual_spend"]) / daily_burn if daily_burn else 0
+
+    return {
+        "current_budget": current_budget,
+        "initial_budget": project["initial_budget"],
+        "total_adjustments": total_adj,
+        "elapsed_days": elapsed_days,
+        "daily_burn": daily_burn,
+        "expected_spend": expected_spend,
+        "expected_burn_pct": expected_burn_pct,
+        "actual_spend": project["actual_spend"],
+        "current_burn_pct": current_burn_pct,
+        "burn_delta": burn_delta,
+        "allocated_days": allocated_days,
+        "allocated_dollars": allocated_dollars,
+        "remaining_days": total_remaining_days,
+        "remaining_dollars": total_remaining_dollars,
+        "overall_completion": overall_completion,
+        "unallocated_budget": unallocated_budget,
+        "budget_days_remaining": budget_days_remaining,
+    }

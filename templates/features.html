@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Features - Project Health Check{% endblock %}
+
+{% block content %}
+<h2>Features</h2>
+
+{% if features %}
+<table>
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th class="text-right">Budget (days)</th>
+            <th class="text-right">Budget ($)</th>
+            <th class="text-right">Completion</th>
+            <th class="text-right">Remaining (days)</th>
+            <th class="text-right">Remaining ($)</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for f in features %}
+        <tr>
+            <td><a href="/features/{{ f.id }}">{{ f.name }}</a></td>
+            <td class="text-right">{{ f.total_days | days }}</td>
+            <td class="text-right">{{ f.total_dollars | currency }}</td>
+            <td class="text-right">{{ f.weighted_completion | pct }}</td>
+            <td class="text-right">{{ f.remaining_days | days }}</td>
+            <td class="text-right">{{ f.remaining_dollars | currency }}</td>
+            <td>
+                <form method="post" action="/features/{{ f.id }}/delete" style="margin:0"
+                      onsubmit="return confirm('Delete feature &quot;{{ f.name }}&quot; and all its requirements/deliverables?')">
+                    <button type="submit" class="btn-small outline secondary">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <th>Totals</th>
+            <th class="text-right">{{ features | sum(attribute='total_days') | days }}</th>
+            <th class="text-right">{{ features | sum(attribute='total_dollars') | currency }}</th>
+            <th></th>
+            <th class="text-right">{{ features | sum(attribute='remaining_days') | days }}</th>
+            <th class="text-right">{{ features | sum(attribute='remaining_dollars') | currency }}</th>
+            <th></th>
+        </tr>
+    </tfoot>
+</table>
+{% else %}
+<p class="text-muted">No features yet. Add one below.</p>
+{% endif %}
+
+<details open>
+    <summary>Add Feature</summary>
+    <form method="post" action="/features/add">
+        <div class="grid">
+            <label>
+                Feature Name
+                <input type="text" name="name" placeholder="e.g., Repricing Tool" required>
+            </label>
+        </div>
+        <button type="submit" class="outline">Add Feature</button>
+    </form>
+</details>
+{% endblock %}
