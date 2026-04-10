@@ -9,13 +9,11 @@
     </ul>
 </nav>
 
-<div style="display: flex; justify-content: space-between; align-items: center;">
-    <h2>{{ feature.name }}</h2>
-    <form method="post" action="/features/{{ feature.id }}/update" style="display:flex; gap:0.5rem; margin:0; align-items:center;">
-        <input type="text" name="name" value="{{ feature.name }}" style="margin:0;">
-        <button type="submit" class="outline btn-small">Rename</button>
-    </form>
-</div>
+<h2>{{ feature.name }}</h2>
+<form method="post" action="/features/{{ feature.id }}/update" class="inline-rename mb-1">
+    <input type="text" name="name" value="{{ feature.name }}">
+    <button type="submit" class="outline btn-small">Rename</button>
+</form>
 
 <div class="summary-grid">
     <div class="summary-card">
@@ -50,9 +48,9 @@
         </span>
     </summary>
 
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-        <form method="post" action="/requirements/{{ req.id }}/update" style="display:flex; gap:0.5rem; margin:0; flex:1; align-items:center;">
-            <input type="text" name="name" value="{{ req.name }}" style="margin:0; flex:1;">
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;">
+        <form method="post" action="/requirements/{{ req.id }}/update" class="inline-rename" style="flex:1;">
+            <input type="text" name="name" value="{{ req.name }}">
             <button type="submit" class="outline btn-small">Rename</button>
         </form>
         <form method="post" action="/requirements/{{ req.id }}/delete" style="margin:0"
@@ -62,7 +60,18 @@
     </div>
 
     {% if req.deliverables %}
+    <div class="table-scroll">
     <table>
+        <colgroup>
+            <col class="col-name">
+            <col class="col-priority">
+            <col class="col-role">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-actions">
+        </colgroup>
         <thead>
             <tr>
                 <th>Deliverable</th>
@@ -79,26 +88,26 @@
             {% for d in req.deliverables %}
             <tr class="priority-{{ d.priority | lower | replace(' ', '-') }}">
                 <form method="post" action="/deliverables/{{ d.id }}/update">
-                    <td><input type="text" name="name" value="{{ d.name }}" style="margin:0; min-width:150px;"></td>
+                    <td><input type="text" name="name" value="{{ d.name }}"></td>
                     <td>
-                        <select name="priority" style="margin:0; min-width:100px;">
+                        <select name="priority">
                             {% for p in ["Must Have", "Should Have", "Could Have"] %}
                             <option {% if d.priority == p %}selected{% endif %}>{{ p }}</option>
                             {% endfor %}
                         </select>
                     </td>
                     <td>
-                        <select name="role_id" style="margin:0; min-width:80px;">
+                        <select name="role_id">
                             <option value="">Default</option>
                             {% for r in roles %}
                             <option value="{{ r.id }}" {% if d.role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
                             {% endfor %}
                         </select>
                     </td>
-                    <td class="text-right"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0" style="margin:0; width:5rem; text-align:right;"></td>
+                    <td class="text-right"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0"></td>
                     <td class="text-right">
                         <input type="number" name="percent_complete" value="{{ d.percent_complete }}"
-                               min="0" max="100" style="margin:0; width:5rem; text-align:right;"
+                               min="0" max="100"
                                class="inline-percent" data-id="{{ d.id }}">
                     </td>
                     <td class="text-right">{{ d.remaining_days | days }}</td>
@@ -123,6 +132,7 @@
             </tr>
         </tfoot>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">No deliverables yet.</p>
     {% endif %}
@@ -159,7 +169,7 @@
                     </select>
                 </label>
             </div>
-            <button type="submit" class="outline">Add Deliverable</button>
+            <button type="submit" class="btn-add">+ Add Deliverable</button>
         </form>
     </details>
 </details>
@@ -175,7 +185,7 @@
                 <input type="text" name="name" placeholder="e.g., Internal Calculations" required>
             </label>
         </div>
-        <button type="submit" class="outline">Add Requirement</button>
+        <button type="submit" class="btn-add">+ Add Requirement</button>
     </form>
 </details>
 {% endblock %}

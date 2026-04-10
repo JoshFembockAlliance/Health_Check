@@ -44,8 +44,12 @@ nav a.active {
 .priority-should { background-color: #fff8e1; }
 .priority-could { background-color: #e3f2fd; }
 
-table td, table th {
+table th {
     white-space: nowrap;
+}
+
+table td {
+    vertical-align: middle;
 }
 
 .actions {
@@ -54,8 +58,92 @@ table td, table th {
 }
 
 .btn-small {
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.75rem;
     font-size: 0.8rem;
+}
+
+/* Inline rename forms: input + button on one line, input takes available space */
+.inline-rename {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 0;
+}
+
+.inline-rename input[type="text"] {
+    margin: 0 !important;
+    flex: 1 1 auto;
+    min-width: 200px;
+    width: auto !important;
+}
+
+.inline-rename button {
+    margin: 0 !important;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    width: auto !important;
+}
+
+/* Table inputs and selects: remove Pico's bottom margin, ensure readable sizes */
+table input,
+table select {
+    margin: 0 !important;
+}
+
+table input[type="number"] {
+    width: 5.5rem;
+    text-align: right;
+}
+
+/* Deliverable table: force the table wider so columns don't crush */
+.table-scroll table {
+    min-width: 1100px;
+}
+
+.table-scroll table input[type="text"] {
+    width: 100%;
+    min-width: 0;
+}
+
+.table-scroll table select {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Column width hints via col classes */
+.col-name { width: 22%; }
+.col-priority { width: 12%; }
+.col-role { width: 12%; }
+.col-num { width: 9%; }
+.col-actions { width: 10%; }
+
+/* Allow deliverable tables to scroll horizontally rather than crush columns */
+.table-scroll {
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+/* Make add buttons clearly look like buttons, not text */
+.btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--pico-primary);
+    border-radius: var(--pico-border-radius);
+    background: var(--pico-primary);
+    color: var(--pico-primary-inverse);
+    font-weight: bold;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
+}
+
+.btn-add:hover {
+    background: var(--pico-primary-hover);
+    border-color: var(--pico-primary-hover);
 }
 
 .requirement-header {
@@ -89,3 +177,154 @@ details summary {
 .delta-positive { color: #c62828; }
 .delta-negative { color: #2e7d32; }
 .delta-zero { color: var(--pico-muted-color); }
+
+/* ── Dashboard: Hero cards ── */
+.hero-grid {
+    grid-template-columns: repeat(3, 1fr);
+    margin-bottom: 2rem;
+}
+
+.hero-card {
+    padding: 1.25rem;
+}
+
+.hero-card .value {
+    font-size: 2rem;
+}
+
+/* ── Dashboard: Budget & Spend detail section ── */
+.dashboard-section {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem !important;
+}
+
+.dashboard-section h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 2rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.detail-label {
+    color: var(--pico-muted-color);
+}
+
+.detail-value {
+    font-weight: 600;
+    text-align: right;
+}
+
+/* ── Dashboard: Progress bars ── */
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.progress-fill-green, .progress-fill-on_track { background: #2e7d32; }
+.progress-fill-amber, .progress-fill-at_risk { background: #f57f17; }
+.progress-fill-red, .progress-fill-behind { background: #c62828; }
+
+/* Target marker on progress bar — shows where completion "should" be */
+.progress-bar-with-target {
+    position: relative;
+}
+
+.progress-target-marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: #333;
+    z-index: 1;
+    border-radius: 1px;
+}
+
+.progress-target-marker::after {
+    content: "";
+    position: absolute;
+    top: -4px;
+    left: -3px;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #333;
+}
+
+/* ── Dashboard: Feature health cards ── */
+.feature-health-card {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.feature-health-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+}
+
+.feature-health-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.feature-health-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.feature-health-bar .progress-bar-container {
+    flex: 1;
+    height: 10px;
+    margin-top: 0;
+}
+
+.feature-health-stats {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    align-items: center;
+}
+
+/* ── Health badges ── */
+.health-badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge-green { background: #e8f5e9; color: #2e7d32; }
+.badge-amber { background: #fff8e1; color: #f57f17; }
+.badge-red { background: #fce4ec; color: #c62828; }
+.badge-grey { background: #f5f5f5; color: #757575; }

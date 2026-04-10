@@ -11,6 +11,7 @@ from calculations import (
     requirement_summary,
     feature_summary,
     project_summary,
+    feature_health,
 )
 
 app = FastAPI()
@@ -118,6 +119,18 @@ def dashboard(request: Request):
     features, project, roles, default_rate = build_feature_data()
     adjustments = list(db["budget_adjustments"].rows)
     summary = project_summary(project, features, adjustments, default_rate)
+
+    on_track_pct = project.get("health_on_track_pct", 100.0)
+    at_risk_pct = project.get("health_at_risk_pct", 80.0)
+
+    for f in features:
+        f["health"] = feature_health(
+            f,
+            summary["expected_burn_pct"],
+            on_track_pct,
+            at_risk_pct,
+        )
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "active": "dashboard",
@@ -155,6 +168,8 @@ def update_project(
     team_size: int = Form(1),
     actual_spend: float = Form(0),
     default_role_id: int = Form(1),
+    health_on_track_pct: float = Form(100.0),
+    health_at_risk_pct: float = Form(80.0),
 ):
     db = get_db()
     db["project"].update(1, {
@@ -165,6 +180,8 @@ def update_project(
         "team_size": team_size,
         "actual_spend": actual_spend,
         "default_role_id": default_role_id,
+        "health_on_track_pct": health_on_track_pct,
+        "health_at_risk_pct": health_at_risk_pct,
     })
     return RedirectResponse("/settings", status_code=303)
 

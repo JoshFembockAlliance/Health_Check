@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from typing import Literal
 
 
 def business_days_between(start: date, end: date) -> int:
@@ -141,4 +142,57 @@ def project_summary(
         "overall_completion": overall_completion,
         "unallocated_budget": unallocated_budget,
         "budget_days_remaining": budget_days_remaining,
+    }
+
+
+HealthStatus = Literal["on_track", "at_risk", "behind", "not_budgeted"]
+
+
+def feature_health(
+    feature: dict,
+    expected_burn_pct: float,
+    on_track_threshold: float,
+    at_risk_threshold: float,
+) -> dict:
+    """Determine a feature's health status by comparing its completion %
+    against the project-level expected burn %.
+
+    Logic:
+      - If the feature has no budget → "not_budgeted"
+      - completion >= expected_burn * (on_track_threshold / 100) → "on_track"
+      - completion >= expected_burn * (at_risk_threshold / 100) → "at_risk"
+      - otherwise → "behind"
+
+    Returns a dict with status, label, badge_class, and the target % for context.
+    """
+    if feature["total_dollars"] <= 0:
+        return {
+            "status": "not_budgeted",
+            "label": "Not Budgeted",
+            "badge_class": "badge-grey",
+            "target_pct": 0,
+        }
+
+    completion = feature["weighted_completion"]
+    on_track_target = expected_burn_pct * (on_track_threshold / 100)
+    at_risk_target = expected_burn_pct * (at_risk_threshold / 100)
+
+    if completion >= on_track_target:
+        status = "on_track"
+        label = "On Track"
+        badge_class = "badge-green"
+    elif completion >= at_risk_target:
+        status = "at_risk"
+        label = "At Risk"
+        badge_class = "badge-amber"
+    else:
+        status = "behind"
+        label = "Behind"
+        badge_class = "badge-red"
+
+    return {
+        "status": status,
+        "label": label,
+        "badge_class": badge_class,
+        "target_pct": on_track_target,
     }

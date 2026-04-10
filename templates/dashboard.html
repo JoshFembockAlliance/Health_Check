@@ -2,7 +2,11 @@
 {% block title %}Dashboard - {{ project.name }}{% endblock %}
 
 {% block content %}
-<h2>{{ project.name }}</h2>
+<h2>{{ project.name }}
+    {% if project.as_of_date %}
+    <span class="text-muted" style="font-size: 1rem; font-weight: normal;">&mdash; as of {{ project.as_of_date }}</span>
+    {% endif %}
+</h2>
 
 {% if not project.start_date or not project.as_of_date or summary.current_budget == 0 %}
 <article>
@@ -10,147 +14,144 @@
 </article>
 {% endif %}
 
-<h3>Budget Overview</h3>
-<div class="summary-grid">
-    <div class="summary-card">
-        <div class="label">Initial Budget</div>
-        <div class="value">{{ summary.initial_budget | currency }}</div>
-    </div>
-    {% if summary.total_adjustments != 0 %}
-    <div class="summary-card">
-        <div class="label">Adjustments</div>
-        <div class="value {% if summary.total_adjustments > 0 %}health-green{% else %}health-red{% endif %}">
-            {{ summary.total_adjustments | currency }}
-        </div>
-    </div>
-    {% endif %}
-    <div class="summary-card">
+{# ── Hero metrics: the 3 numbers a PM looks at first ── #}
+<div class="summary-grid hero-grid">
+    <div class="summary-card hero-card">
         <div class="label">Current Total Budget</div>
         <div class="value">{{ summary.current_budget | currency }}</div>
+        {% if summary.total_adjustments != 0 %}
+        <div class="text-muted">{{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.</div>
+        {% endif %}
     </div>
-    <div class="summary-card">
-        <div class="label">Unallocated Budget</div>
-        <div class="value {% if summary.unallocated_budget < 0 %}health-red{% elif summary.unallocated_budget == 0 %}health-amber{% else %}health-green{% endif %}">
-            {{ summary.unallocated_budget | currency }}
-        </div>
-    </div>
-</div>
-
-<h3>Burn Rate</h3>
-<div class="summary-grid">
-    <div class="summary-card">
-        <div class="label">Daily Burn Rate</div>
-        <div class="value">{{ summary.daily_burn | currency }}</div>
-        <div class="text-muted">{{ project.team_size }} people</div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Expected Spend to Date</div>
-        <div class="value">{{ summary.expected_spend | currency }}</div>
-        <div class="text-muted">{{ summary.elapsed_days }} business days</div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Actual Spend to Date</div>
-        <div class="value">{{ summary.actual_spend | currency }}</div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Burn Delta</div>
-        <div class="value {% if summary.burn_delta > 0 %}delta-positive{% elif summary.burn_delta < 0 %}delta-negative{% else %}delta-zero{% endif %}">
-            {{ summary.burn_delta | currency }}
-        </div>
-    </div>
-</div>
-
-<div class="summary-grid">
-    <div class="summary-card">
-        <div class="label">Expected Burn %</div>
-        <div class="value">{{ summary.expected_burn_pct | pct }}</div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Current Burn %</div>
-        <div class="value">{{ summary.current_burn_pct | pct }}</div>
-    </div>
-    <div class="summary-card">
+    <div class="summary-card hero-card">
         <div class="label">Overall Completion</div>
         <div class="value {% if summary.overall_completion >= summary.current_burn_pct %}health-green{% elif summary.overall_completion >= summary.current_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
             {{ summary.overall_completion | pct }}
         </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar progress-fill-green" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
+        </div>
     </div>
-    <div class="summary-card">
+    <div class="summary-card hero-card">
         <div class="label">Budget Days Remaining</div>
         <div class="value {% if summary.budget_days_remaining < 20 %}health-red{% elif summary.budget_days_remaining < 60 %}health-amber{% else %}health-green{% endif %}">
             {{ summary.budget_days_remaining | days }}
         </div>
+        <div class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</div>
     </div>
 </div>
 
-{% if adjustments %}
-<details>
-    <summary>Budget Adjustment History</summary>
-    <table>
-        <thead>
-            <tr><th>Date</th><th>Amount</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-            {% for adj in adjustments %}
-            <tr>
-                <td>{{ adj.date }}</td>
-                <td>{{ adj.amount | currency }}</td>
-                <td>{{ adj.description }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</details>
-{% endif %}
+{# ── Budget & Spend detail ── #}
+<article class="dashboard-section">
+    <h3>Budget & Spend</h3>
+    <div class="detail-grid">
+        <div class="detail-row">
+            <span class="detail-label">Actual Spend to Date</span>
+            <span class="detail-value">{{ summary.actual_spend | currency }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Expected Spend to Date</span>
+            <span class="detail-value">{{ summary.expected_spend | currency }}
+                <span class="text-muted">({{ summary.elapsed_days }} business days)</span>
+            </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Spend Delta</span>
+            <span class="detail-value {% if summary.burn_delta > 0 %}delta-positive{% elif summary.burn_delta < 0 %}delta-negative{% else %}delta-zero{% endif %}">
+                {{ summary.burn_delta | currency }}
+            </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Current Burn %</span>
+            <span class="detail-value">{{ summary.current_burn_pct | pct }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Expected Burn %</span>
+            <span class="detail-value">{{ summary.expected_burn_pct | pct }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Allocated to Features</span>
+            <span class="detail-value">{{ summary.allocated_dollars | currency }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Unallocated Budget</span>
+            <span class="detail-value {% if summary.unallocated_budget < 0 %}health-red{% elif summary.unallocated_budget > 0 %}health-green{% endif %}">
+                {{ summary.unallocated_budget | currency }}
+            </span>
+        </div>
+    </div>
 
+    {% if adjustments %}
+    <details class="mt-1">
+        <summary>Budget Adjustment History</summary>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Amount</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                {% for adj in adjustments %}
+                <tr>
+                    <td>{{ adj.date }}</td>
+                    <td>{{ adj.amount | currency }}</td>
+                    <td>{{ adj.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% endif %}
+</article>
+
+{# ── Feature Health ── #}
 <h3>Feature Health</h3>
 {% if features %}
-<table>
-    <thead>
-        <tr>
-            <th>Feature</th>
-            <th class="text-right">Budget (days)</th>
-            <th class="text-right">Budget ($)</th>
-            <th class="text-right">Completion</th>
-            <th class="text-right">Remaining (days)</th>
-            <th class="text-right">Remaining ($)</th>
-            <th>Health</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for f in features %}
-        {% set spend_pct = ((f.total_dollars - f.remaining_dollars) / f.total_dollars * 100) if f.total_dollars > 0 else 0 %}
-        <tr>
-            <td><a href="/features/{{ f.id }}">{{ f.name }}</a></td>
-            <td class="text-right">{{ f.total_days | days }}</td>
-            <td class="text-right">{{ f.total_dollars | currency }}</td>
-            <td class="text-right">{{ f.weighted_completion | pct }}</td>
-            <td class="text-right">{{ f.remaining_days | days }}</td>
-            <td class="text-right">{{ f.remaining_dollars | currency }}</td>
-            <td>
-                {% if f.weighted_completion >= spend_pct %}
-                <span class="health-green">On Track</span>
-                {% elif f.weighted_completion >= spend_pct * 0.8 %}
-                <span class="health-amber">At Risk</span>
-                {% else %}
-                <span class="health-red">Behind</span>
+{% for f in features %}
+{% set h = f.health %}
+<div class="feature-health-card">
+    <div class="feature-health-header">
+        <a href="/features/{{ f.id }}"><strong>{{ f.name }}</strong></a>
+        <span class="health-badge {{ h.badge_class }}">{{ h.label }}</span>
+    </div>
+    {% if h.status != "not_budgeted" %}
+    <div class="feature-health-body">
+        <div class="feature-health-bar">
+            <div class="progress-bar-container progress-bar-with-target" title="{{ f.weighted_completion | pct }} complete, target {{ h.target_pct | pct }}">
+                {# Target marker showing where completion should be #}
+                {% if h.target_pct > 0 and h.target_pct <= 100 %}
+                <div class="progress-target-marker" style="left: {{ h.target_pct }}%"></div>
                 {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-    <tfoot>
-        <tr>
-            <th>Totals</th>
-            <th class="text-right">{{ features | sum(attribute='total_days') | days }}</th>
-            <th class="text-right">{{ features | sum(attribute='total_dollars') | currency }}</th>
-            <th class="text-right">{{ summary.overall_completion | pct }}</th>
-            <th class="text-right">{{ features | sum(attribute='remaining_days') | days }}</th>
-            <th class="text-right">{{ features | sum(attribute='remaining_dollars') | currency }}</th>
-            <th></th>
-        </tr>
-    </tfoot>
-</table>
+                <div class="progress-bar progress-fill-{{ h.status }}"
+                     style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
+            </div>
+            <span class="text-muted">{{ f.weighted_completion | pct }}</span>
+        </div>
+        <div class="feature-health-stats">
+            <span>{{ f.total_days | days }} days / {{ f.total_dollars | currency }}</span>
+            <span class="text-muted">&rarr;</span>
+            <span>{{ f.remaining_days | days }} days / {{ f.remaining_dollars | currency }} remaining</span>
+            {% if h.target_pct > 0 %}
+            <span class="text-muted">&bull; target: {{ h.target_pct | pct }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="feature-health-body">
+        <div class="text-muted">No deliverables budgeted yet &mdash; <a href="/features/{{ f.id }}">add deliverables</a></div>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+<div class="feature-health-card" style="background: var(--pico-muted-border-color); font-weight: bold;">
+    <div class="feature-health-header">
+        <span>Totals</span>
+    </div>
+    <div class="feature-health-stats">
+        <span>{{ features | sum(attribute='total_days') | days }} days / {{ features | sum(attribute='total_dollars') | currency }}</span>
+        <span class="text-muted">&rarr;</span>
+        <span>{{ features | sum(attribute='remaining_days') | days }} days / {{ features | sum(attribute='remaining_dollars') | currency }} remaining</span>
+    </div>
+</div>
 {% else %}
 <p class="text-muted">No features yet. <a href="/features">Add some features</a> to see health metrics.</p>
 {% endif %}

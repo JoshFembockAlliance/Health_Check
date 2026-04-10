@@ -45,6 +45,21 @@
             {% endfor %}
         </select>
     </label>
+    <h4>Health Thresholds</h4>
+    <p class="text-muted">Feature health is determined by comparing each feature's completion % against the project's expected burn %.
+        A feature is "On Track" if its completion is at or above the on-track threshold of expected burn, "At Risk" if between the two thresholds, and "Behind" if below the at-risk threshold.</p>
+    <div class="grid">
+        <label>
+            On Track threshold (%)
+            <input type="number" name="health_on_track_pct" value="{{ project.health_on_track_pct|default(100) }}" step="1" min="0" max="200">
+            <small class="text-muted">Completion >= expected burn x this% = On Track</small>
+        </label>
+        <label>
+            At Risk threshold (%)
+            <input type="number" name="health_at_risk_pct" value="{{ project.health_at_risk_pct|default(80) }}" step="1" min="0" max="200">
+            <small class="text-muted">Completion >= expected burn x this% = At Risk, below = Behind</small>
+        </label>
+    </div>
     <button type="submit">Save Project Settings</button>
 </form>
 
@@ -88,7 +103,7 @@
                 <input type="number" name="day_rate" placeholder="1435" step="0.01" min="0" required>
             </label>
         </div>
-        <button type="submit" class="outline">Add Role</button>
+        <button type="submit" class="btn-add">+ Add Role</button>
     </form>
 </details>
 
@@ -141,7 +156,7 @@
             Description
             <input type="text" name="description" placeholder="e.g., +100k for visualisations">
         </label>
-        <button type="submit" class="outline">Add Adjustment</button>
+        <button type="submit" class="btn-add">+ Add Adjustment</button>
     </form>
 </details>
 {% endblock %}

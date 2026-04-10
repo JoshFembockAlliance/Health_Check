@@ -17,6 +17,8 @@ class Project(BaseModel):
     team_size: int = 1
     actual_spend: float = 0.0
     default_role_id: int = 1
+    health_on_track_pct: float = 100.0   # completion >= expected * this% → On Track
+    health_at_risk_pct: float = 80.0     # completion >= expected * this% → At Risk, below → Behind
 
 
 class BudgetAdjustment(BaseModel):

@@ -28,6 +28,8 @@ def init_db():
             "team_size": int,
             "actual_spend": float,
             "default_role_id": int,
+            "health_on_track_pct": float,
+            "health_at_risk_pct": float,
         }, pk="id")
 
     if "budget_adjustments" not in db.table_names():
@@ -69,6 +71,13 @@ def init_db():
     if db["roles"].count == 0:
         db["roles"].insert({"name": "Default", "day_rate": 1435.00})
 
+    # Add threshold columns to existing databases that don't have them
+    existing_cols = {col.name for col in db["project"].columns}
+    if "health_on_track_pct" not in existing_cols:
+        db["project"].add_column("health_on_track_pct", float, not_null_default=100.0)
+    if "health_at_risk_pct" not in existing_cols:
+        db["project"].add_column("health_at_risk_pct", float, not_null_default=80.0)
+
     if db["project"].count == 0:
         default_role = list(db["roles"].rows)[0]
         db["project"].insert({
@@ -80,4 +89,6 @@ def init_db():
             "team_size": 1,
             "actual_spend": 0.0,
             "default_role_id": default_role["id"],
+            "health_on_track_pct": 100.0,
+            "health_at_risk_pct": 80.0,
         })
