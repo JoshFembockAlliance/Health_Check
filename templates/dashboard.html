@@ -15,31 +15,41 @@
 {% endif %}
 
 {# ── Hero metrics: the 3 numbers a PM looks at first ── #}
-<div class="summary-grid hero-grid">
+<dl class="summary-grid hero-grid">
     <div class="summary-card hero-card">
-        <div class="label">Current Total Budget</div>
-        <div class="value">{{ summary.current_budget | currency }}</div>
+        <dt class="label">Current Total Budget</dt>
+        <dd class="value">{{ summary.current_budget | currency }}</dd>
         {% if summary.total_adjustments != 0 %}
-        <div class="text-muted">{{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.</div>
+        <dd class="text-muted">{{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.</dd>
         {% endif %}
     </div>
     <div class="summary-card hero-card">
-        <div class="label">Overall Completion</div>
-        <div class="value {% if summary.overall_completion >= summary.current_burn_pct %}health-green{% elif summary.overall_completion >= summary.current_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
+        <dt class="label">Overall Completion</dt>
+        <dd class="value {% if summary.overall_completion >= summary.expected_burn_pct %}health-green{% elif summary.overall_completion >= summary.expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
             {{ summary.overall_completion | pct }}
-        </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar progress-fill-green" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
-        </div>
+        </dd>
+        <dd>
+            <div class="progress-bar-container progress-bar-with-target"
+                 role="progressbar"
+                 aria-valuenow="{{ summary.overall_completion | round(1) }}"
+                 aria-valuemin="0" aria-valuemax="100"
+                 aria-label="Overall completion {{ summary.overall_completion | pct }}, target {{ summary.expected_burn_pct | pct }}">
+                {% if summary.expected_burn_pct > 0 and summary.expected_burn_pct <= 100 %}
+                <div class="progress-target-marker" style="left: {{ summary.expected_burn_pct }}%"></div>
+                {% endif %}
+                <div class="progress-bar {% if summary.overall_completion >= summary.expected_burn_pct %}progress-fill-on_track{% elif summary.overall_completion >= summary.expected_burn_pct * 0.8 %}progress-fill-at_risk{% else %}progress-fill-behind{% endif %}" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
+            </div>
+        </dd>
+        <dd class="text-muted">target: {{ summary.expected_burn_pct | pct }}</dd>
     </div>
     <div class="summary-card hero-card">
-        <div class="label">Budget Days Remaining</div>
-        <div class="value {% if summary.budget_days_remaining < 20 %}health-red{% elif summary.budget_days_remaining < 60 %}health-amber{% else %}health-green{% endif %}">
+        <dt class="label">Budget Days Remaining</dt>
+        <dd class="value {% if summary.budget_days_remaining < 20 %}health-red{% elif summary.budget_days_remaining < 60 %}health-amber{% else %}health-green{% endif %}">
             {{ summary.budget_days_remaining | days }}
-        </div>
-        <div class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</div>
+        </dd>
+        <dd class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</dd>
     </div>
-</div>
+</dl>
 
 {# ── Budget & Spend detail ── #}
 <article class="dashboard-section">
@@ -86,7 +96,7 @@
         <summary>Budget Adjustment History</summary>
         <table>
             <thead>
-                <tr><th>Date</th><th>Amount</th><th>Description</th></tr>
+                <tr><th scope="col">Date</th><th scope="col">Amount</th><th scope="col">Description</th></tr>
             </thead>
             <tbody>
                 {% for adj in adjustments %}
@@ -103,56 +113,90 @@
 </article>
 
 {# ── Feature Health ── #}
-<h3>Feature Health</h3>
-{% if features %}
-{% for f in features %}
-{% set h = f.health %}
-<div class="feature-health-card">
-    <div class="feature-health-header">
-        <a href="/features/{{ f.id }}"><strong>{{ f.name }}</strong></a>
-        <span class="health-badge {{ h.badge_class }}">{{ h.label }}</span>
+<article class="dashboard-section">
+    <div class="feature-health-title-row">
+        <h3>Feature Health</h3>
+        {% if summary.started_feature_count > 0 %}
+        <span class="text-muted">
+            Started ({{ summary.started_feature_count }}/{{ summary.total_feature_count }}) weighted completion:
+            <strong class="{% if summary.started_completion >= summary.expected_burn_pct %}health-green{% elif summary.started_completion >= summary.expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
+                {{ summary.started_completion | pct }}
+            </strong>
+            vs {{ summary.expected_burn_pct | pct }} expected
+        </span>
+        {% endif %}
     </div>
-    {% if h.status != "not_budgeted" %}
-    <div class="feature-health-body">
-        <div class="feature-health-bar">
-            <div class="progress-bar-container progress-bar-with-target" title="{{ f.weighted_completion | pct }} complete, target {{ h.target_pct | pct }}">
-                {# Target marker showing where completion should be #}
-                {% if h.target_pct > 0 and h.target_pct <= 100 %}
-                <div class="progress-target-marker" style="left: {{ h.target_pct }}%"></div>
-                {% endif %}
-                <div class="progress-bar progress-fill-{{ h.status }}"
-                     style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
+    {% if features %}
+    {% for f in features %}
+    {% set h = f.health %}
+    <div class="feature-health-card {% if f.started %}feature-started{% else %}feature-not-started{% endif %}">
+        <div class="feature-health-header">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button class="started-toggle {% if f.started %}started-on{% else %}started-off{% endif %}"
+                        onclick="toggleStarted({{ f.id }}, this)"
+                        aria-label="{% if f.started %}Mark {{ f.name }} as not started{% else %}Mark {{ f.name }} as started{% endif %}"
+                        aria-pressed="{{ 'true' if f.started else 'false' }}">
+                </button>
+                <a href="/features/{{ f.id }}"><strong>{{ f.name }}</strong></a>
             </div>
-            <span class="text-muted">{{ f.weighted_completion | pct }}</span>
+            <span class="health-badge {{ h.badge_class }}">{{ h.label }}</span>
         </div>
-        <div class="feature-health-stats">
-            <span>{{ f.total_days | days }} days / {{ f.total_dollars | currency }}</span>
-            <span class="text-muted">&rarr;</span>
-            <span>{{ f.remaining_days | days }} days / {{ f.remaining_dollars | currency }} remaining</span>
-            {% if h.target_pct > 0 %}
-            <span class="text-muted">&bull; target: {{ h.target_pct | pct }}</span>
-            {% endif %}
+        {% if h.status != "not_budgeted" %}
+        <div class="feature-health-body">
+            <div class="feature-health-bar">
+                <div class="progress-bar-container progress-bar-with-target"
+                     role="progressbar"
+                     aria-valuenow="{{ f.weighted_completion | round(1) }}"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-label="{{ f.name }} completion {{ f.weighted_completion | pct }}, target {{ h.target_pct | pct }}">
+                    {% if h.target_pct > 0 and h.target_pct <= 100 %}
+                    <div class="progress-target-marker" style="left: {{ h.target_pct }}%"></div>
+                    {% endif %}
+                    <div class="progress-bar progress-fill-{{ h.status }}"
+                         style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
+                </div>
+                <span class="text-muted">{{ f.weighted_completion | pct }}</span>
+            </div>
+            <div class="feature-health-stats">
+                <span>{{ f.total_days | days }} days / {{ f.total_dollars | currency }}</span>
+                <span class="text-muted">&rarr;</span>
+                <span>{{ f.remaining_days | days }} days / {{ f.remaining_dollars | currency }} remaining</span>
+                {% if h.target_pct > 0 %}
+                <span class="text-muted">&bull; target: {{ h.target_pct | pct }}</span>
+                {% endif %}
+            </div>
         </div>
+        {% else %}
+        <div class="feature-health-body">
+            <div class="text-muted">No deliverables budgeted yet &mdash; <a href="/features/{{ f.id }}">add deliverables</a></div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="feature-health-totals">
+        <span><strong>Totals</strong></span>
+        <span class="text-muted">
+            {{ features | sum(attribute='total_days') | days }} days / {{ features | sum(attribute='total_dollars') | currency }}
+            &rarr;
+            {{ features | sum(attribute='remaining_days') | days }} days / {{ features | sum(attribute='remaining_dollars') | currency }} remaining
+        </span>
     </div>
     {% else %}
-    <div class="feature-health-body">
-        <div class="text-muted">No deliverables budgeted yet &mdash; <a href="/features/{{ f.id }}">add deliverables</a></div>
-    </div>
+    <p class="text-muted">No features yet. <a href="/features">Add some features</a> to see health metrics.</p>
     {% endif %}
-</div>
-{% endfor %}
+</article>
+{% endblock %}
 
-<div class="feature-health-card" style="background: var(--pico-muted-border-color); font-weight: bold;">
-    <div class="feature-health-header">
-        <span>Totals</span>
-    </div>
-    <div class="feature-health-stats">
-        <span>{{ features | sum(attribute='total_days') | days }} days / {{ features | sum(attribute='total_dollars') | currency }}</span>
-        <span class="text-muted">&rarr;</span>
-        <span>{{ features | sum(attribute='remaining_days') | days }} days / {{ features | sum(attribute='remaining_dollars') | currency }} remaining</span>
-    </div>
-</div>
-{% else %}
-<p class="text-muted">No features yet. <a href="/features">Add some features</a> to see health metrics.</p>
-{% endif %}
+{% block scripts %}
+<script>
+function toggleStarted(featureId, btn) {
+    fetch(`/api/features/${featureId}/toggle-started`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    }).then(r => r.json()).then(data => {
+        if (data.ok) location.reload();
+    });
+}
+</script>
 {% endblock %}

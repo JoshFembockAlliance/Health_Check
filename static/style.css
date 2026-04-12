@@ -1,6 +1,40 @@
+/* ── Page background ── */
+html, body {
+    background-color: #dde2e8 !important;
+}
+
+/* ── Widen content area ── */
+main.container {
+    max-width: 98vw !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* ── Navbar ── */
+nav.container-fluid {
+    background: #1a2332;
+    padding: 0.75rem 1.5rem;
+    margin-bottom: 0;
+}
+
+nav.container-fluid li strong {
+    color: #fff;
+}
+
+nav.container-fluid a {
+    color: #b0bec5 !important;
+    text-decoration: none;
+}
+
+nav.container-fluid a:hover {
+    color: #fff !important;
+}
+
 nav a.active {
     font-weight: bold;
+    color: #fff !important;
     text-decoration: underline;
+    text-underline-offset: 4px;
 }
 
 .summary-grid {
@@ -10,12 +44,22 @@ nav a.active {
     margin-bottom: 1.5rem;
 }
 
+dl.summary-grid {
+    margin: 0;
+}
+
 .summary-card {
     background: var(--pico-card-background-color);
     border: 1px solid var(--pico-muted-border-color);
     border-radius: var(--pico-border-radius);
     padding: 1rem;
     text-align: center;
+}
+
+.summary-card dt,
+.summary-card dd {
+    margin: 0;
+    padding: 0;
 }
 
 .summary-card .label {
@@ -30,8 +74,8 @@ nav a.active {
 }
 
 .health-green { color: #2e7d32; }
-.health-amber { color: #f57f17; }
-.health-red { color: #c62828; }
+.health-amber { color: #e65100; }
+.health-red { color: #b71c1c; }
 
 .inline-edit {
     width: 5rem;
@@ -45,21 +89,141 @@ nav a.active {
 .priority-could { background-color: #e3f2fd; }
 
 table th {
-    white-space: nowrap;
+    white-space: normal;
+}
+
+table caption {
+    caption-side: top;
+    text-align: left;
+    padding: 0.25rem 0 0.5rem;
 }
 
 table td {
     vertical-align: middle;
 }
 
-.actions {
+/* Read-only output cells */
+.cell-readonly {
+    color: var(--pico-muted-color);
+    font-size: 0.9rem;
+}
+
+/* Row hover highlight */
+tbody tr:hover {
+    background-color: #f0f4f8;
+}
+
+/* Compact table row padding */
+table input,
+table select {
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+    font-size: 0.82rem;
+}
+
+table td, table th {
+    padding-top: 0.3rem !important;
+    padding-bottom: 0.3rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    font-size: 0.85rem;
+}
+
+table th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--pico-muted-color);
+}
+
+/* Priority badge pills (used in features list page) */
+.priority-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.priority-badge-must   { background: #c8e6c9; color: #1b5e20; }
+.priority-badge-should { background: #fff9c4; color: #e65100; }
+.priority-badge-could  { background: #bbdefb; color: #0d47a1; }
+
+/* Priority select — colour-coded to replace badge+dropdown combo */
+.priority-select {
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    padding: 0.2rem 0.4rem !important;
+    border-radius: 6px !important;
+    border: 1px solid transparent !important;
+    cursor: pointer;
+    width: 100% !important;
+    min-width: 3.5rem;
+}
+.priority-select-must   { background-color: #c8e6c9 !important; color: #1b5e20 !important; border-color: #a5d6a7 !important; }
+.priority-select-should { background-color: #fff9c4 !important; color: #c05000 !important; border-color: #fff176 !important; }
+.priority-select-could  { background-color: #bbdefb !important; color: #0d47a1 !important; border-color: #90caf9 !important; }
+
+/* Mini progress bar in % Done cell */
+.percent-cell {
     display: flex;
-    gap: 0.5rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.percent-mini-bar {
+    width: 100%;
+    height: 3px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.percent-mini-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--pico-primary);
+    transition: width 0.3s;
+}
+.percent-mini-fill.fill-done { background: #2e7d32; }
+
+/* Subtotal row */
+tfoot tr th {
+    border-top: 2px solid var(--pico-muted-border-color);
+    background: #f0f4f8;
+    font-weight: 700;
 }
 
 .btn-small {
-    padding: 0.25rem 0.75rem;
-    font-size: 0.8rem;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.btn-icon {
+    padding: 0;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 0 !important;
+    max-width: 24px !important;
+    flex-shrink: 0;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button.btn-icon.outline:not(.secondary) {
+    color: #2e7d32 !important;
+    border-color: #a5d6a7 !important;
+}
+
+button.btn-icon.outline.secondary {
+    color: #b71c1c !important;
+    border-color: #ef9a9a !important;
 }
 
 /* Inline rename forms: input + button on one line, input takes available space */
@@ -69,7 +233,7 @@ table td {
     flex-wrap: nowrap !important;
     gap: 0.5rem;
     align-items: center;
-    margin: 0;
+    margin-bottom: 0 !important;
 }
 
 .inline-rename input[type="text"] {
@@ -84,22 +248,45 @@ table td {
     white-space: nowrap;
     flex: 0 0 auto;
     width: auto !important;
+    background: var(--pico-primary) !important;
+    color: var(--pico-primary-inverse) !important;
+    border-color: var(--pico-primary) !important;
 }
 
-/* Table inputs and selects: remove Pico's bottom margin, ensure readable sizes */
+/* Table inputs, selects and buttons: remove Pico's bottom margin */
 table input,
-table select {
+table select,
+table button {
     margin: 0 !important;
 }
 
+/* Actions cell: keep display:table-cell so row height stays in sync */
+.actions {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.actions button {
+    margin-right: 0.35rem;
+}
+
+.actions button:last-child {
+    margin-right: 0;
+}
+
+/* Ensure form inside tr doesn't create visual gaps or break row borders */
+tr > form {
+    display: contents;
+}
+
 table input[type="number"] {
-    width: 5.5rem;
+    width: 4rem;
     text-align: right;
 }
 
 /* Deliverable table: force the table wider so columns don't crush */
 .table-scroll table {
-    min-width: 1100px;
+    min-width: 700px;
 }
 
 .table-scroll table input[type="text"] {
@@ -113,11 +300,11 @@ table input[type="number"] {
 }
 
 /* Column width hints via col classes */
-.col-name { width: 22%; }
-.col-priority { width: 12%; }
-.col-role { width: 12%; }
-.col-num { width: 9%; }
-.col-actions { width: 10%; }
+.col-name { width: 35%; }
+.col-priority { width: 10%; }
+.col-role { width: 10%; }
+.col-num { width: 6%; }
+.col-actions { width: 56px !important; max-width: 56px !important; }
 
 /* Allow deliverable tables to scroll horizontally rather than crush columns */
 .table-scroll {
@@ -146,14 +333,42 @@ table input[type="number"] {
     border-color: var(--pico-primary-hover);
 }
 
-.requirement-header {
+/* ── Requirement sections on feature detail page ── */
+.requirement-section {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 1rem 1.25rem !important;
+    margin-bottom: 1rem;
     background: var(--pico-card-background-color);
-    cursor: pointer;
-    user-select: none;
 }
 
-.requirement-header:hover {
-    background: var(--pico-secondary-hover-background);
+.requirement-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+    border-bottom: 2px solid var(--pico-primary);
+    padding-bottom: 0.5rem;
+}
+
+.requirement-section-header h3,
+.requirement-section-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.add-deliverable-section {
+    border-top: 1px dashed var(--pico-muted-border-color);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.add-requirement-section {
+    border: 2px dashed var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 1rem 1.25rem;
+    margin-top: 1rem;
+    background: #fff;
 }
 
 details summary {
@@ -161,6 +376,22 @@ details summary {
     font-weight: bold;
     padding: 0.5rem 0;
 }
+
+/* Requirement collapse arrow */
+.collapse-arrow {
+    font-size: 0.7rem;
+    color: var(--pico-muted-color);
+    transition: transform 0.15s;
+    display: inline-block;
+}
+
+details:not([open]) .collapse-arrow {
+    transform: rotate(-90deg);
+}
+
+/* Remove default marker on requirement summary */
+.requirement-section-header::-webkit-details-marker { display: none; }
+.requirement-section-header::marker { display: none; }
 
 .text-right {
     text-align: right;
@@ -173,6 +404,43 @@ details summary {
 
 .mb-1 { margin-bottom: 1rem; }
 .mt-1 { margin-top: 1rem; }
+
+/* ── Inline double-click editing ── */
+.inline-editable {
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0.1em 0.25em;
+    transition: background 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+}
+
+.inline-editable:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.edit-pencil {
+    font-size: 0.7em;
+    color: var(--pico-muted-color);
+    transition: opacity 0.15s;
+    user-select: none;
+}
+
+.inline-edit-input {
+    font-size: inherit;
+    font-weight: inherit;
+    font-family: inherit;
+    color: inherit;
+    background: #fff;
+    border: 2px solid var(--pico-primary);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    margin: 0;
+    min-width: 200px;
+    max-width: 100%;
+    width: auto;
+}
 
 .delta-positive { color: #c62828; }
 .delta-negative { color: #2e7d32; }
@@ -243,7 +511,7 @@ details summary {
 }
 
 .progress-fill-green, .progress-fill-on_track { background: #2e7d32; }
-.progress-fill-amber, .progress-fill-at_risk { background: #f57f17; }
+.progress-fill-amber, .progress-fill-at_risk { background: #e65100; }
 .progress-fill-red, .progress-fill-behind { background: #c62828; }
 
 /* Target marker on progress bar — shows where completion "should" be */
@@ -278,7 +546,18 @@ details summary {
     border: 1px solid var(--pico-muted-border-color);
     border-radius: var(--pico-border-radius);
     padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
+    background: #f8f9fa;
+}
+
+.feature-health-totals {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    margin-top: 0.5rem;
+    border-top: 2px solid var(--pico-muted-border-color);
+    font-size: 0.9rem;
 }
 
 .feature-health-header {
@@ -325,6 +604,229 @@ details summary {
 }
 
 .badge-green { background: #e8f5e9; color: #2e7d32; }
-.badge-amber { background: #fff8e1; color: #f57f17; }
+.badge-amber { background: #fff8e1; color: #e65100; }
 .badge-red { background: #fce4ec; color: #c62828; }
 .badge-grey { background: #f5f5f5; color: #757575; }
+
+/* ── Feature started/not-started toggle ── */
+.started-toggle {
+    width: 2.2rem;
+    height: 1.3rem;
+    padding: 0;
+    margin: 0 !important;
+    border: 2px solid #bdbdbd;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0;
+    flex-shrink: 0;
+    background: #e0e0e0;
+    position: relative;
+    transition: background 0.2s, border-color 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.started-toggle::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+}
+
+.started-toggle.started-on {
+    background: #2e7d32;
+    border-color: #2e7d32;
+}
+
+.started-toggle.started-on::after {
+    transform: translateX(0.8rem);
+}
+
+.feature-not-started {
+    opacity: 0.55;
+}
+
+.feature-not-started:hover {
+    opacity: 1;
+}
+
+/* ── Skip-to-content link ── */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    padding: 0.75rem 1.5rem;
+    background: var(--pico-primary);
+    color: var(--pico-primary-inverse);
+    z-index: 1000;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* ── Focus-visible for custom interactive elements ── */
+.btn-add:focus-visible,
+.started-toggle:focus-visible,
+.inline-editable:focus-visible,
+.btn-small:focus-visible {
+    outline: 2px solid var(--pico-primary);
+    outline-offset: 2px;
+}
+
+nav.container-fluid a:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+/* ── Inline-edit: always show pencil affordance ── */
+.edit-pencil {
+    opacity: 0.35;
+}
+
+.inline-editable:hover .edit-pencil,
+.inline-editable:focus .edit-pencil {
+    opacity: 1;
+}
+
+/* ── Responsive: mobile breakpoints ── */
+@media (max-width: 768px) {
+    .hero-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .risk-summary-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .feature-health-stats {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .risk-summary-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ── Utility classes for inline-style replacements ── */
+.risk-description {
+    margin: 0.25rem 0 0.5rem;
+    color: var(--pico-muted-color);
+    font-size: 0.9rem;
+}
+
+.risk-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.risk-linked-features {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.linked-feature-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: var(--pico-muted-border-color);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem 0.1rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+.unlink-btn {
+    background: none;
+    border: none;
+    padding: 0 0 0 0.15rem;
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--pico-muted-color);
+    line-height: 1;
+}
+
+.edit-link-summary {
+    font-size: 0.85rem;
+    color: var(--pico-muted-color);
+    font-weight: normal;
+}
+
+.feature-health-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+}
+
+.feature-health-title-row h3 {
+    margin: 0;
+}
+
+.req-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0.5rem 0;
+}
+
+/* ── Fieldset styling ── */
+fieldset {
+    border: none;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+
+fieldset legend {
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    padding: 0;
+}
+
+/* ── Confirm dialog ── */
+dialog.confirm-dialog {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 1.5rem;
+    max-width: 400px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    display: none;
+    flex-direction: column;
+}
+
+dialog.confirm-dialog[open] {
+    display: flex;
+}
+
+dialog.confirm-dialog::backdrop {
+    background: rgba(0,0,0,0.4);
+}
+
+dialog.confirm-dialog p {
+    margin-bottom: 1rem;
+}
+
+dialog.confirm-dialog .dialog-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}

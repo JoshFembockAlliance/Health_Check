@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Risks - Project Health Check{% endblock %}
+
+{% block content %}
+<h2>Risks</h2>
+
+{# ── Summary cards ── #}
+<dl class="summary-grid risk-summary-grid" style="grid-template-columns: repeat(5, 1fr);">
+    <div class="summary-card">
+        <dt class="label">To Do</dt>
+        <dd class="value health-red">{{ summary.todo }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">Doing</dt>
+        <dd class="value health-amber">{{ summary.doing }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">Done</dt>
+        <dd class="value health-green">{{ summary.done }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">Open Impact (days)</dt>
+        <dd class="value">{{ summary.total_impact_days | days }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">Open Impact ($)</dt>
+        <dd class="value">{{ summary.total_impact_dollars | currency }}</dd>
+    </div>
+</dl>
+
+{# ── Risk list ── #}
+{% if risks %}
+{% for risk in risks %}
+<article class="requirement-section">
+    <div class="requirement-section-header">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+            <span class="health-badge {% if risk.status == 'done' %}badge-green{% elif risk.status == 'doing' %}badge-amber{% else %}badge-red{% endif %}">
+                {% if risk.status == 'done' %}&#10003; {% elif risk.status == 'doing' %}&#9888; {% else %}&#9675; {% endif %}{{ risk.status | upper }}
+            </span>
+            <h3 style="margin:0;">{{ risk.name }}</h3>
+        </div>
+        <div class="risk-header-meta">
+            {% if risk.due_date %}
+            <span class="text-muted">Due: {{ risk.due_date }}</span>
+            {% endif %}
+            {% if risk.impact_days > 0 %}
+            <span class="text-muted">Impact: {{ risk.impact_days | days }} days ({{ risk.impact_dollars | currency }})</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Description line #}
+    {% if risk.description %}
+    <p class="risk-description">{{ risk.description }}</p>
+    {% endif %}
+
+    {# Linked features #}
+    {% if risk.linked_features %}
+    <div class="risk-linked-features">
+        <span class="text-muted">Linked:</span>
+        {% for f in risk.linked_features %}
+        <span class="linked-feature-badge">
+            <a href="/features/{{ f.id }}">{{ f.name }}</a>
+            <form method="post" action="/risks/{{ risk.id }}/unlink-feature/{{ f.id }}" style="margin:0; display:inline;">
+                <button type="submit" class="unlink-btn" aria-label="Unlink {{ f.name }} from {{ risk.name }}">&times;</button>
+            </form>
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Edit + Link panel #}
+    <details>
+        <summary class="edit-link-summary">Edit / Link Features</summary>
+        <div class="grid" style="margin-top:0.75rem;">
+            <div>
+                <form method="post" action="/risks/{{ risk.id }}/update">
+                    <div class="grid">
+                        <label>
+                            Name
+                            <input type="text" name="name" value="{{ risk.name }}" required>
+                        </label>
+                    </div>
+                    <label>
+                        Description <span class="text-muted">(optional)</span>
+                        <input type="text" name="description" value="{{ risk.description }}">
+                    </label>
+                    <div class="grid">
+                        <label>
+                            Status
+                            <select name="status">
+                                <option value="todo" {% if risk.status == 'todo' %}selected{% endif %}>To Do</option>
+                                <option value="doing" {% if risk.status == 'doing' %}selected{% endif %}>Doing</option>
+                                <option value="done" {% if risk.status == 'done' %}selected{% endif %}>Done</option>
+                            </select>
+                        </label>
+                        <label>
+                            Due Date
+                            <input type="date" name="due_date" value="{{ risk.due_date }}">
+                        </label>
+                        <label>
+                            Impact (days)
+                            <input type="number" name="impact_days" value="{{ risk.impact_days }}" step="0.5" min="0">
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <button type="submit" class="btn-small outline">Save</button>
+                        <button type="submit" formaction="/risks/{{ risk.id }}/delete" class="btn-small outline secondary"
+                                aria-label="Delete risk {{ risk.name }}"
+                                onclick="event.preventDefault(); showConfirm('Delete risk &quot;{{ risk.name }}&quot;?', this.closest('form'), '/risks/{{ risk.id }}/delete')">Delete Risk</button>
+                    </div>
+                </form>
+            </div>
+            <div>
+                {% if all_features %}
+                <form method="post" action="/risks/{{ risk.id }}/link-feature">
+                    <label>
+                        Link a Feature
+                        <select name="feature_id">
+                            {% for f in all_features %}
+                            <option value="{{ f.id }}">{{ f.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button type="submit" class="btn-small outline">+ Link Feature</button>
+                </form>
+                {% else %}
+                <p class="text-muted">No features to link. <a href="/features">Create features first.</a></p>
+                {% endif %}
+            </div>
+        </div>
+    </details>
+</article>
+{% endfor %}
+{% else %}
+<p class="text-muted">No risks tracked yet. Add one below.</p>
+{% endif %}
+
+{# ── Add risk ── #}
+<div class="add-requirement-section">
+    <h3>Add Risk</h3>
+    <form method="post" action="/risks/add">
+        <label>
+            Name <span class="text-muted">(short, at-a-glance)</span>
+            <input type="text" name="name" placeholder="e.g., Third-party API dependency" required>
+        </label>
+        <label>
+            Description <span class="text-muted">(optional detail)</span>
+            <input type="text" name="description" placeholder="e.g., Provider hasn't confirmed SLA timeline — impact depends on whether we can find an alternative">
+        </label>
+        <div class="grid">
+            <label>
+                Status
+                <select name="status">
+                    <option value="todo" selected>To Do</option>
+                    <option value="doing">Doing</option>
+                    <option value="done">Done</option>
+                </select>
+            </label>
+            <label>
+                Due Date
+                <input type="date" name="due_date">
+            </label>
+            <label>
+                Impact (days)
+                <input type="number" name="impact_days" value="0" step="0.5" min="0">
+            </label>
+        </div>
+        <button type="submit" class="btn-add">+ Add Risk</button>
+    </form>
+</div>
+
+{% endblock %}

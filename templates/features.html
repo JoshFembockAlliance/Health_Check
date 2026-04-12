@@ -3,18 +3,20 @@
 
 {% block content %}
 <h2>Features</h2>
+<p class="text-muted">Project budget: {{ project.initial_budget | currency }} &bull; Allocated below: {{ features | sum(attribute='total_dollars') | currency }} &bull; Unallocated: {{ (project.initial_budget - features | sum(attribute='total_dollars')) | currency }}</p>
 
 {% if features %}
 <table>
+    <caption class="text-muted">Feature allocation and completion summary</caption>
     <thead>
         <tr>
-            <th>Feature</th>
-            <th class="text-right">Budget (days)</th>
-            <th class="text-right">Budget ($)</th>
-            <th class="text-right">Completion</th>
-            <th class="text-right">Remaining (days)</th>
-            <th class="text-right">Remaining ($)</th>
-            <th>Actions</th>
+            <th scope="col">Feature</th>
+            <th scope="col" class="text-right">Allocated (days)</th>
+            <th scope="col" class="text-right">Allocated ($)</th>
+            <th scope="col" class="text-right">Completion</th>
+            <th scope="col" class="text-right">Remaining (days)</th>
+            <th scope="col" class="text-right">Remaining ($)</th>
+            <th scope="col">Actions</th>
         </tr>
     </thead>
     <tbody>
@@ -27,9 +29,10 @@
             <td class="text-right">{{ f.remaining_days | days }}</td>
             <td class="text-right">{{ f.remaining_dollars | currency }}</td>
             <td>
-                <form method="post" action="/features/{{ f.id }}/delete" style="margin:0"
-                      onsubmit="return confirm('Delete feature &quot;{{ f.name }}&quot; and all its requirements/deliverables?')">
-                    <button type="submit" class="btn-small outline secondary">Delete</button>
+                <form method="post" action="/features/{{ f.id }}/delete" style="margin:0">
+                    <button type="submit" class="btn-small outline secondary"
+                            aria-label="Delete feature {{ f.name }}"
+                            onclick="event.preventDefault(); showConfirm('Delete feature &quot;{{ f.name }}&quot; and all its requirements/deliverables?', this.closest('form'))">Delete</button>
                 </form>
             </td>
         </tr>
@@ -37,7 +40,7 @@
     </tbody>
     <tfoot>
         <tr>
-            <th>Totals</th>
+            <th>Total Allocated</th>
             <th class="text-right">{{ features | sum(attribute='total_days') | days }}</th>
             <th class="text-right">{{ features | sum(attribute='total_dollars') | currency }}</th>
             <th></th>

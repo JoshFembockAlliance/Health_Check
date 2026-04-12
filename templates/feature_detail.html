@@ -9,53 +9,56 @@
     </ul>
 </nav>
 
-<h2>{{ feature.name }}</h2>
-<form method="post" action="/features/{{ feature.id }}/update" class="inline-rename mb-1">
-    <input type="text" name="name" value="{{ feature.name }}">
-    <button type="submit" class="outline btn-small">Rename</button>
-</form>
+<h2 class="inline-editable" data-action="/features/{{ feature.id }}/update" title="Double-click to rename" tabindex="0" role="button">
+    {{ feature.name }} <span class="edit-pencil" aria-hidden="true">✎</span>
+</h2>
 
-<div class="summary-grid">
+<dl class="summary-grid">
     <div class="summary-card">
-        <div class="label">Total Budget (days)</div>
-        <div class="value">{{ feature.total_days | days }}</div>
+        <dt class="label">Allocated Budget (days)</dt>
+        <dd class="value">{{ feature.total_days | days }}</dd>
     </div>
     <div class="summary-card">
-        <div class="label">Total Budget ($)</div>
-        <div class="value">{{ feature.total_dollars | currency }}</div>
+        <dt class="label">Allocated Budget ($)</dt>
+        <dd class="value">{{ feature.total_dollars | currency }}</dd>
     </div>
     <div class="summary-card">
-        <div class="label">Completion</div>
-        <div class="value">{{ feature.weighted_completion | pct }}</div>
+        <dt class="label">Completion</dt>
+        <dd class="value">{{ feature.weighted_completion | pct }}</dd>
     </div>
     <div class="summary-card">
-        <div class="label">Remaining (days)</div>
-        <div class="value">{{ feature.remaining_days | days }}</div>
+        <dt class="label">Remaining (days)</dt>
+        <dd class="value">{{ feature.remaining_days | days }}</dd>
     </div>
     <div class="summary-card">
-        <div class="label">Remaining ($)</div>
-        <div class="value">{{ feature.remaining_dollars | currency }}</div>
+        <dt class="label">Remaining ($)</dt>
+        <dd class="value">{{ feature.remaining_dollars | currency }}</dd>
     </div>
-</div>
+</dl>
 
 {% for req in feature.requirements %}
-<details open>
-    <summary>
-        {{ req.name }}
-        <span class="text-muted">
-            &mdash; {{ req.total_days | days }} days / {{ req.total_dollars | currency }}
-            / {{ req.weighted_completion | pct }} complete
-        </span>
+<article class="requirement-section">
+    <details class="req-details" data-req-id="{{ req.id }}" open>
+    <summary class="requirement-section-header" style="list-style:none; cursor:pointer;">
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <span class="collapse-arrow">&#9660;</span>
+                <h3 class="inline-editable" data-action="/requirements/{{ req.id }}/update" style="margin:0;" title="Double-click to rename" tabindex="0" role="button">
+                    {{ req.name }} <span class="edit-pencil" aria-hidden="true">✎</span>
+                </h3>
+            </div>
+            <span class="text-muted">
+                {{ req.total_days | days }} days / {{ req.total_dollars | currency }}
+                &bull; {{ req.weighted_completion | pct }} complete
+            </span>
+        </div>
     </summary>
 
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;">
-        <form method="post" action="/requirements/{{ req.id }}/update" class="inline-rename" style="flex:1;">
-            <input type="text" name="name" value="{{ req.name }}">
-            <button type="submit" class="outline btn-small">Rename</button>
-        </form>
-        <form method="post" action="/requirements/{{ req.id }}/delete" style="margin:0"
-              onsubmit="return confirm('Delete requirement &quot;{{ req.name }}&quot; and all its deliverables?')">
-            <button type="submit" class="btn-small outline secondary">Delete Req</button>
+    <div class="req-header-actions">
+        <form method="post" action="/requirements/{{ req.id }}/delete" style="margin:0;">
+            <button type="submit" class="btn-small outline secondary"
+                    aria-label="Delete requirement {{ req.name }}"
+                    onclick="event.preventDefault(); showConfirm('Delete requirement &quot;{{ req.name }}&quot; and all its deliverables?', this.closest('form'))">Delete Req</button>
         </form>
     </div>
 
@@ -74,48 +77,57 @@
         </colgroup>
         <thead>
             <tr>
-                <th>Deliverable</th>
-                <th>Priority</th>
-                <th>Role</th>
-                <th class="text-right">Budget (days)</th>
-                <th class="text-right">% Complete</th>
-                <th class="text-right">Remaining (days)</th>
-                <th class="text-right">Remaining ($)</th>
-                <th>Actions</th>
+                <th scope="col">Deliverable</th>
+                <th scope="col">Priority</th>
+                <th scope="col">Role</th>
+                <th scope="col" class="text-right">Budget (days)</th>
+                <th scope="col" class="text-right">% Done</th>
+                <th scope="col" class="text-right">Remaining days</th>
+                <th scope="col" class="text-right">Remaining $</th>
+                <th scope="col">Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for d in req.deliverables %}
-            <tr class="priority-{{ d.priority | lower | replace(' ', '-') }}">
+            <tr>
                 <form method="post" action="/deliverables/{{ d.id }}/update">
-                    <td><input type="text" name="name" value="{{ d.name }}"></td>
+                    <td><input type="text" name="name" value="{{ d.name }}" aria-label="Deliverable name"></td>
                     <td>
-                        <select name="priority">
-                            {% for p in ["Must Have", "Should Have", "Could Have"] %}
-                            <option {% if d.priority == p %}selected{% endif %}>{{ p }}</option>
-                            {% endfor %}
+                        <select name="priority" aria-label="Priority for {{ d.name }}"
+                                class="priority-select {% if d.priority == 'Must Have' %}priority-select-must{% elif d.priority == 'Should Have' %}priority-select-should{% else %}priority-select-could{% endif %}">
+                            <option value="Must Have" {% if d.priority == "Must Have" %}selected{% endif %}>Must</option>
+                            <option value="Should Have" {% if d.priority == "Should Have" %}selected{% endif %}>Should</option>
+                            <option value="Could Have" {% if d.priority == "Could Have" %}selected{% endif %}>Could</option>
                         </select>
                     </td>
                     <td>
-                        <select name="role_id">
-                            <option value="">Default</option>
+                        <select name="role_id" aria-label="Role for {{ d.name }}">
+                            <option value="">Dflt</option>
                             {% for r in roles %}
-                            <option value="{{ r.id }}" {% if d.role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                            <option value="{{ r.id }}" {% if d.role_id == r.id %}selected{% endif %}>{{ r.name[:6] }}</option>
                             {% endfor %}
                         </select>
                     </td>
-                    <td class="text-right"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0"></td>
+                    <td class="text-right"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0" aria-label="Budget days for {{ d.name }}"></td>
                     <td class="text-right">
-                        <input type="number" name="percent_complete" value="{{ d.percent_complete }}"
-                               min="0" max="100"
-                               class="inline-percent" data-id="{{ d.id }}">
+                        <div class="percent-cell">
+                            <input type="number" name="percent_complete" value="{{ d.percent_complete }}"
+                                   min="0" max="100"
+                                   class="inline-percent" data-id="{{ d.id }}"
+                                   aria-label="Percent complete for {{ d.name }}">
+                            <div class="percent-mini-bar">
+                                <div class="percent-mini-fill {% if d.percent_complete == 100 %}fill-done{% endif %}"
+                                     style="width: {{ d.percent_complete }}%"></div>
+                            </div>
+                        </div>
                     </td>
-                    <td class="text-right">{{ d.remaining_days | days }}</td>
-                    <td class="text-right">{{ d.remaining_dollars | currency }}</td>
+                    <td class="text-right cell-readonly">{{ d.remaining_days | days }}</td>
+                    <td class="text-right cell-readonly">{{ d.remaining_dollars | currency }}</td>
                     <td class="actions">
-                        <button type="submit" class="btn-small outline">Save</button>
-                        <button type="submit" formaction="/deliverables/{{ d.id }}/delete" class="btn-small outline secondary"
-                                onclick="return confirm('Delete this deliverable?')">Del</button>
+                        <button type="submit" class="btn-icon outline" aria-label="Save deliverable {{ d.name }}" title="Save">&#10003;</button>
+                        <button type="submit" formaction="/deliverables/{{ d.id }}/delete" class="btn-icon outline secondary"
+                                aria-label="Delete deliverable {{ d.name }}" title="Delete"
+                                onclick="event.preventDefault(); showConfirm('Delete deliverable &quot;{{ d.name }}&quot;?', this.closest('form'), '/deliverables/{{ d.id }}/delete')">&#10007;</button>
                     </td>
                 </form>
             </tr>
@@ -134,15 +146,14 @@
     </table>
     </div>
     {% else %}
-    <p class="text-muted">No deliverables yet.</p>
+    <p class="text-muted">No deliverables yet. Add one below.</p>
     {% endif %}
 
-    <details>
-        <summary>Add Deliverable</summary>
+    <div class="add-deliverable-section">
         <form method="post" action="/requirements/{{ req.id }}/deliverables/add">
             <div class="grid">
                 <label>
-                    Name
+                    Deliverable Name
                     <input type="text" name="name" required>
                 </label>
                 <label>
@@ -154,9 +165,9 @@
                 <label>
                     Priority
                     <select name="priority">
-                        <option>Must Have</option>
-                        <option>Should Have</option>
-                        <option>Could Have</option>
+                        <option value="Must Have">Must Have</option>
+                        <option value="Should Have">Should Have</option>
+                        <option value="Could Have">Could Have</option>
                     </select>
                 </label>
                 <label>
@@ -171,13 +182,12 @@
             </div>
             <button type="submit" class="btn-add">+ Add Deliverable</button>
         </form>
+    </div>
     </details>
-</details>
-<hr>
+</article>
 {% endfor %}
 
-<details open>
-    <summary>Add Requirement</summary>
+<div class="add-requirement-section">
     <form method="post" action="/features/{{ feature.id }}/requirements/add">
         <div class="grid">
             <label>
@@ -187,14 +197,52 @@
         </div>
         <button type="submit" class="btn-add">+ Add Requirement</button>
     </form>
-</details>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// ── Persist requirement collapse state ──
+const STORAGE_KEY = 'req-open-{{ feature.id }}';
+
+function loadReqStates() {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    document.querySelectorAll('.req-details').forEach(el => {
+        const id = el.dataset.reqId;
+        if (id in saved) {
+            // Only change from default (open) if explicitly saved as closed
+            if (!saved[id]) el.removeAttribute('open');
+            else el.setAttribute('open', '');
+        }
+    });
+}
+
+function saveReqStates() {
+    const state = {};
+    document.querySelectorAll('.req-details').forEach(el => {
+        state[el.dataset.reqId] = el.hasAttribute('open');
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+loadReqStates();
+document.querySelectorAll('.req-details').forEach(el => {
+    el.addEventListener('toggle', saveReqStates);
+});
+
+// ── Priority select colour update ──
+const PRIORITY_CLASSES = { 'Must Have': 'priority-select-must', 'Should Have': 'priority-select-should', 'Could Have': 'priority-select-could' };
+document.querySelectorAll('.priority-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+        sel.classList.remove('priority-select-must', 'priority-select-should', 'priority-select-could');
+        sel.classList.add(PRIORITY_CLASSES[sel.value] || '');
+    });
+});
+
+// ── Inline % complete ──
 document.querySelectorAll('.inline-percent').forEach(input => {
-    let original = input.value;
     input.addEventListener('change', () => {
+        saveReqStates(); // preserve state before reload
         const id = input.dataset.id;
         const val = Math.max(0, Math.min(100, parseInt(input.value) || 0));
         input.value = val;

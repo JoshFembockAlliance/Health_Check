@@ -3,24 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Track project health, budget, features, risks and deliverables at a glance.">
     <title>{% block title %}Project Health Check{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <nav class="container-fluid">
+    <a href="#main" class="skip-link">Skip to main content</a>
+    <nav class="container-fluid" aria-label="Main navigation">
         <ul>
             <li><strong>Project Health Check</strong></li>
         </ul>
         <ul>
-            <li><a href="/" {% if active == "dashboard" %}class="active"{% endif %}>Dashboard</a></li>
-            <li><a href="/features" {% if active == "features" %}class="active"{% endif %}>Features</a></li>
-            <li><a href="/settings" {% if active == "settings" %}class="active"{% endif %}>Settings</a></li>
+            <li><a href="/" {% if active == "dashboard" %}class="active" aria-current="page"{% endif %}>Dashboard</a></li>
+            <li><a href="/features" {% if active == "features" %}class="active" aria-current="page"{% endif %}>Features</a></li>
+            <li><a href="/risks" {% if active == "risks" %}class="active" aria-current="page"{% endif %}>Risks</a></li>
+            <li><a href="/settings" {% if active == "settings" %}class="active" aria-current="page"{% endif %}>Settings</a></li>
         </ul>
     </nav>
-    <main class="container">
+    <main id="main" class="container">
         {% block content %}{% endblock %}
     </main>
+    <dialog id="confirm-dialog" class="confirm-dialog">
+        <p id="confirm-message"></p>
+        <div class="dialog-actions">
+            <button type="button" id="confirm-cancel" class="btn-small outline secondary">Cancel</button>
+            <button type="button" id="confirm-ok" class="btn-small outline">Confirm</button>
+        </div>
+    </dialog>
+    <script>
+    function showConfirm(message, form, actionOverride) {
+        const dialog = document.getElementById('confirm-dialog');
+        document.getElementById('confirm-message').textContent = message;
+        const okBtn = document.getElementById('confirm-ok');
+        const cancelBtn = document.getElementById('confirm-cancel');
+        const newOk = okBtn.cloneNode(true);
+        okBtn.parentNode.replaceChild(newOk, okBtn);
+        newOk.id = 'confirm-ok';
+        newOk.addEventListener('click', function() {
+            if (actionOverride) form.action = actionOverride;
+            form.submit();
+            dialog.close();
+        });
+        cancelBtn.onclick = function() { dialog.close(); };
+        dialog.showModal();
+    }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
