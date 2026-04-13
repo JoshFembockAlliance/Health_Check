@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Literal
 
@@ -172,6 +173,107 @@ def effective_impact_days(
     if resolution_type == "mitigated":
         return impact_days * (mitigation_percentage / 100.0)
     return impact_days  # "realised" or NULL — conservative
+
+
+def get_week_monday(d: date) -> date:
+    """Return the Monday of the week containing d."""
+    return d - timedelta(days=d.weekday())
+
+
+def capacity_days_remaining(
+    remaining_budget: float,
+    as_of_date: date,
+    capacity_periods: list[dict],
+    default_daily_burn: float,
+) -> float:
+    """Walk forward day-by-day from as_of_date, spending at each day's
+    capacity-planned rate until the remaining budget is exhausted.
+
+    capacity_periods: list of dicts with keys week_monday (date), day_rate (float),
+                      team_size (int). Multiple entries per week (one per role).
+    Returns the number of business days the budget covers.
+    """
+    # Build a lookup: week_monday → total daily burn for that week
+    week_burns: dict[date, float] = {}
+    for cp in capacity_periods:
+        monday = cp["week_monday"]
+        week_burns[monday] = week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
+
+    days = 0.0
+    budget_left = remaining_budget
+    current = as_of_date
+    safety_limit = 3650  # max 10 years forward
+
+    for _ in range(safety_limit):
+        if budget_left <= 0:
+            break
+        if current.weekday() < 5:  # business day
+            monday = get_week_monday(current)
+            daily_burn = week_burns.get(monday, default_daily_burn)
+            if daily_burn <= 0:
+                daily_burn = default_daily_burn
+            if budget_left >= daily_burn:
+                budget_left -= daily_burn
+                days += 1.0
+            else:
+                days += budget_left / daily_burn
+                budget_left = 0.0
+        current += timedelta(days=1)
+
+    return days
+
+
+def capacity_plan_summary(
+    as_of_date: date,
+    end_date: date | None,
+    capacity_periods: list[dict],
+    default_team_size: int,
+    default_daily_burn: float,
+) -> dict:
+    """Summarise capacity from as_of_date to end_date (or 52 weeks if no end_date).
+
+    Returns:
+      total_person_days: total person-days of capacity remaining
+      two_week_by_role: {role_label: person_days} for the 2-week window starting as_of_date
+      has_periods: whether any capacity periods exist
+    """
+    if end_date is None or end_date <= as_of_date:
+        end_date = as_of_date + timedelta(weeks=52)
+
+    two_week_end = as_of_date + timedelta(days=14)
+
+    # Build week→role→team_size lookup from enriched capacity periods
+    week_role: dict[date, dict[str, int]] = defaultdict(dict)
+    for cp in capacity_periods:
+        monday = cp["week_monday"]
+        label = cp.get("role_name") or "Default"
+        week_role[monday][label] = week_role[monday].get(label, 0) + cp["team_size"]
+
+    total_person_days = 0.0
+    two_week_by_role: dict[str, float] = {}
+
+    # Walk business days from as_of_date to end_date
+    current = as_of_date
+    while current < end_date:
+        if current.weekday() < 5:
+            monday = get_week_monday(current)
+            if monday in week_role:
+                for role_label, size in week_role[monday].items():
+                    total_person_days += size
+                    if current < two_week_end:
+                        two_week_by_role[role_label] = two_week_by_role.get(role_label, 0.0) + size
+            else:
+                total_person_days += default_team_size
+                if current < two_week_end:
+                    lbl = "Default"
+                    two_week_by_role[lbl] = two_week_by_role.get(lbl, 0.0) + default_team_size
+        current += timedelta(days=1)
+
+    return {
+        "total_person_days": total_person_days,
+        "two_week_by_role": two_week_by_role,
+        "has_periods": len(capacity_periods) > 0,
+    }
 
 
 HealthStatus = Literal["on_track", "at_risk", "behind", "not_budgeted"]

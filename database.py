@@ -114,6 +114,17 @@ def init_db():
             "feature_id": int,
         }, foreign_keys=[("risk_id", "risks"), ("feature_id", "features")])
 
+    # Capacity planning: one row per (week, role) pair.
+    # Multiple rows can exist for the same week to represent different roles.
+    # NULL role_id means use the project's default role/rate for that team_size.
+    if "capacity_periods" not in db.table_names():
+        db["capacity_periods"].create({
+            "id": int,
+            "week_start_date": str,  # ISO date of Monday of the week
+            "role_id": int,          # NULL = default role
+            "team_size": int,        # number of people with this role this week
+        }, pk="id", foreign_keys=[("role_id", "roles")])
+
     if db["project"].count == 0:
         default_role = list(db["roles"].rows)[0]
         db["project"].insert({

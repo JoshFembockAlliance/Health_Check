@@ -7,7 +7,7 @@ import os
 import csv
 import io
 import zipfile
-from datetime import datetime
+from datetime import datetime, date as _date, timedelta
 
 from database import init_db, get_db
 from calculations import (
@@ -17,6 +17,10 @@ from calculations import (
     project_summary,
     feature_health,
     effective_impact_days,
+    capacity_days_remaining,
+    capacity_plan_summary,
+    get_week_monday,
+    parse_date,
 )
 
 app = FastAPI()
@@ -199,6 +203,38 @@ def dashboard(request: Request):
         "locked_risk_pct": round(locked_risk_pct, 1),
     }
 
+    # Capacity planning data for dashboard
+    as_of = parse_date(project.get("as_of_date", ""))
+    end_dt = parse_date(project.get("end_date", ""))
+    cap_rows = list(db.execute(
+        "SELECT cp.id, cp.week_start_date, cp.role_id, cp.team_size, "
+        "COALESCE(r.name, 'Default') as role_name, "
+        "COALESCE(r.day_rate, ?) as day_rate "
+        "FROM capacity_periods cp "
+        "LEFT JOIN roles r ON cp.role_id = r.id "
+        "ORDER BY cp.week_start_date",
+        [default_rate]
+    ).fetchall())
+    enriched_capacity = [
+        {
+            "id": row[0],
+            "week_start_date": row[1],
+            "week_monday": parse_date(row[1]),
+            "role_id": row[2],
+            "team_size": row[3],
+            "role_name": row[4],
+            "day_rate": row[5],
+        }
+        for row in cap_rows
+    ]
+    cap_summary = capacity_plan_summary(
+        as_of or _date.today(),
+        end_dt,
+        enriched_capacity,
+        project.get("team_size", 1),
+        summary["daily_burn"],
+    )
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "active": "dashboard",
@@ -208,6 +244,7 @@ def dashboard(request: Request):
         "summary": summary,
         "roles": roles,
         "risk_summary": risk_summary,
+        "cap_summary": cap_summary,
     })
 
 
@@ -644,6 +681,77 @@ def unlink_feature_from_risk(risk_id: int, feature_id: int):
         [risk_id, feature_id]
     )
     return RedirectResponse("/risks", status_code=303)
+
+
+# ── Capacity Planning ──
+
+@app.get("/capacity")
+def capacity_page(request: Request):
+    db = get_db()
+    project = get_project()
+    roles = get_roles()
+    default_rate = get_role_rate(project["default_role_id"], roles, 0)
+
+    rows = list(db.execute(
+        "SELECT cp.id, cp.week_start_date, cp.role_id, cp.team_size, "
+        "COALESCE(r.name, 'Default') as role_name, "
+        "COALESCE(r.day_rate, ?) as day_rate "
+        "FROM capacity_periods cp "
+        "LEFT JOIN roles r ON cp.role_id = r.id "
+        "ORDER BY cp.week_start_date, cp.id",
+        [default_rate]
+    ).fetchall())
+
+    # Group periods by week for display (regular dict preserves insertion order in Python 3.7+)
+    weeks: dict = {}
+    for row in rows:
+        wdate = row[1]
+        if wdate not in weeks:
+            weeks[wdate] = []
+        weeks[wdate].append({
+            "id": row[0],
+            "week_start_date": row[1],
+            "role_id": row[2],
+            "team_size": row[3],
+            "role_name": row[4],
+            "day_rate": row[5],
+        })
+
+    return templates.TemplateResponse("capacity.html", {
+        "request": request,
+        "active": "capacity",
+        "project": project,
+        "roles": roles,
+        "weeks": weeks,
+    })
+
+
+@app.post("/capacity/add")
+def add_capacity_period(
+    week_start_date: str = Form(...),
+    role_id: Optional[int] = Form(None),
+    team_size: int = Form(1),
+):
+    db = get_db()
+    # Normalise to Monday of the given week
+    try:
+        d = _date.fromisoformat(week_start_date)
+        monday = d - timedelta(days=d.weekday())
+    except ValueError:
+        return RedirectResponse("/capacity", status_code=303)
+    db["capacity_periods"].insert({
+        "week_start_date": monday.isoformat(),
+        "role_id": role_id,
+        "team_size": max(0, team_size),
+    })
+    return RedirectResponse("/capacity", status_code=303)
+
+
+@app.post("/capacity/{period_id}/delete")
+def delete_capacity_period(period_id: int):
+    db = get_db()
+    db["capacity_periods"].delete(period_id)
+    return RedirectResponse("/capacity", status_code=303)
 
 
 # ── Export / Import ──
