@@ -198,6 +198,7 @@ tfoot tr th {
 .btn-small {
     padding: 0.15rem 0.5rem;
     font-size: 0.75rem;
+    width: auto !important;
 }
 
 .btn-icon {
@@ -405,6 +406,13 @@ details:not([open]) .collapse-arrow {
 .mb-1 { margin-bottom: 1rem; }
 .mt-1 { margin-top: 1rem; }
 
+.section-divider {
+    border: none;
+    border-top: 1px solid var(--pico-muted-border-color);
+    margin: 0.5rem 0 1.5rem;
+    opacity: 0.6;
+}
+
 /* ── Inline double-click editing ── */
 .inline-editable {
     cursor: pointer;
@@ -529,6 +537,32 @@ details:not([open]) .collapse-arrow {
     border-radius: 1px;
 }
 
+/* ── Risk overlays on Overall Completion bar ── */
+.risk-overlay {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 3px;
+}
+
+/* Effective/realised impact — dark red, pinned to the right edge */
+.risk-overlay-effective {
+    right: 0;
+    background: rgba(183, 28, 28, 0.72);
+}
+
+/* Open risk — amber, sits just left of the effective block */
+.risk-overlay-open {
+    background: rgba(230, 130, 0, 0.55);
+}
+
+/* Make the hero bar a little taller so the overlays read clearly */
+.hero-card .progress-bar-container {
+    height: 12px;
+    margin-top: 0.6rem;
+}
+
 .progress-target-marker::after {
     content: "";
     position: absolute;
@@ -565,6 +599,12 @@ details:not([open]) .collapse-arrow {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.35rem;
+}
+
+.feature-health-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .feature-health-body {
@@ -771,15 +811,25 @@ nav.container-fluid a:focus-visible {
     font-weight: normal;
 }
 
-.feature-health-title-row {
+.section-title-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     margin-bottom: 0.75rem;
 }
 
-.feature-health-title-row h3 {
+.section-title-row h3 {
     margin: 0;
+}
+
+.section-detail-link {
+    font-size: 0.85rem;
+    font-weight: normal;
+    text-decoration: none;
+}
+
+.section-detail-link:hover {
+    text-decoration: underline;
 }
 
 .req-header-actions {
@@ -829,4 +879,25 @@ dialog.confirm-dialog .dialog-actions {
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
+}
+
+/* ── Risk resolution fields ── */
+.resolution-group {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--pico-card-sectioning-background-color, #f8f9fa);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+}
+
+/* ── Resolve dialog ── */
+#resolve-dialog {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    max-width: 480px;
+    width: 90%;
+}
+
+#resolve-dialog::backdrop {
+    background: rgba(0,0,0,0.4);
 }

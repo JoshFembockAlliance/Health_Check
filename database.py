@@ -95,11 +95,18 @@ def init_db():
             "sort_order": int,
         }, pk="id")
 
-    # Migration: add name column if missing
+    # Migration: add columns if missing
     if "risks" in db.table_names():
         risk_cols = {col.name for col in db["risks"].columns}
         if "name" not in risk_cols:
             db["risks"].add_column("name", str, not_null_default="")
+        if "resolution_type" not in risk_cols:
+            db["risks"].add_column("resolution_type", str)
+        if "mitigation_percentage" not in risk_cols:
+            db["risks"].add_column("mitigation_percentage", float, not_null_default=0.0)
+        # Back-fill existing "done" risks — conservative default: treat as fully realised
+        db.execute("UPDATE risks SET resolution_type = 'realised' WHERE status = 'done' AND resolution_type IS NULL")
+        db.conn.commit()
 
     if "risk_features" not in db.table_names():
         db["risk_features"].create({

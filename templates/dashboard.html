@@ -38,6 +38,12 @@
                 <div class="progress-target-marker" style="left: {{ summary.expected_burn_pct }}%"></div>
                 {% endif %}
                 <div class="progress-bar {% if summary.overall_completion >= summary.expected_burn_pct %}progress-fill-on_track{% elif summary.overall_completion >= summary.expected_burn_pct * 0.8 %}progress-fill-at_risk{% else %}progress-fill-behind{% endif %}" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
+                {% if risk_summary and risk_summary.locked_risk_pct > 0 %}
+                <div class="risk-overlay risk-overlay-effective" style="width: {{ risk_summary.locked_risk_pct }}%"></div>
+                {% endif %}
+                {% if risk_summary and risk_summary.open_risk_pct > 0 %}
+                <div class="risk-overlay risk-overlay-open" style="width: {{ risk_summary.open_risk_pct }}%; right: {{ risk_summary.locked_risk_pct }}%"></div>
+                {% endif %}
             </div>
         </dd>
         <dd class="text-muted">target: {{ summary.expected_burn_pct | pct }}</dd>
@@ -50,6 +56,8 @@
         <dd class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</dd>
     </div>
 </dl>
+
+<hr class="section-divider">
 
 {# ── Budget & Spend detail ── #}
 <article class="dashboard-section">
@@ -112,17 +120,55 @@
     {% endif %}
 </article>
 
+{# ── Risk Exposure ── #}
+{% if risk_summary and (risk_summary.open_count + risk_summary.done_count) > 0 %}
+<article class="dashboard-section">
+    <div class="section-title-row">
+        <h3>Risk Exposure</h3>
+        <a href="/risks" class="text-muted section-detail-link">Full detail &rarr;</a>
+    </div>
+    <div class="detail-grid">
+        <div class="detail-row">
+            <span class="detail-label">Open Risks (todo / doing)</span>
+            <span class="detail-value">{{ risk_summary.open_count }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Open Risk Impact</span>
+            <span class="detail-value {% if risk_summary.open_impact_days > 0 %}health-amber{% endif %}">
+                {{ risk_summary.open_impact_days | days }} days ({{ risk_summary.open_impact_dollars | currency }})
+            </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Closed Risks</span>
+            <span class="detail-value">{{ risk_summary.done_count }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Effective Realised Impact</span>
+            <span class="detail-value {% if risk_summary.effective_impact_days > 0 %}health-red{% endif %}">
+                {{ risk_summary.effective_impact_days | days }} days ({{ risk_summary.effective_impact_dollars | currency }})
+            </span>
+        </div>
+        {% if risk_summary.avoided_days > 0 %}
+        <div class="detail-row">
+            <span class="detail-label">Avoided (closed risks)</span>
+            <span class="detail-value health-green">{{ risk_summary.avoided_days | days }} days saved</span>
+        </div>
+        {% endif %}
+    </div>
+</article>
+{% endif %}
+
 {# ── Feature Health ── #}
 <article class="dashboard-section">
-    <div class="feature-health-title-row">
+    <div class="section-title-row">
         <h3>Feature Health</h3>
         {% if summary.started_feature_count > 0 %}
         <span class="text-muted">
-            Started ({{ summary.started_feature_count }}/{{ summary.total_feature_count }}) weighted completion:
+            Started ({{ summary.started_feature_count }}/{{ summary.total_feature_count }}) &mdash;
             <strong class="{% if summary.started_completion >= summary.expected_burn_pct %}health-green{% elif summary.started_completion >= summary.expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
                 {{ summary.started_completion | pct }}
             </strong>
-            vs {{ summary.expected_burn_pct | pct }} expected
+            weighted vs {{ summary.expected_burn_pct | pct }} expected
         </span>
         {% endif %}
     </div>
@@ -131,7 +177,7 @@
     {% set h = f.health %}
     <div class="feature-health-card {% if f.started %}feature-started{% else %}feature-not-started{% endif %}">
         <div class="feature-health-header">
-            <div style="display:flex; align-items:center; gap:0.5rem;">
+            <div class="feature-health-name">
                 <button class="started-toggle {% if f.started %}started-on{% else %}started-off{% endif %}"
                         onclick="toggleStarted({{ f.id }}, this)"
                         aria-label="{% if f.started %}Mark {{ f.name }} as not started{% else %}Mark {{ f.name }} as started{% endif %}"
@@ -158,17 +204,17 @@
                 <span class="text-muted">{{ f.weighted_completion | pct }}</span>
             </div>
             <div class="feature-health-stats">
-                <span>{{ f.total_days | days }} days / {{ f.total_dollars | currency }}</span>
+                <span>{{ f.total_days | days }} / {{ f.total_dollars | currency }}</span>
                 <span class="text-muted">&rarr;</span>
-                <span>{{ f.remaining_days | days }} days / {{ f.remaining_dollars | currency }} remaining</span>
+                <span>{{ f.remaining_days | days }} / {{ f.remaining_dollars | currency }} remaining</span>
                 {% if h.target_pct > 0 %}
-                <span class="text-muted">&bull; target: {{ h.target_pct | pct }}</span>
+                <span class="text-muted">&bull; target {{ h.target_pct | pct }}</span>
                 {% endif %}
             </div>
         </div>
         {% else %}
         <div class="feature-health-body">
-            <div class="text-muted">No deliverables budgeted yet &mdash; <a href="/features/{{ f.id }}">add deliverables</a></div>
+            <p class="text-muted" style="margin:0">No deliverables budgeted yet &mdash; <a href="/features/{{ f.id }}">add deliverables</a></p>
         </div>
         {% endif %}
     </div>
@@ -177,9 +223,9 @@
     <div class="feature-health-totals">
         <span><strong>Totals</strong></span>
         <span class="text-muted">
-            {{ features | sum(attribute='total_days') | days }} days / {{ features | sum(attribute='total_dollars') | currency }}
+            {{ features | sum(attribute='total_days') | days }} / {{ features | sum(attribute='total_dollars') | currency }}
             &rarr;
-            {{ features | sum(attribute='remaining_days') | days }} days / {{ features | sum(attribute='remaining_dollars') | currency }} remaining
+            {{ features | sum(attribute='remaining_days') | days }} / {{ features | sum(attribute='remaining_dollars') | currency }} remaining
         </span>
     </div>
     {% else %}

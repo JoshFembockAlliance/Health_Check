@@ -145,6 +145,28 @@ def project_summary(
     }
 
 
+def effective_impact_days(
+    impact_days: float,
+    status: str,
+    resolution_type,
+    mitigation_percentage: float,
+) -> float:
+    """Return the realised impact days for a risk.
+    Open risks (todo/doing): full impact_days.
+    avoided:   0
+    mitigated: impact_days × (mitigation_percentage / 100)
+    realised:  impact_days (full)
+    None (done but no resolution set): treat as realised (conservative).
+    """
+    if status != "done":
+        return impact_days
+    if resolution_type == "avoided":
+        return 0.0
+    if resolution_type == "mitigated":
+        return impact_days * (mitigation_percentage / 100.0)
+    return impact_days  # "realised" or NULL — conservative
+
+
 HealthStatus = Literal["on_track", "at_risk", "behind", "not_budgeted"]
 
 

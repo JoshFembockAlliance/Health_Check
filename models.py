@@ -61,6 +61,8 @@ class Risk(BaseModel):
     due_date: str = ""
     impact_days: float = 0.0
     sort_order: int = 0
+    resolution_type: Optional[str] = None   # None | "avoided" | "mitigated" | "realised"
+    mitigation_percentage: float = 0.0      # 0–100, meaningful only when mitigated
 
 
 class RiskFeature(BaseModel):
