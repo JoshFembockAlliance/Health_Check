@@ -123,7 +123,22 @@ def dashboard(request: Request):
     db = get_db()
     features, project, roles, default_rate = build_feature_data()
     adjustments = list(db["budget_adjustments"].rows)
-    summary = project_summary(project, features, adjustments, default_rate)
+
+    # Risk rows needed early to compute realised impact before project_summary
+    risk_rows = db.execute(
+        "SELECT status, impact_days, resolution_type, mitigation_percentage FROM risks"
+    ).fetchall()
+    open_risks = [r for r in risk_rows if r[0] != "done"]
+    closed_risks = [r for r in risk_rows if r[0] == "done"]
+
+    # Effective impact for closed risks only — these have actually materialised
+    # and reduce the budget available for project work
+    realised_risk_days = sum(
+        effective_impact_days(r[1], r[0], r[2], r[3] or 0.0) for r in closed_risks
+    )
+    realised_risk_dollars = realised_risk_days * default_rate
+
+    summary = project_summary(project, features, adjustments, default_rate, realised_risk_dollars)
 
     on_track_pct = project.get("health_on_track_pct", 100.0)
     at_risk_pct = project.get("health_at_risk_pct", 80.0)
@@ -161,12 +176,7 @@ def dashboard(request: Request):
     summary["started_feature_count"] = len(started_features)
     summary["total_feature_count"] = len([f for f in features if f["total_dollars"] > 0])
 
-    # Risk exposure summary for dashboard
-    risk_rows = db.execute(
-        "SELECT status, impact_days, resolution_type, mitigation_percentage FROM risks"
-    ).fetchall()
-    open_risks = [r for r in risk_rows if r[0] != "done"]
-    closed_risks = [r for r in risk_rows if r[0] == "done"]
+    # Remaining risk exposure data for the Risk Exposure section
     open_impact = sum(r[1] for r in open_risks)
     eff_impact = sum(
         effective_impact_days(r[1], r[0], r[2], r[3] or 0.0) for r in risk_rows

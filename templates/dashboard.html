@@ -22,6 +22,9 @@
         {% if summary.total_adjustments != 0 %}
         <dd class="text-muted">{{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.</dd>
         {% endif %}
+        {% if summary.realised_risk_dollars > 0 %}
+        <dd class="text-muted health-red">&#x26A0; Net accessible: {{ summary.accessible_budget | currency }} ({{ summary.realised_risk_dollars | currency }} absorbed by realised risks)</dd>
+        {% endif %}
     </div>
     <div class="summary-card hero-card">
         <dt class="label">Overall Completion</dt>
@@ -54,6 +57,9 @@
             {{ summary.budget_days_remaining | days }}
         </dd>
         <dd class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</dd>
+        {% if summary.realised_risk_dollars > 0 %}
+        <dd class="text-muted">after {{ summary.realised_risk_dollars | currency }} in realised risks</dd>
+        {% endif %}
     </div>
 </dl>
 

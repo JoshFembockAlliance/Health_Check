@@ -95,9 +95,13 @@ def project_summary(
     features: list[dict],
     adjustments: list[dict],
     default_day_rate: float,
+    realised_risk_dollars: float = 0.0,
 ) -> dict:
     total_adj = sum(a["amount"] for a in adjustments)
     current_budget = project["initial_budget"] + total_adj
+
+    # Accessible budget excludes dollars already consumed by closed/realised risks
+    accessible_budget = current_budget - realised_risk_dollars
 
     start = parse_date(project["start_date"])
     as_of = parse_date(project["as_of_date"])
@@ -122,10 +126,13 @@ def project_summary(
         overall_completion = 0
 
     unallocated_budget = current_budget - allocated_dollars
-    budget_days_remaining = (current_budget - project["actual_spend"]) / daily_burn if daily_burn else 0
+    # Days remaining is based on accessible budget (after realised risk deduction)
+    budget_days_remaining = (accessible_budget - project["actual_spend"]) / daily_burn if daily_burn else 0
 
     return {
         "current_budget": current_budget,
+        "accessible_budget": accessible_budget,
+        "realised_risk_dollars": realised_risk_dollars,
         "initial_budget": project["initial_budget"],
         "total_adjustments": total_adj,
         "elapsed_days": elapsed_days,
