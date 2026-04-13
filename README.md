@@ -2,6 +2,8 @@
 
 A lightweight web app for tracking project delivery health — budgets, features, requirements, deliverables, and completion status.
 
+![A screenshot of the Project Health Check Dashboard](./readme_screenshots/Dashboard.png) 
+
 ## Quick Start
 
 ```bash
