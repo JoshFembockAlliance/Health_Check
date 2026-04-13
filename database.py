@@ -125,6 +125,18 @@ def init_db():
             "team_size": int,        # number of people with this role this week
         }, pk="id", foreign_keys=[("role_id", "roles")])
 
+    # PM Notes: freeform notes with status lifecycle and optional due dates.
+    # Status "sticky" notes always appear on the dashboard regardless of due date.
+    if "pm_notes" not in db.table_names():
+        db["pm_notes"].create({
+            "id": int,
+            "name": str,
+            "description": str,
+            "status": str,       # "todo" | "doing" | "done" | "sticky"
+            "due_date": str,     # ISO date; NULL/empty for sticky notes is fine
+            "sort_order": int,
+        }, pk="id")
+
     if db["project"].count == 0:
         default_role = list(db["roles"].rows)[0]
         db["project"].insert({

@@ -6,7 +6,7 @@
     <meta name="description" content="Track project health, budget, features, risks and deliverables at a glance.">
     <title>{% block title %}Project Health Check{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
     <a href="#main" class="skip-link">Skip to main content</a>
@@ -19,6 +19,7 @@
             <li><a href="/features" {% if active == "features" %}class="active" aria-current="page"{% endif %}>Features</a></li>
             <li><a href="/capacity" {% if active == "capacity" %}class="active" aria-current="page"{% endif %}>Capacity</a></li>
             <li><a href="/risks" {% if active == "risks" %}class="active" aria-current="page"{% endif %}>Risks</a></li>
+            <li><a href="/pm-notes" {% if active == "pm_notes" %}class="active" aria-current="page"{% endif %}>PM Notes</a></li>
             <li><a href="/settings" {% if active == "settings" %}class="active" aria-current="page"{% endif %}>Settings</a></li>
         </ul>
     </nav>

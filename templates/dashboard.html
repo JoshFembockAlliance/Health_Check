@@ -193,6 +193,37 @@
 </article>
 {% endif %}
 
+{# ── PM Notes dashboard strip ── #}
+{% if dashboard_notes %}
+<article class="dashboard-section">
+    <div class="section-title-row">
+        <h3>PM Notes</h3>
+        <a href="/pm-notes" class="text-muted section-detail-link">
+            All notes &rarr;
+            {% if notes_overflow > 0 %}<span class="health-badge badge-grey" style="margin-left:0.25rem">+{{ notes_overflow }} more</span>{% endif %}
+        </a>
+    </div>
+    <div class="notes-strip">
+        {% for note in dashboard_notes %}
+        <div class="note-strip-card note-status-{{ note.status }}">
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem">
+                <span class="health-badge note-badge-{{ note.status }}">
+                    {% if note.status == "sticky" %}&#x1F4CC;
+                    {% elif note.status == "todo" %}To Do
+                    {% elif note.status == "doing" %}Doing
+                    {% else %}Done{% endif %}
+                </span>
+                <strong style="font-size:0.9rem">{{ note.name }}</strong>
+            </div>
+            {% if note.due_date and note.status != "sticky" %}
+            <div class="text-muted" style="font-size:0.8rem">Due: {{ note.due_date }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</article>
+{% endif %}
+
 {# ── Feature Health ── #}
 <article class="dashboard-section">
     <div class="section-title-row">

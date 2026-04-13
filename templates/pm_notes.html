@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}PM Notes - {{ project.name }}{% endblock %}
+
+{% block content %}
+<h2>PM Notes</h2>
+
+{# ── Summary counts ── #}
+<dl class="summary-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:1.5rem;">
+    <div class="summary-card">
+        <dt class="label">Sticky</dt>
+        <dd class="value" style="color:#5c6bc0">{{ counts.sticky }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">To Do</dt>
+        <dd class="value health-red">{{ counts.todo }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">Doing</dt>
+        <dd class="value health-amber">{{ counts.doing }}</dd>
+    </div>
+    <div class="summary-card">
+        <dt class="label">Done</dt>
+        <dd class="value health-green">{{ counts.done }}</dd>
+    </div>
+</dl>
+
+{# ── Notes list ── #}
+{% if notes %}
+{% for note in notes %}
+<article class="dashboard-section note-card note-status-{{ note.status }}">
+    <div class="section-title-row" style="margin-bottom:0.5rem">
+        <div style="display:flex; align-items:center; gap:0.75rem">
+            <span class="health-badge note-badge-{{ note.status }}">
+                {% if note.status == "sticky" %}&#x1F4CC; Sticky
+                {% elif note.status == "todo" %}To Do
+                {% elif note.status == "doing" %}Doing
+                {% else %}Done{% endif %}
+            </span>
+            <strong>{{ note.name }}</strong>
+            {% if note.due_date and note.status != "sticky" %}
+            <span class="text-muted">due {{ note.due_date }}</span>
+            {% endif %}
+        </div>
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn-small outline" onclick="toggleNoteEdit({{ note.id }})">Edit</button>
+            <form method="post" action="/pm-notes/{{ note.id }}/delete" style="display:inline">
+                <button type="button" class="btn-small btn-icon outline secondary"
+                        onclick="showConfirm('Delete this note?', this.form)"
+                        aria-label="Delete note">&#x2715;</button>
+            </form>
+        </div>
+    </div>
+
+    {% if note.description %}
+    <p class="risk-description" id="note-desc-{{ note.id }}">{{ note.description }}</p>
+    {% endif %}
+
+    {# Inline edit form (hidden by default) #}
+    <form id="note-edit-{{ note.id }}" method="post" action="/pm-notes/{{ note.id }}/update"
+          style="display:none; margin-top:0.75rem">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.5rem">
+            <label>
+                Name
+                <input type="text" name="name" value="{{ note.name }}" required>
+            </label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem">
+                <label>
+                    Status
+                    <select name="status" onchange="toggleDueDate(this, 'edit-due-{{ note.id }}')">
+                        <option value="todo" {% if note.status=='todo' %}selected{% endif %}>To Do</option>
+                        <option value="doing" {% if note.status=='doing' %}selected{% endif %}>Doing</option>
+                        <option value="done" {% if note.status=='done' %}selected{% endif %}>Done</option>
+                        <option value="sticky" {% if note.status=='sticky' %}selected{% endif %}>Sticky</option>
+                    </select>
+                </label>
+                <label id="edit-due-{{ note.id }}" {% if note.status=='sticky' %}style="display:none"{% endif %}>
+                    Due Date
+                    <input type="date" name="due_date" value="{{ note.due_date or '' }}">
+                </label>
+            </div>
+        </div>
+        <label>
+            Description
+            <textarea name="description" rows="3">{{ note.description or '' }}</textarea>
+        </label>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+            <button type="submit" class="btn-small">Save</button>
+            <button type="button" class="btn-small outline secondary" onclick="toggleNoteEdit({{ note.id }})">Cancel</button>
+        </div>
+    </form>
+</article>
+{% endfor %}
+{% else %}
+<article class="dashboard-section">
+    <p class="text-muted">No notes yet. Add one below.</p>
+</article>
+{% endif %}
+
+{# ── Add note form ── #}
+<article class="dashboard-section">
+    <h3>Add Note</h3>
+    <form method="post" action="/pm-notes/add">
+        <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:1rem; margin-bottom:0.75rem">
+            <label>
+                Name
+                <input type="text" name="name" placeholder="Note title" required>
+            </label>
+            <label>
+                Status
+                <select name="status" onchange="toggleDueDate(this, 'add-due-date')">
+                    <option value="todo">To Do</option>
+                    <option value="doing">Doing</option>
+                    <option value="done">Done</option>
+                    <option value="sticky">Sticky</option>
+                </select>
+            </label>
+            <label id="add-due-date">
+                Due Date
+                <input type="date" name="due_date">
+            </label>
+        </div>
+        <label>
+            Description
+            <textarea name="description" rows="3" placeholder="Optional details…"></textarea>
+        </label>
+        <button type="submit" class="btn-add" style="margin-top:0.5rem">+ Add Note</button>
+    </form>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleNoteEdit(id) {
+    const form = document.getElementById('note-edit-' + id);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+function toggleDueDate(select, labelId) {
+    const label = document.getElementById(labelId);
+    if (label) label.style.display = select.value === 'sticky' ? 'none' : '';
+}
+</script>
+{% endblock %}

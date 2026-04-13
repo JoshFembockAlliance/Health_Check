@@ -235,6 +235,28 @@ def dashboard(request: Request):
         summary["daily_burn"],
     )
 
+    # PM Notes for dashboard: sticky + overdue + due within 14 days, not done
+    # Columns: 0=id, 1=name, 2=description, 3=status, 4=due_date
+    as_of_str = project.get("as_of_date", "")
+    note_rows = list(db.execute(
+        "SELECT id, name, description, status, due_date FROM pm_notes ORDER BY sort_order, id"
+    ).fetchall())
+    dashboard_notes = []
+    for nr in note_rows:
+        nstatus = nr[3]
+        if nstatus == "done":
+            continue
+        note_dict = {"id": nr[0], "name": nr[1], "description": nr[2], "status": nstatus, "due_date": nr[4]}
+        if nstatus == "sticky":
+            dashboard_notes.append(note_dict)
+            continue
+        ndue = parse_date(nr[4])
+        aof = parse_date(as_of_str)
+        if aof and ndue and (ndue <= aof or ndue <= aof + timedelta(days=14)):
+            dashboard_notes.append(note_dict)
+    notes_overflow = max(0, len(dashboard_notes) - 3)
+    dashboard_notes = dashboard_notes[:3]
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "active": "dashboard",
@@ -245,6 +267,8 @@ def dashboard(request: Request):
         "roles": roles,
         "risk_summary": risk_summary,
         "cap_summary": cap_summary,
+        "dashboard_notes": dashboard_notes,
+        "notes_overflow": notes_overflow,
     })
 
 
@@ -681,6 +705,81 @@ def unlink_feature_from_risk(risk_id: int, feature_id: int):
         [risk_id, feature_id]
     )
     return RedirectResponse("/risks", status_code=303)
+
+
+# ── PM Notes ──
+
+@app.get("/pm-notes")
+def pm_notes_page(request: Request):
+    db = get_db()
+    project = get_project()
+    notes = list(db.execute(
+        "SELECT id, name, description, status, due_date, sort_order "
+        "FROM pm_notes ORDER BY "
+        "CASE status WHEN 'sticky' THEN 0 WHEN 'todo' THEN 1 WHEN 'doing' THEN 2 ELSE 3 END, "
+        "due_date ASC, sort_order, id"
+    ).fetchall())
+    enriched = [
+        {"id": r[0], "name": r[1], "description": r[2], "status": r[3], "due_date": r[4], "sort_order": r[5]}
+        for r in notes
+    ]
+    counts = {
+        "todo": sum(1 for n in enriched if n["status"] == "todo"),
+        "doing": sum(1 for n in enriched if n["status"] == "doing"),
+        "done": sum(1 for n in enriched if n["status"] == "done"),
+        "sticky": sum(1 for n in enriched if n["status"] == "sticky"),
+    }
+    return templates.TemplateResponse("pm_notes.html", {
+        "request": request,
+        "active": "pm_notes",
+        "project": project,
+        "notes": enriched,
+        "counts": counts,
+    })
+
+
+@app.post("/pm-notes/add")
+def add_note(
+    name: str = Form(...),
+    description: str = Form(""),
+    status: str = Form("todo"),
+    due_date: str = Form(""),
+):
+    db = get_db()
+    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM pm_notes").fetchone()[0]
+    db["pm_notes"].insert({
+        "name": name,
+        "description": description,
+        "status": status,
+        "due_date": due_date if status != "sticky" else "",
+        "sort_order": max_order + 1,
+    })
+    return RedirectResponse("/pm-notes", status_code=303)
+
+
+@app.post("/pm-notes/{note_id}/update")
+def update_note(
+    note_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    status: str = Form("todo"),
+    due_date: str = Form(""),
+):
+    db = get_db()
+    db["pm_notes"].update(note_id, {
+        "name": name,
+        "description": description,
+        "status": status,
+        "due_date": due_date if status != "sticky" else "",
+    })
+    return RedirectResponse("/pm-notes", status_code=303)
+
+
+@app.post("/pm-notes/{note_id}/delete")
+def delete_note(note_id: int):
+    db = get_db()
+    db["pm_notes"].delete(note_id)
+    return RedirectResponse("/pm-notes", status_code=303)
 
 
 # ── Capacity Planning ──
