@@ -2,11 +2,16 @@
 {% block title %}Dashboard - {{ project.name }}{% endblock %}
 
 {% block content %}
-<h2>{{ project.name }}
-    {% if project.as_of_date %}
-    <span class="text-muted" style="font-size: 1rem; font-weight: normal;">&mdash; as of {{ project.as_of_date }}</span>
-    {% endif %}
-</h2>
+<div class="dashboard-title-row">
+    <h2 style="margin:0">{{ project.name }}
+        {% if project.as_of_date %}
+        <span class="text-muted" style="font-size: 1rem; font-weight: normal;">&mdash; as of {{ project.as_of_date }}</span>
+        {% endif %}
+    </h2>
+    <button onclick="window.print()" class="print-btn no-print" title="Export to PDF" aria-label="Export dashboard to PDF">
+        &#128196;
+    </button>
+</div>
 
 {% if not project.start_date or not project.as_of_date or summary.current_budget == 0 %}
 <article>

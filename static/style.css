@@ -890,6 +890,82 @@ dialog.confirm-dialog .dialog-actions {
     border-radius: var(--pico-border-radius);
 }
 
+/* ── Dashboard title row with print button ── */
+.dashboard-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+button.print-btn {
+    background: none !important;
+    border: 1px solid var(--pico-muted-border-color) !important;
+    border-radius: var(--pico-border-radius) !important;
+    padding: 0.3rem 0.6rem !important;
+    font-size: 1.1rem !important;
+    cursor: pointer !important;
+    color: var(--pico-muted-color) !important;
+    line-height: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    transition: background 0.15s, color 0.15s;
+}
+
+button.print-btn:hover {
+    background: var(--pico-muted-border-color) !important;
+    color: var(--pico-color) !important;
+}
+
+/* ── Print / PDF export styles ── */
+@media print {
+    .no-print,
+    nav,
+    .skip-link,
+    dialog,
+    .started-toggle,
+    button,
+    form,
+    details summary::marker,
+    .section-detail-link {
+        display: none !important;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    main.container {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+
+    .hero-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    .dashboard-section {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ccc !important;
+    }
+
+    .feature-health-card {
+        break-inside: avoid;
+    }
+
+    a {
+        text-decoration: none;
+        color: inherit;
+    }
+}
+
 /* ── Resolve dialog ── */
 #resolve-dialog {
     border: 1px solid var(--pico-muted-border-color);
