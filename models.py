@@ -32,6 +32,7 @@ class Feature(BaseModel):
     id: Optional[int] = None
     name: str
     sort_order: int = 0
+    started: int = 0  # 0 = not started, 1 = started
 
 
 class Requirement(BaseModel):
@@ -50,3 +51,18 @@ class Deliverable(BaseModel):
     priority: str = "Must Have"
     role_id: Optional[int] = None
     sort_order: int = 0
+
+
+class Risk(BaseModel):
+    id: Optional[int] = None
+    name: str
+    description: str = ""
+    status: str = "todo"  # todo, doing, done
+    due_date: str = ""
+    impact_days: float = 0.0
+    sort_order: int = 0
+
+
+class RiskFeature(BaseModel):
+    risk_id: int
+    feature_id: int

@@ -41,9 +41,13 @@
         okBtn.parentNode.replaceChild(newOk, okBtn);
         newOk.id = 'confirm-ok';
         newOk.addEventListener('click', function() {
-            if (actionOverride) form.action = actionOverride;
-            form.submit();
             dialog.close();
+            const submitUrl = actionOverride || form.action;
+            const f = document.createElement('form');
+            f.method = 'post';
+            f.action = submitUrl;
+            document.body.appendChild(f);
+            f.submit();
         });
         cancelBtn.onclick = function() { dialog.close(); };
         dialog.showModal();

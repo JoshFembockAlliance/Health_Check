@@ -38,22 +38,24 @@
 
 {% for req in feature.requirements %}
 <article class="requirement-section">
-    <details class="req-details" data-req-id="{{ req.id }}" open>
-    <summary class="requirement-section-header" style="list-style:none; cursor:pointer;">
-        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-            <div style="display:flex; align-items:center; gap:0.5rem;">
+    <div class="requirement-section-header" style="align-items:center;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button class="collapse-btn" data-req-id="{{ req.id }}" aria-expanded="true"
+                    style="background:none; border:none; cursor:pointer; padding:0; line-height:1;"
+                    aria-label="Toggle requirement {{ req.name }}">
                 <span class="collapse-arrow">&#9660;</span>
-                <h3 class="inline-editable" data-action="/requirements/{{ req.id }}/update" style="margin:0;" title="Double-click to rename" tabindex="0" role="button">
-                    {{ req.name }} <span class="edit-pencil" aria-hidden="true">✎</span>
-                </h3>
-            </div>
-            <span class="text-muted">
-                {{ req.total_days | days }} days / {{ req.total_dollars | currency }}
-                &bull; {{ req.weighted_completion | pct }} complete
-            </span>
+            </button>
+            <h3 class="inline-editable" data-action="/requirements/{{ req.id }}/update" style="margin:0;" title="Double-click to rename" tabindex="0" role="button">
+                {{ req.name }} <span class="edit-pencil" aria-hidden="true">✎</span>
+            </h3>
         </div>
-    </summary>
+        <span class="text-muted">
+            {{ req.total_days | days }} days / {{ req.total_dollars | currency }}
+            &bull; {{ req.weighted_completion | pct }} complete
+        </span>
+    </div>
 
+    <div class="req-body" data-req-id="{{ req.id }}">
     <div class="req-header-actions">
         <form method="post" action="/requirements/{{ req.id }}/delete" style="margin:0;">
             <button type="submit" class="btn-small outline secondary"
@@ -183,7 +185,7 @@
             <button type="submit" class="btn-add">+ Add Deliverable</button>
         </form>
     </div>
-    </details>
+    </div>
 </article>
 {% endfor %}
 
@@ -207,27 +209,109 @@ const STORAGE_KEY = 'req-open-{{ feature.id }}';
 
 function loadReqStates() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    document.querySelectorAll('.req-details').forEach(el => {
-        const id = el.dataset.reqId;
-        if (id in saved) {
-            // Only change from default (open) if explicitly saved as closed
-            if (!saved[id]) el.removeAttribute('open');
-            else el.setAttribute('open', '');
+    document.querySelectorAll('.req-body').forEach(body => {
+        const id = body.dataset.reqId;
+        if (id in saved && !saved[id]) {
+            body.style.display = 'none';
+            const btn = document.querySelector(`.collapse-btn[data-req-id="${id}"]`);
+            if (btn) {
+                btn.setAttribute('aria-expanded', 'false');
+                const arrow = btn.querySelector('.collapse-arrow');
+                if (arrow) arrow.style.transform = 'rotate(-90deg)';
+            }
         }
     });
 }
 
 function saveReqStates() {
     const state = {};
-    document.querySelectorAll('.req-details').forEach(el => {
-        state[el.dataset.reqId] = el.hasAttribute('open');
+    document.querySelectorAll('.collapse-btn').forEach(btn => {
+        state[btn.dataset.reqId] = btn.getAttribute('aria-expanded') === 'true';
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 loadReqStates();
-document.querySelectorAll('.req-details').forEach(el => {
-    el.addEventListener('toggle', saveReqStates);
+document.querySelectorAll('.collapse-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const id = btn.dataset.reqId;
+        const body = document.querySelector(`.req-body[data-req-id="${id}"]`);
+        const isOpen = btn.getAttribute('aria-expanded') === 'true';
+        const arrow = btn.querySelector('.collapse-arrow');
+        if (isOpen) {
+            body.style.display = 'none';
+            btn.setAttribute('aria-expanded', 'false');
+            if (arrow) arrow.style.transform = 'rotate(-90deg)';
+        } else {
+            body.style.display = '';
+            btn.setAttribute('aria-expanded', 'true');
+            if (arrow) arrow.style.transform = '';
+        }
+        saveReqStates();
+    });
+});
+
+// ── Inline name editing ──
+document.querySelectorAll('.inline-editable').forEach(el => {
+    function activateEdit(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (el.querySelector('.inline-edit-input')) return; // already editing
+
+        const action = el.dataset.action;
+        const currentText = el.childNodes[0].textContent.trim();
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentText;
+        input.className = 'inline-edit-input';
+
+        el.style.visibility = 'hidden';
+        el.insertAdjacentElement('afterend', input);
+        input.focus();
+        input.select();
+
+        function submit() {
+            const newName = input.value.trim();
+            input.removeEventListener('blur', submit);
+            input.remove();
+            el.style.visibility = '';
+            if (newName && newName !== currentText) {
+                if (typeof saveReqStates === 'function') saveReqStates();
+                const f = document.createElement('form');
+                f.method = 'post';
+                f.action = action;
+                const n = document.createElement('input');
+                n.type = 'hidden';
+                n.name = 'name';
+                n.value = newName;
+                f.appendChild(n);
+                document.body.appendChild(f);
+                f.submit();
+            }
+        }
+
+        function cancel() {
+            input.removeEventListener('blur', submit);
+            input.remove();
+            el.style.visibility = '';
+        }
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); submit(); }
+            if (e.key === 'Escape') cancel();
+        });
+        input.addEventListener('blur', submit);
+    }
+
+    // Single click on pencil icon activates edit
+    const pencil = el.querySelector('.edit-pencil');
+    if (pencil) pencil.addEventListener('click', activateEdit);
+
+    // Double-click anywhere on the element also activates edit
+    el.addEventListener('dblclick', activateEdit);
+
+
 });
 
 // ── Priority select colour update ──

@@ -45,7 +45,13 @@ def init_db():
             "id": int,
             "name": str,
             "sort_order": int,
+            "started": int,  # 0 = not started, 1 = started
         }, pk="id")
+
+    # Migration: add started column if missing
+    feat_cols = {col.name for col in db["features"].columns}
+    if "started" not in feat_cols:
+        db["features"].add_column("started", int, not_null_default=0)
 
     if "requirements" not in db.table_names():
         db["requirements"].create({
@@ -77,6 +83,29 @@ def init_db():
         db["project"].add_column("health_on_track_pct", float, not_null_default=100.0)
     if "health_at_risk_pct" not in existing_cols:
         db["project"].add_column("health_at_risk_pct", float, not_null_default=80.0)
+
+    if "risks" not in db.table_names():
+        db["risks"].create({
+            "id": int,
+            "name": str,
+            "description": str,
+            "status": str,
+            "due_date": str,
+            "impact_days": float,
+            "sort_order": int,
+        }, pk="id")
+
+    # Migration: add name column if missing
+    if "risks" in db.table_names():
+        risk_cols = {col.name for col in db["risks"].columns}
+        if "name" not in risk_cols:
+            db["risks"].add_column("name", str, not_null_default="")
+
+    if "risk_features" not in db.table_names():
+        db["risk_features"].create({
+            "risk_id": int,
+            "feature_id": int,
+        }, foreign_keys=[("risk_id", "risks"), ("feature_id", "features")])
 
     if db["project"].count == 0:
         default_role = list(db["roles"].rows)[0]

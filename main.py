@@ -1,9 +1,13 @@
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 import os
+import csv
+import io
+import zipfile
+from datetime import datetime
 
 from database import init_db, get_db
 from calculations import (
@@ -82,7 +86,7 @@ def build_feature_data(feature_id=None):
             fdict = f
         else:
             fid = f[0]
-            fdict = {"id": f[0], "name": f[1], "sort_order": f[2]}
+            fdict = {"id": f[0], "name": f[1], "sort_order": f[2], "started": f[3] if len(f) > 3 else 0}
 
         reqs = list(db.execute(
             "SELECT * FROM requirements WHERE feature_id = ? ORDER BY sort_order, id", [fid]
@@ -123,13 +127,38 @@ def dashboard(request: Request):
     on_track_pct = project.get("health_on_track_pct", 100.0)
     at_risk_pct = project.get("health_at_risk_pct", 80.0)
 
+    # Compute weighted completion for started features only
+    started_features = [f for f in features if f.get("started", 0) and f["total_days"] > 0]
+    started_total_days = sum(f["total_days"] for f in started_features)
+    if started_total_days > 0:
+        started_completion = sum(
+            f["total_days"] * f["weighted_completion"] for f in started_features
+        ) / started_total_days
+    else:
+        started_completion = 0
+
     for f in features:
-        f["health"] = feature_health(
-            f,
-            summary["expected_burn_pct"],
-            on_track_pct,
-            at_risk_pct,
-        )
+        # Use started-weighted expected burn for started features,
+        # but only evaluate health for features that have started
+        if f.get("started", 0) and f["total_dollars"] > 0:
+            # Scale expected burn by how much of the started budget this feature represents
+            f["health"] = feature_health(
+                f,
+                summary["expected_burn_pct"],
+                on_track_pct,
+                at_risk_pct,
+            )
+        else:
+            f["health"] = feature_health(
+                f,
+                summary["expected_burn_pct"],
+                on_track_pct,
+                at_risk_pct,
+            )
+
+    summary["started_completion"] = started_completion
+    summary["started_feature_count"] = len(started_features)
+    summary["total_feature_count"] = len([f for f in features if f["total_dollars"] > 0])
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -232,6 +261,23 @@ def features_list(request: Request):
         "features": features,
         "project": project,
     })
+
+
+@app.post("/features/{feature_id}/toggle-started")
+def toggle_started(feature_id: int):
+    db = get_db()
+    f = db["features"].get(feature_id)
+    db["features"].update(feature_id, {"started": 0 if f.get("started", 0) else 1})
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/api/features/{feature_id}/toggle-started")
+def api_toggle_started(feature_id: int):
+    db = get_db()
+    f = db["features"].get(feature_id)
+    new_val = 0 if f.get("started", 0) else 1
+    db["features"].update(feature_id, {"started": new_val})
+    return JSONResponse({"ok": True, "started": new_val})
 
 
 @app.post("/features/add")
@@ -372,3 +418,208 @@ def delete_deliverable(del_id: int):
     feature_id = req["feature_id"]
     db["deliverables"].delete(del_id)
     return RedirectResponse(f"/features/{feature_id}", status_code=303)
+
+
+# ── Risks ──
+
+@app.get("/risks")
+def risks_page(request: Request):
+    db = get_db()
+    project = get_project()
+    roles = get_roles()
+    default_role_rate = get_role_rate(project["default_role_id"], roles, 0)
+    risks = list(db.execute(
+        "SELECT id, name, description, status, due_date, impact_days, sort_order FROM risks ORDER BY sort_order, id"
+    ).fetchall())
+    features_rows = list(db.execute("SELECT id, name FROM features ORDER BY sort_order, id").fetchall())
+    all_features = [{"id": f[0], "name": f[1]} for f in features_rows]
+
+    enriched_risks = []
+    for r in risks:
+        rdict = {
+            "id": r[0], "name": r[1], "description": r[2], "status": r[3],
+            "due_date": r[4], "impact_days": r[5], "sort_order": r[6],
+        }
+        rdict["impact_dollars"] = rdict["impact_days"] * default_role_rate
+        # Get linked features
+        links = list(db.execute(
+            "SELECT f.id, f.name FROM risk_features rf JOIN features f ON rf.feature_id = f.id WHERE rf.risk_id = ?",
+            [rdict["id"]]
+        ).fetchall())
+        rdict["linked_features"] = [{"id": l[0], "name": l[1]} for l in links]
+        enriched_risks.append(rdict)
+
+    # Summary counts
+    todo_count = sum(1 for r in enriched_risks if r["status"] == "todo")
+    doing_count = sum(1 for r in enriched_risks if r["status"] == "doing")
+    done_count = sum(1 for r in enriched_risks if r["status"] == "done")
+    total_impact_days = sum(r["impact_days"] for r in enriched_risks if r["status"] != "done")
+    total_impact_dollars = sum(r["impact_dollars"] for r in enriched_risks if r["status"] != "done")
+
+    return templates.TemplateResponse("risks.html", {
+        "request": request,
+        "active": "risks",
+        "risks": enriched_risks,
+        "all_features": all_features,
+        "summary": {
+            "todo": todo_count,
+            "doing": doing_count,
+            "done": done_count,
+            "total_impact_days": total_impact_days,
+            "total_impact_dollars": total_impact_dollars,
+        },
+        "default_rate": default_role_rate,
+    })
+
+
+@app.post("/risks/add")
+def add_risk(
+    name: str = Form(...),
+    description: str = Form(""),
+    status: str = Form("todo"),
+    due_date: str = Form(""),
+    impact_days: float = Form(0),
+):
+    db = get_db()
+    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM risks").fetchone()[0]
+    db["risks"].insert({
+        "name": name,
+        "description": description,
+        "status": status,
+        "due_date": due_date,
+        "impact_days": impact_days,
+        "sort_order": max_order + 1,
+    })
+    return RedirectResponse("/risks", status_code=303)
+
+
+@app.post("/risks/{risk_id}/update")
+def update_risk(
+    risk_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    status: str = Form("todo"),
+    due_date: str = Form(""),
+    impact_days: float = Form(0),
+):
+    db = get_db()
+    db["risks"].update(risk_id, {
+        "name": name,
+        "description": description,
+        "status": status,
+        "due_date": due_date,
+        "impact_days": impact_days,
+    })
+    return RedirectResponse("/risks", status_code=303)
+
+
+@app.post("/risks/{risk_id}/delete")
+def delete_risk(risk_id: int):
+    db = get_db()
+    db.execute("DELETE FROM risk_features WHERE risk_id = ?", [risk_id])
+    db["risks"].delete(risk_id)
+    return RedirectResponse("/risks", status_code=303)
+
+
+@app.post("/api/risks/{risk_id}/status")
+def update_risk_status(risk_id: int, status: str = Form("todo")):
+    db = get_db()
+    if status in ("todo", "doing", "done"):
+        db["risks"].update(risk_id, {"status": status})
+    return JSONResponse({"ok": True, "status": status})
+
+
+@app.post("/risks/{risk_id}/link-feature")
+def link_feature_to_risk(risk_id: int, feature_id: int = Form(...)):
+    db = get_db()
+    existing = db.execute(
+        "SELECT COUNT(*) FROM risk_features WHERE risk_id = ? AND feature_id = ?",
+        [risk_id, feature_id]
+    ).fetchone()[0]
+    if not existing:
+        db["risk_features"].insert({"risk_id": risk_id, "feature_id": feature_id})
+    return RedirectResponse("/risks", status_code=303)
+
+
+@app.post("/risks/{risk_id}/unlink-feature/{feature_id}")
+def unlink_feature_from_risk(risk_id: int, feature_id: int):
+    db = get_db()
+    db.execute(
+        "DELETE FROM risk_features WHERE risk_id = ? AND feature_id = ?",
+        [risk_id, feature_id]
+    )
+    return RedirectResponse("/risks", status_code=303)
+
+
+# ── Export / Import ──
+
+EXPORT_TABLES = ["project", "roles", "budget_adjustments", "features", "requirements", "deliverables", "risks", "risk_features"]
+
+
+@app.get("/export")
+def export_csv():
+    db = get_db()
+    buf = io.BytesIO()
+    project = get_project()
+    project_name = project["name"].replace(" ", "_").replace("/", "-")
+    filename = f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for table_name in EXPORT_TABLES:
+            if table_name not in db.table_names():
+                continue
+            rows = list(db[table_name].rows)
+            if not rows:
+                continue
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+            zf.writestr(f"{table_name}.csv", output.getvalue())
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.post("/import")
+async def import_csv(file: UploadFile = File(...)):
+    db = get_db()
+    content = await file.read()
+    buf = io.BytesIO(content)
+
+    with zipfile.ZipFile(buf, "r") as zf:
+        # Clear existing data in reverse FK order
+        for table_name in reversed(EXPORT_TABLES):
+            if table_name in db.table_names():
+                db[table_name].delete_where()
+
+        for table_name in EXPORT_TABLES:
+            csv_filename = f"{table_name}.csv"
+            if csv_filename not in zf.namelist():
+                continue
+            csv_content = zf.read(csv_filename).decode("utf-8")
+            reader = csv.DictReader(io.StringIO(csv_content))
+            for row in reader:
+                # Convert numeric fields
+                cleaned = {}
+                for k, v in row.items():
+                    if v == "" or v is None:
+                        cleaned[k] = None
+                    else:
+                        try:
+                            if "." in v:
+                                cleaned[k] = float(v)
+                            else:
+                                cleaned[k] = int(v)
+                        except (ValueError, TypeError):
+                            cleaned[k] = v
+                db[table_name].insert(cleaned)
+
+    # Re-run init to ensure any missing columns/defaults exist
+    init_db()
+
+    return RedirectResponse("/settings", status_code=303)
