@@ -1,3 +1,9 @@
+"""database.py — SQLite schema initialisation and migration.
+
+All tables are created here if they don't exist. Additive migrations
+(new columns) are also applied here so that an existing database
+automatically gains new fields on the next server start.
+"""
 import sqlite_utils
 import os
 
@@ -5,12 +11,16 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "health_check.db")
 
 
 def get_db() -> sqlite_utils.Database:
+    """Return a sqlite_utils Database handle. A new connection is opened each call."""
     return sqlite_utils.Database(DB_PATH)
 
 
 def init_db():
+    """Create all tables and run additive migrations. Safe to call on every startup."""
     db = get_db()
 
+    # roles — named day-rate buckets (e.g. "Developer $1,435/day").
+    # The project has a default_role_id; deliverables can override with a specific role.
     if "roles" not in db.table_names():
         db["roles"].create({
             "id": int,
@@ -18,6 +28,9 @@ def init_db():
             "day_rate": float,
         }, pk="id")
 
+    # project — singleton row (id=1). All financial settings live here.
+    # health_on_track_pct / health_at_risk_pct are percentage thresholds used by
+    # feature_health() to colour-code each feature's progress badge.
     if "project" not in db.table_names():
         db["project"].create({
             "id": int,
@@ -32,6 +45,8 @@ def init_db():
             "health_at_risk_pct": float,
         }, pk="id")
 
+    # budget_adjustments — one row per change event (e.g. scope increase, contingency).
+    # current_budget = initial_budget + SUM(adjustments.amount)
     if "budget_adjustments" not in db.table_names():
         db["budget_adjustments"].create({
             "id": int,
@@ -40,6 +55,9 @@ def init_db():
             "description": str,
         }, pk="id")
 
+    # features → requirements → deliverables: three-tier work breakdown structure.
+    # started=1 means the PM has acknowledged this feature is in flight,
+    # which affects the adjusted health target on the dashboard.
     if "features" not in db.table_names():
         db["features"].create({
             "id": int,
@@ -84,6 +102,9 @@ def init_db():
     if "health_at_risk_pct" not in existing_cols:
         db["project"].add_column("health_at_risk_pct", float, not_null_default=80.0)
 
+    # risks — project risks with impact measured in days.
+    # resolution_type (avoided/mitigated/realised) determines how much of
+    # impact_days actually "lands" on the budget via effective_impact_days().
     if "risks" not in db.table_names():
         db["risks"].create({
             "id": int,

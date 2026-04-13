@@ -4,18 +4,22 @@ from typing import Literal
 
 
 def business_days_between(start: date, end: date) -> int:
+    """Count business days from start (inclusive) to end (exclusive).
+    Returns 0 if start >= end.
+    """
     if start >= end:
         return 0
     days = 0
     current = start
     while current < end:
-        if current.weekday() < 5:
+        if current.weekday() < 5:  # Mon–Fri
             days += 1
         current += timedelta(days=1)
     return days
 
 
 def parse_date(s: str) -> date | None:
+    """Parse an ISO date string (YYYY-MM-DD). Returns None for empty or invalid input."""
     if not s:
         return None
     try:
@@ -25,18 +29,22 @@ def parse_date(s: str) -> date | None:
 
 
 def remaining_days(budget_days: float, percent_complete: int) -> float:
+    """Days not yet consumed: budget_days × (1 - completion %)."""
     return budget_days * (1 - percent_complete / 100)
 
 
 def budget_dollars(budget_days: float, day_rate: float) -> float:
+    """Convert a day budget to dollars at the given day rate."""
     return budget_days * day_rate
 
 
 def remaining_dollars(budget_days: float, percent_complete: int, day_rate: float) -> float:
+    """Dollar value of remaining work for a single deliverable."""
     return remaining_days(budget_days, percent_complete) * day_rate
 
 
 def deliverable_summary(d: dict, day_rate: float) -> dict:
+    """Enrich a deliverable dict with computed dollar and remaining-day fields."""
     bd = d["budget_days"]
     pc = d["percent_complete"]
     return {
@@ -48,6 +56,11 @@ def deliverable_summary(d: dict, day_rate: float) -> dict:
 
 
 def requirement_summary(req: dict, deliverables: list[dict], day_rate: float) -> dict:
+    """Aggregate a list of enriched deliverables into a requirement-level summary.
+
+    weighted_completion is the budget-day-weighted average completion across
+    all deliverables (larger deliverables count more).
+    """
     total_days = sum(d["budget_days"] for d in deliverables)
     total_dollars = sum(d["budget_dollars"] for d in deliverables)
     total_remaining_days = sum(d["remaining_days"] for d in deliverables)
@@ -70,6 +83,11 @@ def requirement_summary(req: dict, deliverables: list[dict], day_rate: float) ->
 
 
 def feature_summary(feature: dict, requirements: list[dict]) -> dict:
+    """Aggregate a list of requirement summaries into a feature-level summary.
+
+    weighted_completion rolls up from requirements the same way requirements
+    roll up from deliverables — weighted by total_days at each level.
+    """
     total_days = sum(r["total_days"] for r in requirements)
     total_dollars = sum(r["total_dollars"] for r in requirements)
     total_remaining_days = sum(r["remaining_days"] for r in requirements)
@@ -98,6 +116,12 @@ def project_summary(
     default_day_rate: float,
     realised_risk_dollars: float = 0.0,
 ) -> dict:
+    """Compute all top-level project financial metrics.
+
+    realised_risk_dollars: dollars consumed by closed risks (avoided=0,
+    mitigated=partial, realised=full). These reduce the accessible budget
+    and therefore the Budget Days Remaining figure.
+    """
     total_adj = sum(a["amount"] for a in adjustments)
     current_budget = project["initial_budget"] + total_adj
 
