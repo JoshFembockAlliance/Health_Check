@@ -74,26 +74,24 @@
     </div>
 </dl>
 
-{# ── Capacity Plan hero card (shown when periods exist or project has end date) ── #}
+{# ── Capacity Plan summary cards (shown when periods exist) ── #}
 {% if cap_summary and cap_summary.has_periods %}
-<dl class="summary-grid" style="grid-template-columns: 1fr; margin-bottom: 1.5rem;">
-    <div class="summary-card" style="text-align:left; padding: 1.25rem;">
-        <dt class="label" style="font-size:0.85rem; color: var(--pico-muted-color); margin-bottom:0.5rem;">Capacity Plan</dt>
-        <dd style="margin:0; display:flex; align-items:baseline; gap:1.5rem; flex-wrap:wrap;">
-            <span>
-                <strong style="font-size:1.4rem">{{ cap_summary.total_person_days | days }}</strong>
-                <span class="text-muted"> person-days remaining</span>
-            </span>
-            {% if cap_summary.two_week_by_role %}
-            <span class="text-muted" style="font-size:0.85rem; border-left:1px solid var(--pico-muted-border-color); padding-left:1.5rem;">
-                Next 2 weeks:
-                {% for role, days in cap_summary.two_week_by_role.items() %}
-                <strong>{{ role }}</strong> {{ days | days }} person-days{% if not loop.last %},{% endif %}
-                {% endfor %}
-            </span>
-            {% endif %}
-        </dd>
-        <dd class="text-muted" style="margin-top:0.5rem; font-size:0.82rem;"><a href="/capacity">Manage capacity &rarr;</a></dd>
+<dl class="summary-grid hero-grid" style="margin-top: 1.5rem; grid-template-columns: 1fr 1fr;">
+    <div class="summary-card hero-card">
+        <dt class="label">Capacity Remaining</dt>
+        <dd class="value">{{ cap_summary.total_person_days | days }}</dd>
+        <dd class="text-muted">person-days planned ahead</dd>
+        <dd class="text-muted" style="font-size:0.82rem;"><a href="/capacity">Manage capacity &rarr;</a></dd>
+    </div>
+    <div class="summary-card hero-card">
+        <dt class="label">Next 2 Weeks</dt>
+        {% if cap_summary.two_week_by_role %}
+        {% for role, days in cap_summary.two_week_by_role.items() %}
+        <dd><strong>{{ role }}</strong> <span class="text-muted">{{ days | days }} person-days</span></dd>
+        {% endfor %}
+        {% else %}
+        <dd class="text-muted">No capacity entries in the next 2 weeks</dd>
+        {% endif %}
     </div>
 </dl>
 {% endif %}
