@@ -30,6 +30,9 @@
         {% if summary.realised_risk_dollars > 0 %}
         <dd class="text-muted health-red">&#x26A0; Net accessible: {{ summary.accessible_budget | currency }} ({{ summary.realised_risk_dollars | currency }} absorbed by realised risks)</dd>
         {% endif %}
+        {% if risk_summary and risk_summary.open_impact_dollars > 0 %}
+        <dd class="text-muted health-amber">&#x26A0; {{ risk_summary.open_impact_dollars | currency }} unrealised risk exposure (open, may still be mitigated)</dd>
+        {% endif %}
     </div>
     <div class="summary-card hero-card">
         <dt class="label">Overall Completion</dt>
@@ -64,6 +67,9 @@
         <dd class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</dd>
         {% if summary.realised_risk_dollars > 0 %}
         <dd class="text-muted">after {{ summary.realised_risk_dollars | currency }} in realised risks</dd>
+        {% endif %}
+        {% if risk_summary and risk_summary.open_impact_days > 0 %}
+        <dd class="text-muted health-amber">&#x26A0; Up to {{ risk_summary.open_impact_days | days }} days in open risks (not yet lost)</dd>
         {% endif %}
     </div>
 </dl>
