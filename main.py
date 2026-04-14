@@ -235,25 +235,30 @@ def dashboard(request: Request):
         summary["daily_burn"],
     )
 
-    # PM Notes for dashboard: sticky + overdue + due within 14 days, not done
+    # PM Notes for dashboard: sticky + overdue + due within 14 days, not done.
+    # Stickies always show first; remaining notes sorted ascending by due_date.
     # Columns: 0=id, 1=name, 2=description, 3=status, 4=due_date
     as_of_str = project.get("as_of_date", "")
     note_rows = list(db.execute(
         "SELECT id, name, description, status, due_date FROM pm_notes ORDER BY sort_order, id"
     ).fetchall())
-    dashboard_notes = []
+    sticky_notes = []
+    dated_notes = []
+    aof = parse_date(as_of_str)
     for nr in note_rows:
         nstatus = nr[3]
         if nstatus == "done":
             continue
         note_dict = {"id": nr[0], "name": nr[1], "description": nr[2], "status": nstatus, "due_date": nr[4]}
         if nstatus == "sticky":
-            dashboard_notes.append(note_dict)
+            sticky_notes.append(note_dict)
             continue
         ndue = parse_date(nr[4])
-        aof = parse_date(as_of_str)
         if aof and ndue and (ndue <= aof or ndue <= aof + timedelta(days=14)):
-            dashboard_notes.append(note_dict)
+            dated_notes.append(note_dict)
+    # Sort non-sticky notes by due_date ascending (None sorts last)
+    dated_notes.sort(key=lambda n: n["due_date"] or "9999-99-99")
+    dashboard_notes = sticky_notes + dated_notes
     notes_overflow = max(0, len(dashboard_notes) - 3)
     dashboard_notes = dashboard_notes[:3]
 
