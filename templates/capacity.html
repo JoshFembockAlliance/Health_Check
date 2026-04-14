@@ -7,11 +7,29 @@
 </div>
 
 <article class="dashboard-section">
-    <p class="text-muted" style="margin:0">
+    <p class="text-muted" style="margin-bottom:1rem">
         Define team composition week by week. Each row represents a group of people in a given role for that week.
-        Weeks without a capacity entry use the project's default team size and day rate.
-        The project's default team size is <strong>{{ project.team_size }}</strong> people.
+        Weeks without a capacity entry fall back to the default team size and role below.
     </p>
+    <form method="post" action="/capacity/defaults" style="margin:0">
+        <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end;">
+            <label style="margin:0">
+                Default Team Size
+                <input type="number" name="team_size" value="{{ project.team_size }}" min="1" required>
+            </label>
+            <label style="margin:0">
+                Default Role
+                <select name="default_role_id">
+                    {% for role in roles %}
+                    <option value="{{ role.id }}" {% if role.id == project.default_role_id %}selected{% endif %}>
+                        {{ role.name }} ({{ role.day_rate | currency }}/day)
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn-small outline" style="margin:0">Save Defaults</button>
+        </div>
+    </form>
 </article>
 
 {# ── Capacity period table ── #}

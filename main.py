@@ -304,21 +304,18 @@ def update_project(
     start_date: str = Form(""),
     as_of_date: str = Form(""),
     initial_budget: float = Form(0),
-    team_size: int = Form(1),
     actual_spend: float = Form(0),
-    default_role_id: int = Form(1),
     health_on_track_pct: float = Form(100.0),
     health_at_risk_pct: float = Form(80.0),
 ):
     db = get_db()
+    # team_size and default_role_id are managed via /capacity/defaults
     db["project"].update(1, {
         "name": name,
         "start_date": start_date,
         "as_of_date": as_of_date,
         "initial_budget": initial_budget,
-        "team_size": team_size,
         "actual_spend": actual_spend,
-        "default_role_id": default_role_id,
         "health_on_track_pct": health_on_track_pct,
         "health_at_risk_pct": health_at_risk_pct,
     })
@@ -859,6 +856,21 @@ def add_capacity_period(
 def delete_capacity_period(period_id: int):
     db = get_db()
     db["capacity_periods"].delete(period_id)
+    return RedirectResponse("/capacity", status_code=303)
+
+
+@app.post("/capacity/defaults")
+def update_capacity_defaults(
+    team_size: int = Form(1),
+    default_role_id: int = Form(1),
+):
+    """Update the project-level default team size and role used for weeks
+    without an explicit capacity entry."""
+    db = get_db()
+    db["project"].update(1, {
+        "team_size": max(1, team_size),
+        "default_role_id": default_role_id,
+    })
     return RedirectResponse("/capacity", status_code=303)
 
 

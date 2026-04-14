@@ -13,10 +13,6 @@
                     Project Name
                     <input type="text" name="name" value="{{ project.name }}" required>
                 </label>
-                <label>
-                    Team Size
-                    <input type="number" name="team_size" value="{{ project.team_size }}" min="1" required>
-                </label>
             </div>
             <div class="grid">
                 <label>
@@ -38,16 +34,7 @@
                     <input type="number" name="actual_spend" value="{{ project.actual_spend }}" step="0.01" min="0">
                 </label>
             </div>
-            <label>
-                Default Role
-                <select name="default_role_id">
-                    {% for role in roles %}
-                    <option value="{{ role.id }}" {% if role.id == project.default_role_id %}selected{% endif %}>
-                        {{ role.name }} ({{ role.day_rate | currency }}/day)
-                    </option>
-                    {% endfor %}
-                </select>
-            </label>
+            <p class="text-muted" style="margin:0; font-size:0.9rem;">Default team size and role are configured in <a href="/capacity">Capacity Planning</a>.</p>
         </fieldset>
         <fieldset>
             <legend>Health Thresholds</legend>
