@@ -5,24 +5,11 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
-* [x] For hero cards current total budget and budget days remaining, I would like to add in an indication of the amount of unrealised risk that has not yet been lost as a contrasting point to time which has been lost to the risk. 
-
-* [x] PM Notes; put stickies first, then sort by due date
-
-* [x] Risk Exposure Panel; Effective Realised impact currently includes numbers from the open risks. Those have NOT been realised yet and can actually be mitigated, so the number is a little misleading. 
-
-* [x] The hero cards at the top of the dashboard are pressed up against the top of the capacity plan item. Capacity plan does not seem to visually match the hero cards or the other summary sections. Maybe split it into 2 hero cards or a new hero card and a new line in another section or whatever way of achieving clarity that aligns with standard UX conventions the most.
+Make the capacity planning widgets present regardless of whether or not any capacity overrides have been set. If the default capacity is the only relevant metric then it should still be shown. 
 
 ### Capacity Planning
-* [x] Currently the default rate for the default team size is appearing in the dropdown for roles but that is not helpful as it's the fallback default, not something that a user would configure. Instead, they would probably specifically not configure capacity for a time period if they wanted that rate. 
-
-* [x] It might make sense to move the default team size selector from the settings page into the capacity planner around the top with a selection for the default role as that would be used to calculate the capacity for any time periods where capacity hasn't been explicitly set. There may need to be a refactor and code cleanup to ensure that this change doesn't break anything else that was expecting that information to come from settings. 
 
 ### Risks
-* [x] In the Risk editor form, text entry for risk descriptions would benefit from being larger. Right now it's a single line but either a decent sized free text box that allows for newlines or even implementing a rich text editor would be better. There's also a pretty standard structure that would be good to add in as a sort of starting-point template for the text: 
-> * Original expectation: 
-> * What changed / was revealed:
-> * Notable tmeline and sequencing impacts: 
 
 ## New Feature Items
 ### Multiple Projects - Low Priority
