@@ -305,7 +305,7 @@ table input[type="number"] {
 .col-priority { width: 10%; }
 .col-role { width: 10%; }
 .col-num { width: 6%; }
-.col-actions { width: 56px !important; max-width: 56px !important; }
+.col-actions { width: 1%; white-space: nowrap; }
 
 /* Allow deliverable tables to scroll horizontally rather than crush columns */
 .table-scroll {
