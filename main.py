@@ -180,15 +180,19 @@ def dashboard(request: Request):
     summary["started_feature_count"] = len(started_features)
     summary["total_feature_count"] = len([f for f in features if f["total_dollars"] > 0])
 
-    # Remaining risk exposure data for the Risk Exposure section
+    # Remaining risk exposure data for the Risk Exposure section.
+    # open_impact = raw days at risk from open (unresolved) risks.
+    # eff_impact = effective days already lost from CLOSED risks only —
+    #   open risks haven't materialised and may still be mitigated, so they
+    #   are intentionally excluded from "Effective Realised Impact".
     open_impact = sum(r[1] for r in open_risks)
     eff_impact = sum(
-        effective_impact_days(r[1], r[0], r[2], r[3] or 0.0) for r in risk_rows
+        effective_impact_days(r[1], r[0], r[2], r[3] or 0.0) for r in closed_risks
     )
     avoided = sum(r[1] for r in closed_risks if r[2] == "avoided")
     current_budget = summary["current_budget"]
     open_risk_pct = min(100.0, open_impact * default_rate / current_budget * 100) if current_budget else 0.0
-    locked_risk_pct = min(100.0 - open_risk_pct, (eff_impact - open_impact) * default_rate / current_budget * 100) if current_budget else 0.0
+    locked_risk_pct = min(100.0 - open_risk_pct, eff_impact * default_rate / current_budget * 100) if current_budget else 0.0
     risk_summary = {
         "open_count": len(open_risks),
         "done_count": len(closed_risks),
