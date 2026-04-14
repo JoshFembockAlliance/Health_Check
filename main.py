@@ -193,11 +193,14 @@ def dashboard(request: Request):
     current_budget = summary["current_budget"]
     open_risk_pct = min(100.0, open_impact * default_rate / current_budget * 100) if current_budget else 0.0
     locked_risk_pct = min(100.0 - open_risk_pct, eff_impact * default_rate / current_budget * 100) if current_budget else 0.0
+    daily_burn = summary["daily_burn"]
+    open_impact_budget_days = open_impact * default_rate / daily_burn if daily_burn else 0.0
     risk_summary = {
         "open_count": len(open_risks),
         "done_count": len(closed_risks),
         "open_impact_days": open_impact,
         "open_impact_dollars": open_impact * default_rate,
+        "open_impact_budget_days": open_impact_budget_days,
         "effective_impact_days": eff_impact,
         "effective_impact_dollars": eff_impact * default_rate,
         "avoided_days": avoided,

@@ -69,7 +69,7 @@
         <dd class="text-muted">after {{ summary.realised_risk_dollars | currency }} in realised risks</dd>
         {% endif %}
         {% if risk_summary and risk_summary.open_impact_days > 0 %}
-        <dd class="text-muted health-amber">&#x26A0; Up to {{ risk_summary.open_impact_days | days }} days in open risks (not yet lost)</dd>
+        <dd class="text-muted health-amber">&#x26A0; Up to {{ risk_summary.open_impact_days | days }} person-days / {{ risk_summary.open_impact_budget_days | days }} budget days in open risks (not yet lost)</dd>
         {% endif %}
     </div>
 </dl>
