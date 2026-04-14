@@ -334,6 +334,10 @@ table input[type="number"] {
     border-color: var(--pico-primary-hover);
 }
 
+/* Remove disclosure triangle when summary is styled as a btn-add button */
+summary.btn-add { list-style: none; }
+summary.btn-add::-webkit-details-marker { display: none; }
+
 /* ── Requirement sections on feature detail page ── */
 .requirement-section {
     border: 1px solid var(--pico-muted-border-color);

@@ -151,8 +151,9 @@
     <p class="text-muted">No deliverables yet. Add one below.</p>
     {% endif %}
 
-    <div class="add-deliverable-section">
-        <form method="post" action="/requirements/{{ req.id }}/deliverables/add">
+    <details class="add-deliverable-section">
+        <summary class="btn-add">+ New Deliverable</summary>
+        <form method="post" action="/requirements/{{ req.id }}/deliverables/add" style="margin-top:0.75rem">
             <div class="grid">
                 <label>
                     Deliverable Name
@@ -184,7 +185,7 @@
             </div>
             <button type="submit" class="btn-add">+ Add Deliverable</button>
         </form>
-    </div>
+    </details>
     </div>
 </article>
 {% endfor %}

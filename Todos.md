@@ -17,7 +17,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Features & Deliverables
 * [ ] Typically I prefer to bulk update estimates against multiple deliverables before pressing save. Currently when I eventually save a deliverable, the page refreshes and I lose any edits I have made to other deliverables. I would rather have the page kept in sync with what is on my screen by having it not refresh and save regardless of whether I have pressed the save button when I leave the field I was editing. A visual indicator like having the background of the deliverable that was saved pulse for a moment afterwards might also help to communicate the change.  
 
-* [ ] The New Deliverable form at the bottom of every feature takes up a lot of space when not being used. Hide the form and add a button for `New Deliverable` to expand/reveal it. 
+* [x] The New Deliverable form at the bottom of every feature takes up a lot of space when not being used. Hide the form and add a button for `New Deliverable` to expand/reveal it. 
 
 
 ## New Feature Items
