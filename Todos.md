@@ -5,7 +5,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
-* [ ] Make the capacity planning widgets consistently available regardless of whether or not any capacity overrides have been set in the capacity tab. If the default capacity is the only relevant metric then it should still be shown as it is a useful forward-indicator for planning. 
+* [x] Make the capacity planning widgets consistently available regardless of whether or not any capacity overrides have been set in the capacity tab. If the default capacity is the only relevant metric then it should still be shown as it is a useful forward-indicator for planning. 
 
 * [ ] The Capacity Remaining hero card does not seem to give the actual number of person days available at the default day rate. Please check, explain, verify, and correct for clarity the calculation being performed. 
 

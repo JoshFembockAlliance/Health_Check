@@ -74,14 +74,18 @@
     </div>
 </dl>
 
-{# ── Capacity Plan summary cards (shown when periods exist) ── #}
-{% if cap_summary and cap_summary.has_periods %}
+{# ── Capacity Plan summary cards (always shown when project is configured) ── #}
+{% if cap_summary %}
 <dl class="summary-grid hero-grid" style="margin-top: 1.5rem; grid-template-columns: 1fr 1fr;">
     <div class="summary-card hero-card">
         <dt class="label">Capacity Remaining</dt>
         <dd class="value">{{ cap_summary.total_person_days | days }}</dd>
         <dd class="text-muted">person-days planned ahead</dd>
+        {% if not cap_summary.has_periods %}
+        <dd class="text-muted" style="font-size:0.82rem;">based on default team size &mdash; <a href="/capacity">add weekly overrides &rarr;</a></dd>
+        {% else %}
         <dd class="text-muted" style="font-size:0.82rem;"><a href="/capacity">Manage capacity &rarr;</a></dd>
+        {% endif %}
     </div>
     <div class="summary-card hero-card">
         <dt class="label">Next 2 Weeks</dt>
