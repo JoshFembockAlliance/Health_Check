@@ -9,7 +9,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 * [x] In the Current Total Budget hero card, right now the total budget is the big number. I would like the net accessible budget to be the big number with the total as the first piece of the other information that tells us how we got there. I'd also like the title of the card to reflect this. 
 
-* [ ] Remove the line about overheads from the budget days remaining as the other hero card communicates it better. Also, communicate the budget days lost in realised risks in terms of days at the default team size. 
+* [x] Remove the line about overheads from the budget days remaining as the other hero card communicates it better. Also, communicate the budget days lost in realised risks in terms of days at the default team size. 
 
 ### Features & Deliverables
 

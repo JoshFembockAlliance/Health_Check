@@ -70,11 +70,8 @@
             {{ summary.budget_days_remaining | days }}
         </dd>
         <dd class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</dd>
-        {% if summary.overhead_dollars > 0 %}
-        <dd class="text-muted">after {{ summary.overhead_dollars | currency }} in overheads</dd>
-        {% endif %}
-        {% if summary.realised_risk_dollars > 0 %}
-        <dd class="text-muted">after {{ summary.realised_risk_dollars | currency }} in realised risks</dd>
+        {% if summary.realised_risk_dollars > 0 and summary.daily_burn > 0 %}
+        <dd class="text-muted">after {{ (summary.realised_risk_dollars / summary.daily_burn) | days }} lost to realised risks</dd>
         {% endif %}
         {% if risk_summary and risk_summary.open_impact_days > 0 %}
         <dd class="text-muted health-amber">&#x26A0; Up to {{ risk_summary.open_impact_days | days }} person-days / {{ risk_summary.open_impact_budget_days | days }} budget days in open risks (not yet lost)</dd>
