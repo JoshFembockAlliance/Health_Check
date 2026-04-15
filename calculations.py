@@ -247,6 +247,63 @@ def capacity_days_remaining(
     return days
 
 
+def capacity_budget_summary(
+    remaining_budget: float,
+    as_of_date: date,
+    capacity_periods: list[dict],
+    default_daily_burn: float,
+    default_team_size: int,
+) -> dict:
+    """Walk forward day-by-day from as_of_date, spending at each day's
+    capacity-planned rate until the remaining budget is exhausted.
+
+    Returns:
+      budget_days:  business days the remaining budget can fund (float,
+                    accounting for per-week capacity fluctuations)
+      person_days:  total person-days represented by those budget days
+                    (team_size × days, summed week by week)
+
+    capacity_periods entries have keys: week_monday, day_rate, team_size.
+    Multiple entries per week are supported (one per role); their burn
+    and headcount are summed within each week.
+    """
+    # Build per-week lookups: burn rate and total headcount
+    week_burns: dict[date, float] = {}
+    week_sizes: dict[date, int] = {}
+    for cp in capacity_periods:
+        monday = cp["week_monday"]
+        week_burns[monday] = week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
+        week_sizes[monday] = week_sizes.get(monday, 0) + cp["team_size"]
+
+    budget_days = 0.0
+    person_days = 0.0
+    budget_left = remaining_budget
+    current = as_of_date
+    safety_limit = 3650
+
+    for _ in range(safety_limit):
+        if budget_left <= 0:
+            break
+        if current.weekday() < 5:  # business day
+            monday = get_week_monday(current)
+            daily_burn = week_burns.get(monday, default_daily_burn)
+            if daily_burn <= 0:
+                daily_burn = default_daily_burn
+            team_size = week_sizes.get(monday, default_team_size)
+            if budget_left >= daily_burn:
+                budget_left -= daily_burn
+                budget_days += 1.0
+                person_days += team_size
+            else:
+                fraction = budget_left / daily_burn
+                budget_days += fraction
+                person_days += fraction * team_size
+                budget_left = 0.0
+        current += timedelta(days=1)
+
+    return {"budget_days": budget_days, "person_days": person_days}
+
+
 def capacity_plan_summary(
     as_of_date: date,
     end_date: date | None,

@@ -12,6 +12,7 @@ from calculations import (
     get_week_monday,
     capacity_days_remaining,
     capacity_plan_summary,
+    capacity_budget_summary,
 )
 
 
@@ -426,3 +427,87 @@ class TestCapacityPlanSummary:
         )
         # 2 people for 5 days in the first week (within 2-week window)
         assert result["two_week_by_role"].get("Developer", 0) == pytest.approx(10.0)
+
+
+# ── capacity_budget_summary ────────────────────────────────────────────────
+
+class TestCapacityBudgetSummary:
+    def test_no_periods_uses_default_burn_and_team_size(self):
+        # $5000 budget at $1000/day default, team_size=2 → 5 budget days, 10 person-days
+        result = capacity_budget_summary(
+            remaining_budget=5_000.0,
+            as_of_date=date(2024, 1, 15),  # Monday
+            capacity_periods=[],
+            default_daily_burn=1_000.0,
+            default_team_size=2,
+        )
+        assert result["budget_days"] == pytest.approx(5.0)
+        assert result["person_days"] == pytest.approx(10.0)
+
+    def test_with_capacity_period_uses_period_burn_and_size(self):
+        # $2000 budget, 1 person at $500/day → 4 budget days, 4 person-days
+        monday = date(2024, 1, 15)
+        periods = [{"week_monday": monday, "day_rate": 500.0, "team_size": 1}]
+        result = capacity_budget_summary(
+            remaining_budget=2_000.0,
+            as_of_date=monday,
+            capacity_periods=periods,
+            default_daily_burn=1_000.0,
+            default_team_size=3,
+        )
+        assert result["budget_days"] == pytest.approx(4.0)
+        assert result["person_days"] == pytest.approx(4.0)
+
+    def test_multi_role_same_week_sums_headcount(self):
+        # 2 devs at $500/day + 1 designer at $800/day = $1800/day burn, 3 people/day
+        # $3600 budget → 2 budget days, 6 person-days
+        monday = date(2024, 1, 15)
+        periods = [
+            {"week_monday": monday, "day_rate": 500.0, "team_size": 2},
+            {"week_monday": monday, "day_rate": 800.0, "team_size": 1},
+        ]
+        result = capacity_budget_summary(
+            remaining_budget=3_600.0,
+            as_of_date=monday,
+            capacity_periods=periods,
+            default_daily_burn=1_000.0,
+            default_team_size=1,
+        )
+        assert result["budget_days"] == pytest.approx(2.0)
+        assert result["person_days"] == pytest.approx(6.0)
+
+    def test_partial_last_day(self):
+        # $1500 at $1000/day, team_size=4 → 1.5 budget days, 6 person-days
+        result = capacity_budget_summary(
+            remaining_budget=1_500.0,
+            as_of_date=date(2024, 1, 15),
+            capacity_periods=[],
+            default_daily_burn=1_000.0,
+            default_team_size=4,
+        )
+        assert result["budget_days"] == pytest.approx(1.5)
+        assert result["person_days"] == pytest.approx(6.0)
+
+    def test_zero_budget_returns_zero(self):
+        result = capacity_budget_summary(
+            remaining_budget=0.0,
+            as_of_date=date(2024, 1, 15),
+            capacity_periods=[],
+            default_daily_burn=1_000.0,
+            default_team_size=2,
+        )
+        assert result["budget_days"] == pytest.approx(0.0)
+        assert result["person_days"] == pytest.approx(0.0)
+
+    def test_skips_weekends(self):
+        # Friday start, $2000 at $1000/day, team_size=2 → 2 budget days skipping weekend
+        friday = date(2024, 1, 19)
+        result = capacity_budget_summary(
+            remaining_budget=2_000.0,
+            as_of_date=friday,
+            capacity_periods=[],
+            default_daily_burn=1_000.0,
+            default_team_size=2,
+        )
+        assert result["budget_days"] == pytest.approx(2.0)
+        assert result["person_days"] == pytest.approx(4.0)

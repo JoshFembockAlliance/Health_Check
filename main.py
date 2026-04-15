@@ -19,6 +19,7 @@ from calculations import (
     effective_impact_days,
     capacity_days_remaining,
     capacity_plan_summary,
+    capacity_budget_summary,
     get_week_monday,
     parse_date,
 )
@@ -241,6 +242,14 @@ def dashboard(request: Request):
         project.get("team_size", 1),
         summary["daily_burn"],
     )
+    remaining_budget = summary["accessible_budget"] - summary["actual_spend"]
+    cap_budget = capacity_budget_summary(
+        remaining_budget,
+        as_of or _date.today(),
+        enriched_capacity,
+        summary["daily_burn"],
+        project.get("team_size", 1),
+    )
 
     # PM Notes for dashboard: sticky + overdue + due within 14 days, not done.
     # Stickies always show first; remaining notes sorted ascending by due_date.
@@ -279,6 +288,7 @@ def dashboard(request: Request):
         "roles": roles,
         "risk_summary": risk_summary,
         "cap_summary": cap_summary,
+        "cap_budget": cap_budget,
         "dashboard_notes": dashboard_notes,
         "notes_overflow": notes_overflow,
     })
