@@ -14,6 +14,9 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 * [ ] display or even 3 risk cards per row as there will likely be a few and the horizontal space doesn't make them easier to read.
 * [ ] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
 
+### Project Readme.md enhancements
+* [ ] The readme is a visitor's first look at the application. Add a little more information that explains the different tabs and the way they interact with the dashboard to paint a holistic project health picture, maybe with a few enticing screenshots like the current picture of the dashboard would look good.  As the audience is project managers who are unlikely to be technically inclined, ensuring clarity in instructions about how a layman project manager who can access their terminal but has limited knowledge about code can get set up and running the app locally on a mac would be nice. 
+
 
 ## New Feature Items
 
