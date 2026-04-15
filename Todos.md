@@ -6,7 +6,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ### Dashboard 
 
-* [ ] The Capacity Remaining hero card does not seem to give the actual number of person days available at the default day rate. Please check, explain, verify, and correct for clarity the calculation being performed. 
+* [x] The Capacity Remaining hero card does not seem to give the actual number of person days available at the default day rate. Please check, explain, verify, and correct for clarity the calculation being performed. 
 
 * [ ] For budget and spend, group like items together. As a concrete example: if we have a current and expected spend to date, a current and expected burn, allocated and unallocated, then these things should be presented together to tell a cohesive story, either in sequence or on the same line. 
 

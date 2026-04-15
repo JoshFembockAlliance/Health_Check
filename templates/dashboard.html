@@ -80,7 +80,12 @@
     <div class="summary-card hero-card">
         <dt class="label">Capacity Remaining</dt>
         <dd class="value">{{ cap_summary.total_person_days | days }}</dd>
-        <dd class="text-muted">person-days planned ahead</dd>
+        <dd class="text-muted">person-days of scheduled capacity</dd>
+        {% if summary.daily_burn > 0 and project.team_size > 0 %}
+        {% set budget_person_days = summary.budget_days_remaining * project.team_size %}
+        {% set rate_per_person = summary.daily_burn / project.team_size %}
+        <dd class="text-muted">budget covers {{ budget_person_days | days }} person-days at {{ rate_per_person | currency }}/day</dd>
+        {% endif %}
         {% if not cap_summary.has_periods %}
         <dd class="text-muted" style="font-size:0.82rem;">based on default team size &mdash; <a href="/capacity">add weekly overrides &rarr;</a></dd>
         {% else %}
