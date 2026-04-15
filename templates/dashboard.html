@@ -111,6 +111,7 @@
 <article class="dashboard-section">
     <h3>Budget & Spend</h3>
     <div class="detail-grid">
+        {# Spend pair: actual vs expected side-by-side #}
         <div class="detail-row">
             <span class="detail-label">Actual Spend to Date</span>
             <span class="detail-value">{{ summary.actual_spend | currency }}</span>
@@ -121,12 +122,14 @@
                 <span class="text-muted">({{ summary.elapsed_days }} business days)</span>
             </span>
         </div>
-        <div class="detail-row">
-            <span class="detail-label">Spend Delta</span>
+        {# Delta spans both columns to summarise the spend pair above #}
+        <div class="detail-row" style="grid-column: 1 / -1">
+            <span class="detail-label">Spend Delta (actual vs expected)</span>
             <span class="detail-value {% if summary.burn_delta > 0 %}delta-positive{% elif summary.burn_delta < 0 %}delta-negative{% else %}delta-zero{% endif %}">
                 {{ summary.burn_delta | currency }}
             </span>
         </div>
+        {# Burn rate pair: current vs expected side-by-side #}
         <div class="detail-row">
             <span class="detail-label">Current Burn %</span>
             <span class="detail-value">{{ summary.current_burn_pct | pct }}</span>
@@ -135,6 +138,7 @@
             <span class="detail-label">Expected Burn %</span>
             <span class="detail-value">{{ summary.expected_burn_pct | pct }}</span>
         </div>
+        {# Allocation pair: committed vs available side-by-side #}
         <div class="detail-row">
             <span class="detail-label">Allocated to Features</span>
             <span class="detail-value">{{ summary.allocated_dollars | currency }}</span>

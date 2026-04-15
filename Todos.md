@@ -8,7 +8,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 * [x] The Capacity Remaining hero card does not seem to give the actual number of person days available at the default day rate. Please check, explain, verify, and correct for clarity the calculation being performed. 
 
-* [ ] For budget and spend, group like items together. As a concrete example: if we have a current and expected spend to date, a current and expected burn, allocated and unallocated, then these things should be presented together to tell a cohesive story, either in sequence or on the same line. 
+* [x] For budget and spend, group like items together. As a concrete example: if we have a current and expected spend to date, a current and expected burn, allocated and unallocated, then these things should be presented together to tell a cohesive story, either in sequence or on the same line. 
 
 ### Features & Deliverables
 * [ ] Typically I prefer to bulk update estimates against multiple deliverables before pressing save. Currently when I eventually save a deliverable, the page refreshes and I lose any edits I have made to other deliverables. I would rather have the page kept in sync with what is on my screen by having it not refresh and save regardless of whether I have pressed the save button when I leave the field I was editing. A visual indicator like having the background of the deliverable that was saved pulse for a moment afterwards might also help to communicate the change.  
