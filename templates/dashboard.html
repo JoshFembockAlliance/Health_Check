@@ -65,7 +65,7 @@
         <dd class="text-muted">target: {{ summary.expected_burn_pct | pct }}</dd>
     </div>
     <div class="summary-card hero-card">
-        <dt class="label">Budget Days Remaining</dt>
+        <dt class="label">Full Team Budget Days Remaining</dt>
         <dd class="value {% if summary.budget_days_remaining < 20 %}health-red{% elif summary.budget_days_remaining < 60 %}health-amber{% else %}health-green{% endif %}">
             {{ summary.budget_days_remaining | days }}
         </dd>
