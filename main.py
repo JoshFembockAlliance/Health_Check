@@ -128,6 +128,8 @@ def dashboard(request: Request):
     db = get_db()
     features, project, roles, default_rate = build_feature_data()
     adjustments = list(db["budget_adjustments"].rows)
+    overheads = list(db["overheads"].rows)
+    overhead_total = sum(o["amount"] for o in overheads)
 
     # Risk rows needed early to compute realised impact before project_summary
     risk_rows = db.execute(
@@ -143,7 +145,11 @@ def dashboard(request: Request):
     )
     realised_risk_dollars = realised_risk_days * default_rate
 
-    summary = project_summary(project, features, adjustments, default_rate, realised_risk_dollars)
+    summary = project_summary(
+        project, features, adjustments, default_rate,
+        realised_risk_dollars=realised_risk_dollars,
+        overhead_dollars=overhead_total,
+    )
 
     on_track_pct = project.get("health_on_track_pct", 100.0)
     at_risk_pct = project.get("health_at_risk_pct", 80.0)
@@ -284,6 +290,7 @@ def dashboard(request: Request):
         "project": project,
         "features": features,
         "adjustments": adjustments,
+        "overheads": overheads,
         "summary": summary,
         "roles": roles,
         "risk_summary": risk_summary,
@@ -302,12 +309,18 @@ def settings_page(request: Request):
     project = get_project()
     roles = get_roles()
     adjustments = list(db["budget_adjustments"].rows)
+    overheads = list(db.execute("SELECT * FROM overheads ORDER BY sort_order, id").fetchall())
+    overheads = [
+        {"id": o[0], "name": o[1], "description": o[2], "amount": o[3], "sort_order": o[4]}
+        for o in overheads
+    ]
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "active": "settings",
         "project": project,
         "roles": roles,
         "adjustments": adjustments,
+        "overheads": overheads,
     })
 
 
@@ -367,6 +380,47 @@ def add_adjustment(amount: float = Form(0), date: str = Form(""), description: s
 def delete_adjustment(adj_id: int):
     db = get_db()
     db["budget_adjustments"].delete(adj_id)
+    return RedirectResponse("/settings", status_code=303)
+
+
+# ── Overheads ──
+# Fixed dollar costs that reduce the budget pool available for delivery
+# (PM salary, tool licences, etc.). Sum is deducted from accessible_budget
+# in project_summary() so all "remaining budget" displays reflect it.
+
+@app.post("/settings/overheads/add")
+def add_overhead(name: str = Form(...), description: str = Form(""), amount: float = Form(0)):
+    db = get_db()
+    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM overheads").fetchone()[0]
+    db["overheads"].insert({
+        "name": name,
+        "description": description,
+        "amount": amount,
+        "sort_order": max_order + 1,
+    })
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/overheads/{overhead_id}/update")
+def update_overhead(
+    overhead_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    amount: float = Form(0),
+):
+    db = get_db()
+    db["overheads"].update(overhead_id, {
+        "name": name,
+        "description": description,
+        "amount": amount,
+    })
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/overheads/{overhead_id}/delete")
+def delete_overhead(overhead_id: int):
+    db = get_db()
+    db["overheads"].delete(overhead_id)
     return RedirectResponse("/settings", status_code=303)
 
 
@@ -909,7 +963,7 @@ def update_capacity_defaults(
 
 # ── Export / Import ──
 
-EXPORT_TABLES = ["project", "roles", "budget_adjustments", "features", "requirements", "deliverables", "risks", "risk_features"]
+EXPORT_TABLES = ["project", "roles", "budget_adjustments", "features", "requirements", "deliverables", "risks", "risk_features", "overheads"]
 
 
 @app.get("/export")

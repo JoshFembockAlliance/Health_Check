@@ -158,6 +158,18 @@ def init_db():
             "sort_order": int,
         }, pk="id")
 
+    # overheads — fixed dollar costs that reduce the budget pool available for
+    # feature delivery (e.g. PM salary, tool licences, cloud hosting).
+    # Sum of amount is deducted from accessible_budget in project_summary().
+    if "overheads" not in db.table_names():
+        db["overheads"].create({
+            "id": int,
+            "name": str,
+            "description": str,
+            "amount": float,
+            "sort_order": int,
+        }, pk="id")
+
     if db["project"].count == 0:
         default_role = list(db["roles"].rows)[0]
         db["project"].insert({

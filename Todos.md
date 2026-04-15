@@ -5,16 +5,20 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
+* [ ] The budget days remaining hero card should be renamed to full team budget days remaining to add some visual clarity as we now have a different card for addressing the actual allocated capacity budget remaining. The full-team burn rate is a useful metric for a different conversation as long as it is labelled as such.
 
-* [x] The Capacity Remaining hero card does not seem to give the actual number of person days available at the default day rate. Please check, explain, verify, and correct for clarity the calculation being performed. 
-
-* [x] For budget and spend, group like items together. As a concrete example: if we have a current and expected spend to date, a current and expected burn, allocated and unallocated, then these things should be presented together to tell a cohesive story, either in sequence or on the same line. 
+* [ ] In the Current Total Budget hero card, right now the total budget is the big number. I would like the net accessible budget to be the big number with the total as the first piece of the other information that tells us how we got there. I'd also like the title of the card to reflect this. 
 
 ### Features & Deliverables
-* [x] Typically I prefer to bulk update estimates against multiple deliverables before pressing save. Currently when I eventually save a deliverable, the page refreshes and I lose any edits I have made to other deliverables. I would rather have the page kept in sync with what is on my screen by having it not refresh and save regardless of whether I have pressed the save button when I leave the field I was editing. A visual indicator like having the background of the deliverable that was saved pulse for a moment afterwards might also help to communicate the change.  
+
+### Risks
+* [ ] A little padding between the cards at the top and the risk information.
+* [ ] display or even 3 risk cards per row as there will likely be a few and the horizontal space doesn't make them easier to read.
+* [ ] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
 
 
 ## New Feature Items
+
 ### Multiple Projects - Low Priority
 * [ ] This application is currently set up to help a Project Manager track the health of one and only one project at a time. The ability to create more than one project and to swap between them would allow a PM to keep track of multiple projects at once. Each project would need a name and description and its financials and settings etc should be entirely separate from other projects. I expect this would break imports and exports as they currently exist, so those may need to be removed.
 

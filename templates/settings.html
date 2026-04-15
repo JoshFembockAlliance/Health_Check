@@ -159,6 +159,63 @@
 </article>
 
 <article class="dashboard-section">
+    <h3 style="margin-top:0;">Overheads</h3>
+    <p class="text-muted">Fixed dollar costs that don't directly deliver features but draw from the same budget (e.g., Project Manager, tooling licences, cloud hosting). The total is deducted from the budget pool available for feature delivery.</p>
+    {% if overheads %}
+    <table>
+        <caption class="text-muted">Project overheads</caption>
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Description</th>
+                <th scope="col">Amount ($)</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for oh in overheads %}
+            <tr>
+                <form method="post" action="/settings/overheads/{{ oh.id }}/update">
+                    <td><input type="text" name="name" value="{{ oh.name }}" required aria-label="Overhead name"></td>
+                    <td><input type="text" name="description" value="{{ oh.description }}" aria-label="Overhead description for {{ oh.name }}"></td>
+                    <td><input type="number" name="amount" value="{{ oh.amount }}" step="0.01" min="0" required aria-label="Amount for {{ oh.name }}"></td>
+                    <td class="actions">
+                        <button type="submit" class="btn-small outline">Save</button>
+                        <button type="submit" formaction="/settings/overheads/{{ oh.id }}/delete" class="btn-small outline secondary"
+                                aria-label="Delete overhead {{ oh.name }}"
+                                onclick="event.preventDefault(); showConfirm('Delete overhead &quot;{{ oh.name }}&quot;?', this.closest('form'), '/settings/overheads/{{ oh.id }}/delete')">Delete</button>
+                    </td>
+                </form>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No overheads yet.</p>
+    {% endif %}
+    <details>
+        <summary>Add Overhead</summary>
+        <form method="post" action="/settings/overheads/add">
+            <div class="grid">
+                <label>
+                    Name
+                    <input type="text" name="name" placeholder="e.g., Project Manager" required>
+                </label>
+                <label>
+                    Amount ($)
+                    <input type="number" name="amount" placeholder="50000" step="0.01" min="0" required>
+                </label>
+            </div>
+            <label>
+                Description
+                <input type="text" name="description" placeholder="e.g., PM for 6 months">
+            </label>
+            <button type="submit" class="btn-add">+ Add Overhead</button>
+        </form>
+    </details>
+</article>
+
+<article class="dashboard-section">
     <h3 style="margin-top:0;">Export / Import</h3>
     <p class="text-muted">Export all project data as a zip of CSVs, or import from a previously exported zip to restore or switch projects. Importing will <strong>replace all existing data</strong>.</p>
     <div class="grid">

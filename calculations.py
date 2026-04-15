@@ -115,18 +115,26 @@ def project_summary(
     adjustments: list[dict],
     default_day_rate: float,
     realised_risk_dollars: float = 0.0,
+    overhead_dollars: float = 0.0,
 ) -> dict:
     """Compute all top-level project financial metrics.
 
     realised_risk_dollars: dollars consumed by closed risks (avoided=0,
     mitigated=partial, realised=full). These reduce the accessible budget
     and therefore the Budget Days Remaining figure.
+
+    overhead_dollars: sum of project overheads (PM salary, licences, etc.).
+    These are committed non-delivery costs that reduce the budget pool
+    available for feature work — so they reduce both accessible_budget
+    (flowing through to Budget Days Remaining and Capacity Remaining) and
+    unallocated_budget (so features/overheads/unallocated tile to current_budget).
     """
     total_adj = sum(a["amount"] for a in adjustments)
     current_budget = project["initial_budget"] + total_adj
 
     # Accessible budget excludes dollars already consumed by closed/realised risks
-    accessible_budget = current_budget - realised_risk_dollars
+    # and dollars committed to overheads (non-delivery costs).
+    accessible_budget = current_budget - realised_risk_dollars - overhead_dollars
 
     start = parse_date(project["start_date"])
     as_of = parse_date(project["as_of_date"])
@@ -150,14 +158,17 @@ def project_summary(
     else:
         overall_completion = 0
 
-    unallocated_budget = current_budget - allocated_dollars
-    # Days remaining is based on accessible budget (after realised risk deduction)
+    # Unallocated budget tiles cleanly with allocated_dollars and overhead_dollars:
+    # current_budget = allocated_to_features + allocated_to_overheads + unallocated
+    unallocated_budget = current_budget - allocated_dollars - overhead_dollars
+    # Days remaining is based on accessible budget (after realised risk and overhead deductions)
     budget_days_remaining = (accessible_budget - project["actual_spend"]) / daily_burn if daily_burn else 0
 
     return {
         "current_budget": current_budget,
         "accessible_budget": accessible_budget,
         "realised_risk_dollars": realised_risk_dollars,
+        "overhead_dollars": overhead_dollars,
         "initial_budget": project["initial_budget"],
         "total_adjustments": total_adj,
         "elapsed_days": elapsed_days,

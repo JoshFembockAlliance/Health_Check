@@ -215,6 +215,52 @@ class TestProjectSummary:
         assert result["accessible_budget"] == 100_000.0
         assert result["budget_days_remaining"] == pytest.approx(100.0)
 
+    def test_overhead_reduces_accessible_budget(self):
+        # $10k of overheads on $100k budget → $90k accessible
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = project_summary(proj, [], [], default_day_rate=1_000.0, overhead_dollars=10_000.0)
+        assert result["accessible_budget"] == 90_000.0
+        assert result["overhead_dollars"] == 10_000.0
+
+    def test_overhead_reduces_budget_days_remaining(self):
+        # No elapsed days, $100k budget, $20k overhead at $1k/day → 80 days
+        proj = self._make_project(budget=100_000, team_size=1, spend=0,
+                                  start="2024-01-15", as_of="2024-01-15")
+        result = project_summary(proj, [], [], default_day_rate=1_000.0, overhead_dollars=20_000.0)
+        assert result["budget_days_remaining"] == pytest.approx(80.0)
+
+    def test_overhead_reduces_unallocated_budget(self):
+        # $100k budget, $30k allocated to features, $20k overhead → $50k unallocated
+        proj = self._make_project(budget=100_000)
+        features = [
+            {"total_days": 30, "total_dollars": 30_000, "remaining_days": 30,
+             "remaining_dollars": 30_000, "weighted_completion": 0.0},
+        ]
+        result = project_summary(proj, features, [], default_day_rate=1_000.0, overhead_dollars=20_000.0)
+        assert result["unallocated_budget"] == 50_000.0
+        # Identity check: features + overheads + unallocated == current_budget
+        assert result["allocated_dollars"] + result["overhead_dollars"] + result["unallocated_budget"] == pytest.approx(result["current_budget"])
+
+    def test_overhead_and_risk_both_reduce_accessible(self):
+        # Both deductions stack: $100k - $5k risk - $10k overhead → $85k accessible
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = project_summary(
+            proj, [], [], default_day_rate=1_000.0,
+            realised_risk_dollars=5_000.0, overhead_dollars=10_000.0,
+        )
+        assert result["accessible_budget"] == 85_000.0
+        assert result["realised_risk_dollars"] == 5_000.0
+        assert result["overhead_dollars"] == 10_000.0
+
+    def test_zero_overhead_keeps_full_budget(self):
+        # Default overhead_dollars=0.0 → no change to accessible or unallocated
+        proj = self._make_project(budget=100_000, team_size=1, spend=0,
+                                  start="2024-01-15", as_of="2024-01-15")
+        result = project_summary(proj, [], [], default_day_rate=1_000.0)
+        assert result["overhead_dollars"] == 0.0
+        assert result["accessible_budget"] == 100_000.0
+        assert result["unallocated_budget"] == 100_000.0
+
     def test_expected_burn_pct(self):
         # 1 person, $1k/day, $100k budget, 5 days elapsed → 5% expected burn
         proj = self._make_project(budget=100_000, team_size=1, spend=0)

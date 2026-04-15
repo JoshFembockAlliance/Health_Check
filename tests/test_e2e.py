@@ -66,6 +66,29 @@ def test_add_and_delete_role(page: Page):
         page.wait_for_load_state("networkidle")
 
 
+def test_add_and_delete_overhead(page: Page):
+    """Can add an overhead via the Settings form and it appears in the table."""
+    page.goto(f"{BASE}/settings")
+
+    # The "Add Overhead" form is inside a <details> element — open it first
+    page.locator("details:has(form[action='/settings/overheads/add']) summary").click()
+
+    oh_form = page.locator("form[action='/settings/overheads/add']")
+    oh_form.locator("input[name='name']").fill("E2E Test Overhead")
+    oh_form.locator("input[name='description']").fill("E2E test description")
+    oh_form.locator("input[name='amount']").fill("12345")
+    oh_form.locator("button[type='submit']").click()
+
+    # Overhead appears in the overheads table as an editable input
+    expect(page.locator("td input[name='name'][value='E2E Test Overhead']").first).to_be_visible()
+
+    # Delete all E2E Test Overhead entries (handles leftover state from previous runs)
+    while page.locator("td input[name='name'][value='E2E Test Overhead']").count() > 0:
+        page.locator("button[formaction*='/settings/overheads/'][formaction*='/delete']").last.click()
+        page.locator("#confirm-ok").click()
+        page.wait_for_load_state("networkidle")
+
+
 # ── Features ──────────────────────────────────────────────────────────────
 
 def test_features_page_loads(page: Page):

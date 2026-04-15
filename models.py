@@ -68,3 +68,11 @@ class Risk(BaseModel):
 class RiskFeature(BaseModel):
     risk_id: int
     feature_id: int
+
+
+class Overhead(BaseModel):
+    id: Optional[int] = None
+    name: str
+    description: str = ""
+    amount: float = 0.0
+    sort_order: int = 0
