@@ -458,6 +458,14 @@ details:not([open]) .collapse-arrow {
 .delta-negative { color: #2e7d32; }
 .delta-zero { color: var(--pico-muted-color); }
 
+/* ── Autosave pulse: briefly flashes row green on successful save ── */
+@keyframes row-saved-pulse {
+    0%   { background-color: transparent; }
+    25%  { background-color: rgba(46, 125, 50, 0.18); }
+    100% { background-color: transparent; }
+}
+.row-saved { animation: row-saved-pulse 0.9s ease; }
+
 /* ── Dashboard: Hero cards ── */
 .hero-grid {
     grid-template-columns: repeat(3, 1fr);

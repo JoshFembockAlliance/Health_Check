@@ -520,6 +520,26 @@ def update_percent(del_id: int, percent_complete: int = Form(0)):
     return JSONResponse({"ok": True, "feature_id": req["feature_id"]})
 
 
+@app.post("/api/deliverables/{del_id}/update")
+def api_update_deliverable(
+    del_id: int,
+    name: str = Form(...),
+    budget_days: float = Form(0),
+    percent_complete: int = Form(0),
+    priority: str = Form("Must Have"),
+    role_id: Optional[int] = Form(None),
+):
+    db = get_db()
+    db["deliverables"].update(del_id, {
+        "name": name,
+        "budget_days": budget_days,
+        "percent_complete": max(0, min(100, percent_complete)),
+        "priority": priority,
+        "role_id": role_id if role_id else None,
+    })
+    return JSONResponse({"ok": True})
+
+
 @app.post("/deliverables/{del_id}/delete")
 def delete_deliverable(del_id: int):
     db = get_db()

@@ -91,7 +91,7 @@
         </thead>
         <tbody>
             {% for d in req.deliverables %}
-            <tr>
+            <tr data-del-id="{{ d.id }}">
                 <form method="post" action="/deliverables/{{ d.id }}/update">
                     <td><input type="text" name="name" value="{{ d.name }}" aria-label="Deliverable name"></td>
                     <td>
@@ -324,20 +324,62 @@ document.querySelectorAll('.priority-select').forEach(sel => {
     });
 });
 
-// ── Inline % complete ──
-document.querySelectorAll('.inline-percent').forEach(input => {
-    input.addEventListener('change', () => {
-        saveReqStates(); // preserve state before reload
-        const id = input.dataset.id;
-        const val = Math.max(0, Math.min(100, parseInt(input.value) || 0));
-        input.value = val;
-        fetch(`/api/deliverables/${id}/percent`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `percent_complete=${val}`
-        }).then(r => r.json()).then(data => {
-            if (data.ok) location.reload();
+// ── Autosave deliverables on blur/change — no page refresh ──
+// Uses <tr data-del-id> as the anchor (always in correct DOM position;
+// the <form> inside <tr> is invalid HTML and may be repositioned by
+// browsers via foster-parenting, so we avoid relying on it for queries).
+function autoSave(tr) {
+    const delId = tr.dataset.delId;
+    if (!delId) return;
+
+    // Clamp percent within 0–100 and update the mini-bar immediately
+    const pctInput = tr.querySelector('[name="percent_complete"]');
+    if (pctInput) {
+        const clamped = Math.max(0, Math.min(100, parseInt(pctInput.value) || 0));
+        pctInput.value = clamped;
+        const fill = tr.querySelector('.percent-mini-fill');
+        if (fill) {
+            fill.style.width = clamped + '%';
+            fill.classList.toggle('fill-done', clamped === 100);
+        }
+    }
+
+    // Collect named field values directly from the row's DOM
+    const params = new URLSearchParams();
+    ['name', 'budget_days', 'percent_complete', 'priority', 'role_id'].forEach(fname => {
+        const el = tr.querySelector(`[name="${fname}"]`);
+        if (el) params.set(fname, el.value);
+    });
+
+    fetch(`/api/deliverables/${delId}/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: params.toString(),
+    }).then(r => r.json()).then(res => {
+        if (res.ok) {
+            tr.classList.remove('row-saved');
+            void tr.offsetWidth; // restart animation if already playing
+            tr.classList.add('row-saved');
+        }
+    }).catch(() => { /* network error — silent, user can still try save button */ });
+}
+
+document.querySelectorAll('tr[data-del-id]').forEach(tr => {
+    // Intercept the Save (✓) button click so it doesn't cause a page reload
+    const saveBtn = tr.querySelector('button.btn-icon.outline:not(.secondary)');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', e => {
+            e.preventDefault();
+            autoSave(tr);
         });
+    }
+    // Autosave when the user leaves any text / number input
+    tr.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('blur', () => autoSave(tr));
+    });
+    // Autosave immediately when a select changes
+    tr.querySelectorAll('select').forEach(sel => {
+        sel.addEventListener('change', () => autoSave(tr));
     });
 });
 </script>
