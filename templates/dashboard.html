@@ -22,18 +22,18 @@
 {# ── Hero metrics: the 3 numbers a PM looks at first ── #}
 <dl class="summary-grid hero-grid">
     <div class="summary-card hero-card">
-        <dt class="label">Current Total Budget</dt>
-        <dd class="value">{{ summary.current_budget | currency }}</dd>
-        {% if summary.total_adjustments != 0 %}
-        <dd class="text-muted">{{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.</dd>
-        {% endif %}
-        {% if summary.overhead_dollars > 0 %}
-        <dd class="text-muted">{{ summary.overhead_dollars | currency }} committed to overheads</dd>
-        {% endif %}
-        {% if summary.realised_risk_dollars > 0 or summary.overhead_dollars > 0 %}
-        <dd class="text-muted health-red">&#x26A0; Net accessible: {{ summary.accessible_budget | currency }}
-            {% if summary.realised_risk_dollars > 0 %}({{ summary.realised_risk_dollars | currency }} absorbed by realised risks){% endif %}
+        <dt class="label">Net Accessible Budget</dt>
+        <dd class="value">{{ summary.accessible_budget | currency }}</dd>
+        <dd class="text-muted">{{ summary.current_budget | currency }} total budget
+            {% if summary.total_adjustments != 0 %}
+            &mdash; {{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.
+            {% endif %}
         </dd>
+        {% if summary.overhead_dollars > 0 %}
+        <dd class="text-muted">less {{ summary.overhead_dollars | currency }} in overheads</dd>
+        {% endif %}
+        {% if summary.realised_risk_dollars > 0 %}
+        <dd class="text-muted health-red">less {{ summary.realised_risk_dollars | currency }} absorbed by realised risks</dd>
         {% endif %}
         {% if risk_summary and risk_summary.open_impact_dollars > 0 %}
         <dd class="text-muted health-amber">&#x26A0; {{ risk_summary.open_impact_dollars | currency }} unrealised risk exposure (open, may still be mitigated)</dd>
