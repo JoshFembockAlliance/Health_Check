@@ -5,11 +5,11 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
-* [ ] The budget days remaining hero card should be renamed to full team budget days remaining to add some visual clarity as we now have a different card for addressing the actual allocated capacity budget remaining. The full-team burn rate is a useful metric for a different conversation as long as it is labelled as such.
+* [x] The budget days remaining hero card should be renamed to full team budget days remaining to add some visual clarity as we now have a different card for addressing the actual allocated capacity budget remaining. The full-team burn rate is a useful metric for a different conversation as long as it is labelled as such.
 
-* [ ] In the Current Total Budget hero card, right now the total budget is the big number. I would like the net accessible budget to be the big number with the total as the first piece of the other information that tells us how we got there. I'd also like the title of the card to reflect this. 
+* [x] In the Current Total Budget hero card, right now the total budget is the big number. I would like the net accessible budget to be the big number with the total as the first piece of the other information that tells us how we got there. I'd also like the title of the card to reflect this. 
 
-* [ ] Remove the line about overheads from the budget days remaining as the other hero card communicates it better. Also, communicate the budget days lost in realised risks in terms of days at the default team size. 
+* [x] Remove the line about overheads from the budget days remaining as the other hero card communicates it better. Also, communicate the budget days lost in realised risks in terms of days at the default team size. 
 
 ### Features & Deliverables
 
