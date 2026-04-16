@@ -4,6 +4,8 @@
 
 ![The Project Health Check Dashboard showing budget, completion, and feature health](./readme_screenshots/Dashboard.png)
 
+> **Dashboard** — your live executive summary, fed automatically by every other tab.
+
 ---
 
 ## What is Project Health Check?
@@ -14,17 +16,57 @@ No formulas to maintain. No pivot tables. Just open your browser and see where t
 
 ---
 
-## The Six Tabs at a Glance
+## The Tabs at a Glance
 
-| Tab | What it does |
-|---|---|
-| **Dashboard** | Your live executive summary — budget health, completion progress, risk exposure, and urgent notes, all calculated automatically from the other tabs |
-| **Features** | Define the top-level work areas of your project, each with its own budget allocation and completion rollup |
-| **Feature Detail** | Break each feature into requirements and individual deliverables; set budget (in days), priority, and update completion % as work progresses |
-| **Capacity Planning** | Record your team composition week by week; this drives the burn rate and "days remaining" figures on the Dashboard |
-| **Risks** | Log risks with their potential impact; the Dashboard shows open risks as warnings and deducts the impact of closed (realised) risks from your accessible budget |
-| **PM Notes** | Capture sticky reminders and action items with a to-do/doing/done lifecycle; sticky notes and anything due within two weeks appear on the Dashboard automatically |
-| **Settings** | Set your project name, dates, initial budget, team defaults, day rates, and health thresholds; also where you export or import all your data |
+Each tab feeds a different piece of the Dashboard puzzle. You enter data across the tabs; the Dashboard assembles the picture automatically.
+
+---
+
+### Features
+
+![The Features tab showing budget allocation and completion rollup for each work area](./readme_screenshots/Features.png)
+
+Define the top-level work areas of your project — each with its own budget allocation in days and dollars. The completion column rolls up live from the deliverables you track inside each feature, so you always know which areas are on track and which are lagging. The Dashboard uses these numbers to colour-code each feature green, amber, or red.
+
+---
+
+### Feature Detail
+
+![The Feature Detail page showing requirements and deliverables with budget, priority, and completion](./readme_screenshots/Feature_Detail.png)
+
+Click any feature to drill into its requirements and individual deliverables. Each deliverable has a budget (in days), a role, a priority level, and a **% Done** field. Updating completion here is the only input the Dashboard needs to recalculate health — no formulas to touch.
+
+---
+
+### Capacity Planning
+
+![The Capacity Planning tab for recording team composition week by week](./readme_screenshots/Capacity.png)
+
+Record your team's size and composition week by week. The Dashboard uses your default role's day rate and the current week's headcount to calculate your daily burn rate and how many budget days remain. When someone joins or goes on leave, add an override for that week and the numbers update immediately.
+
+---
+
+### Risks
+
+![The Risks tab showing open and realised risks with financial impact](./readme_screenshots/Risks.png)
+
+Log every risk with its potential impact in days and dollars. Risks flow to the Dashboard in two ways: **open** risks appear as a warning overlay on the budget cards (your worst-case exposure), while **realised** risks (closed and confirmed) have their impact permanently deducted from your accessible budget. The kanban-style To Do / Doing / Done columns let you track mitigation progress at a glance.
+
+---
+
+### PM Notes
+
+![The PM Notes tab with sticky reminders and to-do items](./readme_screenshots/PM_Notes.png)
+
+Capture reminders, action items, and anything you need to stay on top of. Notes can be flagged **Sticky** or given a due date — either condition causes them to surface automatically on the Dashboard. If more than three notes are due in the next two weeks, the Dashboard shows a count badge so nothing gets buried in a long list.
+
+---
+
+### Settings
+
+![The Settings tab for configuring project details, roles, and health thresholds](./readme_screenshots/Settings.png)
+
+Configure your project name, start date, initial budget, team defaults, and day rates. This is also where you set the health thresholds that determine when a feature turns amber or red, record fixed overhead costs, and export or import all your project data as JSON.
 
 ---
 
@@ -39,10 +81,6 @@ The Dashboard is a read-only summary — you never type directly into it. Everyt
 **Risks adjust your accessible budget.** A risk that has been closed and realised (it actually happened) has its impact deducted from your remaining budget on the Dashboard. Risks that are still open show as a warning overlay on the progress bars, so you can see your worst-case exposure at a glance.
 
 **PM Notes surface what's urgent.** Any note marked Sticky, or any note with a due date in the next two weeks, appears as a card on the Dashboard. If there are more than three, the Dashboard shows a count so nothing gets buried.
-
-<!-- Future screenshot: Features tab with completion rollup table -->
-
-<!-- Future screenshot: Risks tab showing open vs. realised impact -->
 
 ---
 
