@@ -12,7 +12,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Features & Deliverables
 
 ### Risks
-* [ ] A little padding between the cards at the top and the risk information.
+* [x] A little padding between the cards at the top and the risk information.
 * [ ] display or even 3 risk cards per row as there will likely be a few and the horizontal space doesn't make them easier to read.
 * [ ] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
 * [ ] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
