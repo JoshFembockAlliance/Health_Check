@@ -19,22 +19,22 @@
         <dd class="value health-green">{{ summary.done }}</dd>
     </div>
     <div class="summary-card">
-        <dt class="label">Open Impact (days)</dt>
+        <dt class="label">Unrealised Exposure (days)</dt>
         <dd class="value">{{ summary.open_impact_days | days }}</dd>
     </div>
     <div class="summary-card">
-        <dt class="label">Open Impact ($)</dt>
+        <dt class="label">Unrealised Exposure ($)</dt>
         <dd class="value">{{ summary.open_impact_dollars | currency }}</dd>
     </div>
     <div class="summary-card">
-        <dt class="label">Effective Impact (days)</dt>
+        <dt class="label">Realised Impact (days)</dt>
         <dd class="value">{{ summary.effective_impact_days | days }}</dd>
-        <dd class="text-muted" style="font-size:0.75rem;">incl. closed</dd>
+        <dd class="text-muted" style="font-size:0.75rem;">all risks</dd>
     </div>
     <div class="summary-card">
-        <dt class="label">Effective Impact ($)</dt>
+        <dt class="label">Realised Impact ($)</dt>
         <dd class="value">{{ summary.effective_impact_dollars | currency }}</dd>
-        <dd class="text-muted" style="font-size:0.75rem;">incl. closed</dd>
+        <dd class="text-muted" style="font-size:0.75rem;">all risks</dd>
     </div>
 </dl>
 
@@ -47,11 +47,9 @@
             <span class="health-badge {% if risk.status == 'done' %}badge-green{% elif risk.status == 'doing' %}badge-amber{% else %}badge-red{% endif %}">
                 {% if risk.status == 'done' %}&#10003; {% elif risk.status == 'doing' %}&#9888; {% else %}&#9675; {% endif %}{{ risk.status | upper }}
             </span>
-            {% if risk.status == 'done' and risk.resolution_type %}
-            <span class="health-badge {% if risk.resolution_type == 'avoided' %}badge-green{% elif risk.resolution_type == 'mitigated' %}badge-amber{% else %}badge-red{% endif %}">
-                {% if risk.resolution_type == 'avoided' %}Avoided
-                {% elif risk.resolution_type == 'mitigated' %}Mitigated ({{ risk.mitigation_percentage | round(1) }}%)
-                {% else %}Realised{% endif %}
+            {% if risk.resolution_label %}
+            <span class="health-badge {% if risk.resolution_label == 'Avoided' %}badge-green{% elif risk.resolution_label == 'Mitigated' %}badge-amber{% else %}badge-red{% endif %}">
+                {{ risk.resolution_label }}{% if risk.resolution_label == 'Mitigated' %} ({{ risk.realised_percentage | round(1) }}%){% endif %}
             </span>
             {% endif %}
             <h3 style="margin:0;">{{ risk.name }}</h3>
@@ -63,8 +61,8 @@
             {% if risk.impact_days > 0 %}
             <span class="text-muted">
                 Impact: {{ risk.impact_days | days }} days ({{ risk.impact_dollars | currency }})
-                {% if risk.status == 'done' %}
-                &rarr; effective: {{ risk.effective_impact_days | days }} days ({{ risk.effective_impact_dollars | currency }})
+                {% if risk.realised_percentage > 0 %}
+                &rarr; realised: {{ risk.effective_impact_days | days }} days ({{ risk.effective_impact_dollars | currency }})
                 {% endif %}
             </span>
             {% endif %}
@@ -110,7 +108,7 @@
                     <div class="grid">
                         <label>
                             Status
-                            <select name="status" onchange="onEditStatusChange(this, {{ risk.id }})">
+                            <select name="status">
                                 <option value="todo" {% if risk.status == 'todo' %}selected{% endif %}>To Do</option>
                                 <option value="doing" {% if risk.status == 'doing' %}selected{% endif %}>Doing</option>
                                 <option value="done" {% if risk.status == 'done' %}selected{% endif %}>Done</option>
@@ -124,30 +122,10 @@
                             Impact (days)
                             <input type="number" name="impact_days" value="{{ risk.impact_days }}" step="0.5" min="0">
                         </label>
-                    </div>
-                    <div class="resolution-group" id="resolution-group-{{ risk.id }}"
-                         style="{% if risk.status != 'done' %}display:none;{% endif %}">
-                        <div class="grid">
-                            <label>
-                                Resolution
-                                <select name="resolution_type" id="resolution_type_{{ risk.id }}"
-                                        onchange="toggleMitigationPct(this, {{ risk.id }})">
-                                    <option value="">— select —</option>
-                                    <option value="avoided" {% if risk.resolution_type == 'avoided' %}selected{% endif %}>Avoided (0% realised)</option>
-                                    <option value="mitigated" {% if risk.resolution_type == 'mitigated' %}selected{% endif %}>Mitigated (partial %)</option>
-                                    <option value="realised" {% if risk.resolution_type == 'realised' %}selected{% endif %}>Realised (100%)</option>
-                                </select>
-                            </label>
-                            <div id="mitigation_pct_group_{{ risk.id }}"
-                                 style="{% if risk.resolution_type != 'mitigated' %}display:none;{% endif %}">
-                                <label>
-                                    % of Impact Realised
-                                    <input type="number" name="mitigation_percentage"
-                                           value="{{ risk.mitigation_percentage }}"
-                                           step="0.1" min="0" max="100">
-                                </label>
-                            </div>
-                        </div>
+                        <label>
+                            % Realised
+                            <input type="number" name="realised_percentage" value="{{ risk.realised_percentage }}" step="1" min="0" max="100">
+                        </label>
                     </div>
                     <div class="actions">
                         <button type="submit" class="btn-small outline">Save</button>
@@ -197,7 +175,7 @@
         <div class="grid">
             <label>
                 Status
-                <select name="status" onchange="onAddStatusChange(this)">
+                <select name="status">
                     <option value="todo" selected>To Do</option>
                     <option value="doing">Doing</option>
                     <option value="done">Done</option>
@@ -211,114 +189,13 @@
                 Impact (days)
                 <input type="number" name="impact_days" value="0" step="0.5" min="0">
             </label>
-        </div>
-        <div class="resolution-group" id="add-resolution-group" style="display:none;">
-            <div class="grid">
-                <label>
-                    Resolution
-                    <select name="resolution_type" id="add_resolution_type"
-                            onchange="toggleMitigationPctAdd()">
-                        <option value="">— select —</option>
-                        <option value="avoided">Avoided (0% realised)</option>
-                        <option value="mitigated">Mitigated (partial %)</option>
-                        <option value="realised">Realised (100%)</option>
-                    </select>
-                </label>
-                <div id="add-mitigation-pct-group" style="display:none;">
-                    <label>
-                        % of Impact Realised
-                        <input type="number" name="mitigation_percentage" value="0" step="0.1" min="0" max="100">
-                    </label>
-                </div>
-            </div>
+            <label>
+                % Realised <span class="text-muted">(usually 0 on creation)</span>
+                <input type="number" name="realised_percentage" value="0" step="1" min="0" max="100">
+            </label>
         </div>
         <button type="submit" class="btn-add">+ Add Risk</button>
     </form>
 </div>
 
-{# ── Resolution dialog ── #}
-<dialog id="resolve-dialog">
-    <article>
-        <header><strong>Close Risk: Specify Resolution</strong></header>
-        <p id="resolve-dialog-risk-name" class="text-muted"></p>
-        <label>
-            Resolution type
-            <select id="resolve-type-select" onchange="toggleResolveDialogPct()">
-                <option value="avoided">Avoided — no impact realised</option>
-                <option value="mitigated">Mitigated — partial impact realised</option>
-                <option value="realised">Realised — full impact</option>
-            </select>
-        </label>
-        <div id="resolve-pct-group" style="display:none; margin-top:0.5rem;">
-            <label>
-                % of Impact Realised
-                <input type="number" id="resolve-pct-input" value="50" step="0.1" min="0" max="100">
-            </label>
-        </div>
-        <footer style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
-            <button class="btn-small secondary outline" onclick="document.getElementById('resolve-dialog').close()">Cancel</button>
-            <button class="btn-small" onclick="submitResolve()">Confirm</button>
-        </footer>
-    </article>
-</dialog>
-
-{% endblock %}
-
-{% block scripts %}
-<script>
-let _pendingResolveRiskId = null;
-
-function onEditStatusChange(sel, riskId) {
-    const group = document.getElementById('resolution-group-' + riskId);
-    group.style.display = sel.value === 'done' ? '' : 'none';
-}
-
-function toggleMitigationPct(sel, riskId) {
-    const pctGroup = document.getElementById('mitigation_pct_group_' + riskId);
-    pctGroup.style.display = sel.value === 'mitigated' ? '' : 'none';
-}
-
-function onAddStatusChange(sel) {
-    document.getElementById('add-resolution-group').style.display =
-        sel.value === 'done' ? '' : 'none';
-}
-
-function toggleMitigationPctAdd() {
-    const sel = document.getElementById('add_resolution_type');
-    document.getElementById('add-mitigation-pct-group').style.display =
-        sel.value === 'mitigated' ? '' : 'none';
-}
-
-function toggleResolveDialogPct() {
-    const sel = document.getElementById('resolve-type-select');
-    document.getElementById('resolve-pct-group').style.display =
-        sel.value === 'mitigated' ? '' : 'none';
-}
-
-function onStatusChangeToDone(riskId, riskName) {
-    _pendingResolveRiskId = riskId;
-    document.getElementById('resolve-dialog-risk-name').textContent = riskName;
-    document.getElementById('resolve-dialog').showModal();
-}
-
-function submitResolve() {
-    if (!_pendingResolveRiskId) return;
-    const resType = document.getElementById('resolve-type-select').value;
-    const pct = document.getElementById('resolve-pct-input').value;
-    const body = new URLSearchParams({
-        resolution_type: resType,
-        mitigation_percentage: resType === 'mitigated' ? pct : '0',
-    });
-    fetch('/api/risks/' + _pendingResolveRiskId + '/resolve', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body.toString(),
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            document.getElementById('resolve-dialog').close();
-            location.reload();
-        }
-    });
-}
-</script>
 {% endblock %}

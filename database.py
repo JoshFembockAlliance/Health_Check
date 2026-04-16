@@ -103,8 +103,9 @@ def init_db():
         db["project"].add_column("health_at_risk_pct", float, not_null_default=80.0)
 
     # risks — project risks with impact measured in days.
-    # resolution_type (avoided/mitigated/realised) determines how much of
-    # impact_days actually "lands" on the budget via effective_impact_days().
+    # status drives the lifecycle (todo/doing/done); realised_percentage
+    # (0-100, independent of status) determines how many impact_days
+    # have already been absorbed into the budget via effective_impact_days().
     if "risks" not in db.table_names():
         db["risks"].create({
             "id": int,
@@ -114,20 +115,31 @@ def init_db():
             "due_date": str,
             "impact_days": float,
             "sort_order": int,
+            "realised_percentage": float,
         }, pk="id")
 
-    # Migration: add columns if missing
+    # Migration: reshape legacy (resolution_type, mitigation_percentage) columns
+    # into a single realised_percentage field.
     if "risks" in db.table_names():
         risk_cols = {col.name for col in db["risks"].columns}
         if "name" not in risk_cols:
             db["risks"].add_column("name", str, not_null_default="")
-        if "resolution_type" not in risk_cols:
-            db["risks"].add_column("resolution_type", str)
-        if "mitigation_percentage" not in risk_cols:
-            db["risks"].add_column("mitigation_percentage", float, not_null_default=0.0)
-        # Back-fill existing "done" risks — conservative default: treat as fully realised
-        db.execute("UPDATE risks SET resolution_type = 'realised' WHERE status = 'done' AND resolution_type IS NULL")
-        db.conn.commit()
+        if "realised_percentage" not in risk_cols:
+            db["risks"].add_column("realised_percentage", float, not_null_default=0.0)
+            # Back-fill from the legacy columns if they are still present.
+            if "resolution_type" in risk_cols and "mitigation_percentage" in risk_cols:
+                db.execute("UPDATE risks SET realised_percentage = 0 WHERE resolution_type = 'avoided'")
+                db.execute("UPDATE risks SET realised_percentage = mitigation_percentage WHERE resolution_type = 'mitigated'")
+                db.execute("UPDATE risks SET realised_percentage = 100 WHERE resolution_type = 'realised'")
+                # Conservative default — any closed risk without a resolution
+                # previously counted as fully realised; match that.
+                db.execute("UPDATE risks SET realised_percentage = 100 WHERE status = 'done' AND (resolution_type IS NULL OR resolution_type = '')")
+                db.conn.commit()
+        # Drop legacy columns once migration has run.
+        current_cols = {col.name for col in db["risks"].columns}
+        legacy_cols = {c for c in ("resolution_type", "mitigation_percentage") if c in current_cols}
+        if legacy_cols:
+            db["risks"].transform(drop=legacy_cols)
 
     if "risk_features" not in db.table_names():
         db["risk_features"].create({

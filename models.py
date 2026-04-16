@@ -61,8 +61,11 @@ class Risk(BaseModel):
     due_date: str = ""
     impact_days: float = 0.0
     sort_order: int = 0
-    resolution_type: Optional[str] = None   # None | "avoided" | "mitigated" | "realised"
-    mitigation_percentage: float = 0.0      # 0–100, meaningful only when mitigated
+    # realised_percentage is independent of status: even an open risk can have
+    # some portion already absorbed. 0 = nothing realised yet, 100 = fully
+    # absorbed. For closed risks the derived label is Avoided (0%),
+    # Mitigated (1-99%), or Realised (100%).
+    realised_percentage: float = 0.0
 
 
 class RiskFeature(BaseModel):

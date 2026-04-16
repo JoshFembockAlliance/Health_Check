@@ -4,6 +4,8 @@ import pytest
 from calculations import (
     business_days_between,
     effective_impact_days,
+    unrealised_exposure_days,
+    resolution_label,
     deliverable_summary,
     requirement_summary,
     feature_summary,
@@ -45,29 +47,54 @@ class TestBusinessDaysBetween:
 # ── effective_impact_days ──────────────────────────────────────────────────
 
 class TestEffectiveImpactDays:
-    def test_open_todo_returns_full_impact(self):
-        assert effective_impact_days(10.0, "todo", None, 0.0) == 10.0
+    def test_zero_percent_returns_zero(self):
+        assert effective_impact_days(10.0, 0.0) == 0.0
 
-    def test_open_doing_returns_full_impact(self):
-        assert effective_impact_days(5.0, "doing", "avoided", 100.0) == 5.0
+    def test_hundred_percent_returns_full(self):
+        assert effective_impact_days(10.0, 100.0) == pytest.approx(10.0)
 
-    def test_done_avoided_returns_zero(self):
-        assert effective_impact_days(10.0, "done", "avoided", 0.0) == 0.0
+    def test_partial_returns_proportional(self):
+        assert effective_impact_days(10.0, 40.0) == pytest.approx(4.0)
 
-    def test_done_mitigated_returns_partial(self):
-        assert effective_impact_days(10.0, "done", "mitigated", 40.0) == pytest.approx(4.0)
+    def test_partial_open_risk_counts(self):
+        # Realised % is independent of status — open risks with partial
+        # realisation still contribute to the realised total.
+        assert effective_impact_days(8.0, 25.0) == pytest.approx(2.0)
 
-    def test_done_mitigated_fully(self):
-        assert effective_impact_days(10.0, "done", "mitigated", 100.0) == pytest.approx(10.0)
+    def test_zero_impact_returns_zero(self):
+        assert effective_impact_days(0.0, 75.0) == 0.0
 
-    def test_done_realised_returns_full(self):
-        assert effective_impact_days(10.0, "done", "realised", 0.0) == 10.0
 
-    def test_done_no_resolution_returns_full_conservative(self):
-        assert effective_impact_days(10.0, "done", None, 0.0) == 10.0
+class TestUnrealisedExposureDays:
+    def test_open_zero_percent_full_exposure(self):
+        assert unrealised_exposure_days(10.0, "todo", 0.0) == pytest.approx(10.0)
 
-    def test_zero_impact(self):
-        assert effective_impact_days(0.0, "todo", None, 0.0) == 0.0
+    def test_open_partial_realised(self):
+        # 10 days × (1 - 30%) = 7 days still at risk
+        assert unrealised_exposure_days(10.0, "doing", 30.0) == pytest.approx(7.0)
+
+    def test_closed_risk_has_no_exposure(self):
+        # Closed risks have zero remaining exposure regardless of realised %
+        assert unrealised_exposure_days(10.0, "done", 0.0) == 0.0
+        assert unrealised_exposure_days(10.0, "done", 50.0) == 0.0
+        assert unrealised_exposure_days(10.0, "done", 100.0) == 0.0
+
+
+class TestResolutionLabel:
+    def test_open_risks_have_no_label(self):
+        assert resolution_label("todo", 50.0) == ""
+        assert resolution_label("doing", 100.0) == ""
+
+    def test_closed_zero_is_avoided(self):
+        assert resolution_label("done", 0.0) == "Avoided"
+
+    def test_closed_full_is_realised(self):
+        assert resolution_label("done", 100.0) == "Realised"
+
+    def test_closed_partial_is_mitigated(self):
+        assert resolution_label("done", 1.0) == "Mitigated"
+        assert resolution_label("done", 50.0) == "Mitigated"
+        assert resolution_label("done", 99.0) == "Mitigated"
 
 
 # ── deliverable_summary ────────────────────────────────────────────────────

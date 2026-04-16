@@ -17,6 +17,8 @@ from calculations import (
     project_summary,
     feature_health,
     effective_impact_days,
+    unrealised_exposure_days,
+    resolution_label,
     capacity_days_remaining,
     capacity_plan_summary,
     capacity_budget_summary,
@@ -131,24 +133,31 @@ def dashboard(request: Request):
     overheads = list(db["overheads"].rows)
     overhead_total = sum(o["amount"] for o in overheads)
 
-    # Risk rows needed early to compute realised impact before project_summary
+    # Risk rows needed early so realised/open risk dollars can flow into project_summary.
+    # Tuple positions: (status, impact_days, realised_percentage).
     risk_rows = db.execute(
-        "SELECT status, impact_days, resolution_type, mitigation_percentage FROM risks"
+        "SELECT status, impact_days, realised_percentage FROM risks"
     ).fetchall()
     open_risks = [r for r in risk_rows if r[0] != "done"]
     closed_risks = [r for r in risk_rows if r[0] == "done"]
 
-    # Effective impact for closed risks only — these have actually materialised
-    # and reduce the budget available for project work
+    # Realised risk days are summed across ALL risks — realised_percentage is
+    # independent of status, so open risks with partial realisation count too.
     realised_risk_days = sum(
-        effective_impact_days(r[1], r[0], r[2], r[3] or 0.0) for r in closed_risks
+        effective_impact_days(r[1], r[2] or 0.0) for r in risk_rows
     )
     realised_risk_dollars = realised_risk_days * default_rate
+    # Open risk exposure = unrealised portion of open risks only.
+    open_exposure_days = sum(
+        unrealised_exposure_days(r[1], r[0], r[2] or 0.0) for r in risk_rows
+    )
+    open_risk_dollars = open_exposure_days * default_rate
 
     summary = project_summary(
         project, features, adjustments, default_rate,
         realised_risk_dollars=realised_risk_dollars,
         overhead_dollars=overhead_total,
+        open_risk_dollars=open_risk_dollars,
     )
 
     on_track_pct = project.get("health_on_track_pct", 100.0)
@@ -188,31 +197,27 @@ def dashboard(request: Request):
     summary["started_feature_count"] = len(started_features)
     summary["total_feature_count"] = len([f for f in features if f["total_dollars"] > 0])
 
-    # Remaining risk exposure data for the Risk Exposure section.
-    # open_impact = raw days at risk from open (unresolved) risks.
-    # eff_impact = effective days already lost from CLOSED risks only —
-    #   open risks haven't materialised and may still be mitigated, so they
-    #   are intentionally excluded from "Effective Realised Impact".
-    open_impact = sum(r[1] for r in open_risks)
-    eff_impact = sum(
-        effective_impact_days(r[1], r[0], r[2], r[3] or 0.0) for r in closed_risks
-    )
-    avoided = sum(r[1] for r in closed_risks if r[2] == "avoided")
+    # Risk exposure breakdown for the Risk Exposure section.
+    # open_exposure_days: unrealised portion of open risks (still at risk).
+    # realised_risk_days: already-absorbed portion across ALL risks
+    #   (open-with-partial + closed).
+    # avoided_days: closed risks that landed at 0% — days "saved" vs impact.
+    avoided = sum(r[1] for r in closed_risks if (r[2] or 0.0) == 0)
     current_budget = summary["current_budget"]
-    open_risk_pct = min(100.0, open_impact * default_rate / current_budget * 100) if current_budget else 0.0
-    locked_risk_pct = min(100.0 - open_risk_pct, eff_impact * default_rate / current_budget * 100) if current_budget else 0.0
+    open_risk_pct = min(100.0, open_risk_dollars / current_budget * 100) if current_budget else 0.0
+    locked_risk_pct = min(100.0 - open_risk_pct, realised_risk_dollars / current_budget * 100) if current_budget else 0.0
     daily_burn = summary["daily_burn"]
-    open_impact_budget_days = open_impact * default_rate / daily_burn if daily_burn else 0.0
+    open_impact_budget_days = open_risk_dollars / daily_burn if daily_burn else 0.0
     risk_summary = {
         "open_count": len(open_risks),
         "done_count": len(closed_risks),
-        "open_impact_days": open_impact,
-        "open_impact_dollars": open_impact * default_rate,
+        "open_impact_days": open_exposure_days,
+        "open_impact_dollars": open_risk_dollars,
         "open_impact_budget_days": open_impact_budget_days,
-        "effective_impact_days": eff_impact,
-        "effective_impact_dollars": eff_impact * default_rate,
+        "effective_impact_days": realised_risk_days,
+        "effective_impact_dollars": realised_risk_dollars,
         "avoided_days": avoided,
-        "effective_impact_pct": min(100.0, eff_impact * default_rate / current_budget * 100) if current_budget else 0.0,
+        "effective_impact_pct": min(100.0, realised_risk_dollars / current_budget * 100) if current_budget else 0.0,
         "open_impact_pct": open_risk_pct,
         "open_risk_pct": round(open_risk_pct, 1),
         "locked_risk_pct": round(locked_risk_pct, 1),
@@ -624,7 +629,7 @@ def risks_page(request: Request):
     roles = get_roles()
     default_role_rate = get_role_rate(project["default_role_id"], roles, 0)
     risks = list(db.execute(
-        "SELECT id, name, description, status, due_date, impact_days, sort_order, resolution_type, mitigation_percentage FROM risks ORDER BY sort_order, id"
+        "SELECT id, name, description, status, due_date, impact_days, sort_order, realised_percentage FROM risks ORDER BY sort_order, id"
     ).fetchall())
     features_rows = list(db.execute("SELECT id, name FROM features ORDER BY sort_order, id").fetchall())
     all_features = [{"id": f[0], "name": f[1]} for f in features_rows]
@@ -634,14 +639,18 @@ def risks_page(request: Request):
         rdict = {
             "id": r[0], "name": r[1], "description": r[2], "status": r[3],
             "due_date": r[4], "impact_days": r[5], "sort_order": r[6],
-            "resolution_type": r[7], "mitigation_percentage": r[8] or 0.0,
+            "realised_percentage": r[7] or 0.0,
         }
         rdict["impact_dollars"] = rdict["impact_days"] * default_role_rate
         rdict["effective_impact_days"] = effective_impact_days(
-            rdict["impact_days"], rdict["status"],
-            rdict["resolution_type"], rdict["mitigation_percentage"]
+            rdict["impact_days"], rdict["realised_percentage"]
         )
         rdict["effective_impact_dollars"] = rdict["effective_impact_days"] * default_role_rate
+        rdict["unrealised_days"] = unrealised_exposure_days(
+            rdict["impact_days"], rdict["status"], rdict["realised_percentage"]
+        )
+        rdict["unrealised_dollars"] = rdict["unrealised_days"] * default_role_rate
+        rdict["resolution_label"] = resolution_label(rdict["status"], rdict["realised_percentage"])
         # Get linked features
         links = list(db.execute(
             "SELECT f.id, f.name FROM risk_features rf JOIN features f ON rf.feature_id = f.id WHERE rf.risk_id = ?",
@@ -654,13 +663,14 @@ def risks_page(request: Request):
     todo_count = sum(1 for r in enriched_risks if r["status"] == "todo")
     doing_count = sum(1 for r in enriched_risks if r["status"] == "doing")
     done_count = sum(1 for r in enriched_risks if r["status"] == "done")
-    open_impact_days = sum(r["impact_days"] for r in enriched_risks if r["status"] != "done")
+    open_impact_days = sum(r["unrealised_days"] for r in enriched_risks)
     open_impact_dollars = open_impact_days * default_role_rate
     effective_impact_days_total = sum(r["effective_impact_days"] for r in enriched_risks)
     effective_impact_dollars_total = effective_impact_days_total * default_role_rate
-    avoided_days = sum(r["impact_days"] for r in enriched_risks if r["resolution_type"] == "avoided")
-    mitigated_days = sum(r["effective_impact_days"] for r in enriched_risks if r["resolution_type"] == "mitigated")
-    realised_days = sum(r["effective_impact_days"] for r in enriched_risks if r["resolution_type"] == "realised")
+    avoided_days = sum(
+        r["impact_days"] for r in enriched_risks
+        if r["status"] == "done" and r["realised_percentage"] == 0
+    )
 
     return templates.TemplateResponse("risks.html", {
         "request": request,
@@ -676,11 +686,14 @@ def risks_page(request: Request):
             "effective_impact_days": effective_impact_days_total,
             "effective_impact_dollars": effective_impact_dollars_total,
             "avoided_days": avoided_days,
-            "mitigated_days": mitigated_days,
-            "realised_days": realised_days,
         },
         "default_rate": default_role_rate,
     })
+
+
+def _clamp_pct(value: float) -> float:
+    """Constrain a percentage value to [0, 100]."""
+    return max(0.0, min(100.0, value))
 
 
 @app.post("/risks/add")
@@ -690,14 +703,10 @@ def add_risk(
     status: str = Form("todo"),
     due_date: str = Form(""),
     impact_days: float = Form(0),
-    resolution_type: Optional[str] = Form(None),
-    mitigation_percentage: float = Form(0.0),
+    realised_percentage: float = Form(0.0),
 ):
     db = get_db()
     max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM risks").fetchone()[0]
-    if status != "done":
-        resolution_type = None
-        mitigation_percentage = 0.0
     db["risks"].insert({
         "name": name,
         "description": description,
@@ -705,8 +714,7 @@ def add_risk(
         "due_date": due_date,
         "impact_days": impact_days,
         "sort_order": max_order + 1,
-        "resolution_type": resolution_type,
-        "mitigation_percentage": mitigation_percentage if resolution_type == "mitigated" else 0.0,
+        "realised_percentage": _clamp_pct(realised_percentage),
     })
     return RedirectResponse("/risks", status_code=303)
 
@@ -719,21 +727,16 @@ def update_risk(
     status: str = Form("todo"),
     due_date: str = Form(""),
     impact_days: float = Form(0),
-    resolution_type: Optional[str] = Form(None),
-    mitigation_percentage: float = Form(0.0),
+    realised_percentage: float = Form(0.0),
 ):
     db = get_db()
-    if status != "done":
-        resolution_type = None
-        mitigation_percentage = 0.0
     db["risks"].update(risk_id, {
         "name": name,
         "description": description,
         "status": status,
         "due_date": due_date,
         "impact_days": impact_days,
-        "resolution_type": resolution_type,
-        "mitigation_percentage": mitigation_percentage if resolution_type == "mitigated" else 0.0,
+        "realised_percentage": _clamp_pct(realised_percentage),
     })
     return RedirectResponse("/risks", status_code=303)
 
@@ -747,36 +750,23 @@ def delete_risk(risk_id: int):
 
 
 @app.post("/api/risks/{risk_id}/status")
-def update_risk_status(risk_id: int, status: str = Form("todo"), resolution_type: Optional[str] = Form(None)):
+def update_risk_status(risk_id: int, status: str = Form("todo")):
+    """Inline status change from a risk card. Realised % is handled
+    independently via /api/risks/{id}/realised — no modal flow needed.
+    """
     if status not in ("todo", "doing", "done"):
         return JSONResponse({"ok": False, "error": "invalid status"})
-    if status == "done" and resolution_type is None:
-        return JSONResponse({"ok": False, "needs_resolution": True, "status": status})
     db = get_db()
-    update_data: dict = {"status": status}
-    if status != "done":
-        update_data["resolution_type"] = None
-        update_data["mitigation_percentage"] = 0.0
-    db["risks"].update(risk_id, update_data)
+    db["risks"].update(risk_id, {"status": status})
     return JSONResponse({"ok": True, "status": status})
 
 
-@app.post("/api/risks/{risk_id}/resolve")
-def resolve_risk(
-    risk_id: int,
-    resolution_type: str = Form(...),
-    mitigation_percentage: float = Form(0.0),
-):
-    if resolution_type not in ("avoided", "mitigated", "realised"):
-        return JSONResponse({"ok": False, "error": "invalid resolution_type"}, status_code=422)
-    pct = max(0.0, min(100.0, mitigation_percentage))
+@app.post("/api/risks/{risk_id}/realised")
+def update_risk_realised(risk_id: int, realised_percentage: float = Form(0.0)):
+    """Inline edit of realised % from a risk card."""
     db = get_db()
-    db["risks"].update(risk_id, {
-        "status": "done",
-        "resolution_type": resolution_type,
-        "mitigation_percentage": pct if resolution_type == "mitigated" else 0.0,
-    })
-    return JSONResponse({"ok": True, "resolution_type": resolution_type})
+    db["risks"].update(risk_id, {"realised_percentage": _clamp_pct(realised_percentage)})
+    return JSONResponse({"ok": True, "realised_percentage": _clamp_pct(realised_percentage)})
 
 
 @app.post("/risks/{risk_id}/link-feature")

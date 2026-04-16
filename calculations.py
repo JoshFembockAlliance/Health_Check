@@ -116,12 +116,20 @@ def project_summary(
     default_day_rate: float,
     realised_risk_dollars: float = 0.0,
     overhead_dollars: float = 0.0,
+    open_risk_dollars: float = 0.0,
 ) -> dict:
     """Compute all top-level project financial metrics.
 
-    realised_risk_dollars: dollars consumed by closed risks (avoided=0,
-    mitigated=partial, realised=full). These reduce the accessible budget
-    and therefore the Budget Days Remaining figure.
+    realised_risk_dollars: dollars already absorbed via realised_percentage
+    on any risk (open or closed). These reduce the accessible budget and
+    therefore the Budget Days Remaining figure.
+
+    open_risk_dollars: dollars of unrealised exposure from open risks —
+    impact_days × (1 - realised%) × day_rate, summed. Reported on the
+    summary so the dashboard can surface "at risk" next to unallocated
+    budget. Does NOT reduce accessible_budget (open risks haven't landed
+    yet and may still be mitigated), but flags the unallocated value as
+    unsafe to fully allocate.
 
     overhead_dollars: sum of project overheads (PM salary, licences, etc.).
     These are committed non-delivery costs that reduce the budget pool
@@ -172,6 +180,7 @@ def project_summary(
         "current_budget": current_budget,
         "accessible_budget": accessible_budget,
         "realised_risk_dollars": realised_risk_dollars,
+        "open_risk_dollars": open_risk_dollars,
         "overhead_dollars": overhead_dollars,
         "initial_budget": project["initial_budget"],
         "total_adjustments": total_adj,
@@ -193,26 +202,45 @@ def project_summary(
     }
 
 
-def effective_impact_days(
-    impact_days: float,
-    status: str,
-    resolution_type,
-    mitigation_percentage: float,
-) -> float:
-    """Return the realised impact days for a risk.
-    Open risks (todo/doing): full impact_days.
-    avoided:   0
-    mitigated: impact_days × (mitigation_percentage / 100)
-    realised:  impact_days (full)
-    None (done but no resolution set): treat as realised (conservative).
+def effective_impact_days(impact_days: float, realised_percentage: float) -> float:
+    """Return the already-realised impact days for a risk.
+
+    realised_percentage is independent of status: an open risk can have
+    partial realisation (some time irrecoverably spent), and a closed risk
+    carries whatever percentage was set when it was resolved. The exposure
+    (unrealised portion) is impact_days * (1 - realised_percentage/100)
+    and is only meaningful for open risks.
+    """
+    return impact_days * (realised_percentage / 100.0)
+
+
+def unrealised_exposure_days(impact_days: float, status: str, realised_percentage: float) -> float:
+    """Return the portion of impact_days still at risk for an open risk.
+
+    Closed risks carry zero remaining exposure — whatever hasn't already
+    been realised is gone with the resolution.
+    """
+    if status == "done":
+        return 0.0
+    return impact_days * (1.0 - realised_percentage / 100.0)
+
+
+def resolution_label(status: str, realised_percentage: float) -> str:
+    """Derived display label for a closed risk.
+
+    Open risks return an empty string (no resolution yet). Closed risks
+    map to the classic register vocabulary:
+      0%         → Avoided
+      1% to 99%  → Mitigated
+      100%       → Realised
     """
     if status != "done":
-        return impact_days
-    if resolution_type == "avoided":
-        return 0.0
-    if resolution_type == "mitigated":
-        return impact_days * (mitigation_percentage / 100.0)
-    return impact_days  # "realised" or NULL — conservative
+        return ""
+    if realised_percentage <= 0:
+        return "Avoided"
+    if realised_percentage >= 100:
+        return "Realised"
+    return "Mitigated"
 
 
 def get_week_monday(d: date) -> date:
