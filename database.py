@@ -114,6 +114,7 @@ def init_db():
             "status": str,
             "due_date": str,
             "impact_days": float,
+            "timeline_impact_days": float,
             "sort_order": int,
             "realised_percentage": float,
             "resultant_work": str,
@@ -127,6 +128,8 @@ def init_db():
             db["risks"].add_column("name", str, not_null_default="")
         if "resultant_work" not in risk_cols:
             db["risks"].add_column("resultant_work", str, not_null_default="")
+        if "timeline_impact_days" not in risk_cols:
+            db["risks"].add_column("timeline_impact_days", float, not_null_default=0.0)
         if "realised_percentage" not in risk_cols:
             db["risks"].add_column("realised_percentage", float, not_null_default=0.0)
             # Back-fill from the legacy columns if they are still present.

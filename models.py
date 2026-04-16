@@ -60,6 +60,11 @@ class Risk(BaseModel):
     status: str = "todo"  # todo, doing, done
     due_date: str = ""
     impact_days: float = 0.0
+    # timeline_impact_days: schedule slip in days, separate from impact_days
+    # which measures billable/budget cost. A sequencing hiccup might cost 3d
+    # of billable time but slip the schedule by 10d — both are worth noting
+    # but only impact_days flows into budget calculations.
+    timeline_impact_days: float = 0.0
     sort_order: int = 0
     # realised_percentage is independent of status: even an open risk can have
     # some portion already absorbed. 0 = nothing realised yet, 100 = fully

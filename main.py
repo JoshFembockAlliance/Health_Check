@@ -629,7 +629,7 @@ def risks_page(request: Request):
     roles = get_roles()
     default_role_rate = get_role_rate(project["default_role_id"], roles, 0)
     risks = list(db.execute(
-        "SELECT id, name, description, status, due_date, impact_days, sort_order, realised_percentage, resultant_work FROM risks ORDER BY sort_order, id"
+        "SELECT id, name, description, status, due_date, impact_days, sort_order, realised_percentage, resultant_work, timeline_impact_days FROM risks ORDER BY sort_order, id"
     ).fetchall())
     features_rows = list(db.execute("SELECT id, name FROM features ORDER BY sort_order, id").fetchall())
     all_features = [{"id": f[0], "name": f[1]} for f in features_rows]
@@ -641,6 +641,7 @@ def risks_page(request: Request):
             "due_date": r[4], "impact_days": r[5], "sort_order": r[6],
             "realised_percentage": r[7] or 0.0,
             "resultant_work": r[8] or "",
+            "timeline_impact_days": r[9] or 0.0,
         }
         rdict["impact_dollars"] = rdict["impact_days"] * default_role_rate
         rdict["effective_impact_days"] = effective_impact_days(
@@ -704,6 +705,7 @@ def add_risk(
     status: str = Form("todo"),
     due_date: str = Form(""),
     impact_days: float = Form(0),
+    timeline_impact_days: float = Form(0),
     realised_percentage: float = Form(0.0),
     resultant_work: str = Form(""),
 ):
@@ -715,6 +717,7 @@ def add_risk(
         "status": status,
         "due_date": due_date,
         "impact_days": impact_days,
+        "timeline_impact_days": timeline_impact_days,
         "sort_order": max_order + 1,
         "realised_percentage": _clamp_pct(realised_percentage),
         "resultant_work": resultant_work,
@@ -730,6 +733,7 @@ def update_risk(
     status: str = Form("todo"),
     due_date: str = Form(""),
     impact_days: float = Form(0),
+    timeline_impact_days: float = Form(0),
     realised_percentage: float = Form(0.0),
     resultant_work: str = Form(""),
 ):
@@ -740,6 +744,7 @@ def update_risk(
         "status": status,
         "due_date": due_date,
         "impact_days": impact_days,
+        "timeline_impact_days": timeline_impact_days,
         "realised_percentage": _clamp_pct(realised_percentage),
         "resultant_work": resultant_work,
     })
