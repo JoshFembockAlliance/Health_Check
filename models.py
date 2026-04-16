@@ -66,6 +66,11 @@ class Risk(BaseModel):
     # absorbed. For closed risks the derived label is Avoided (0%),
     # Mitigated (1-99%), or Realised (100%).
     realised_percentage: float = 0.0
+    # resultant_work: free text describing the work items that flow from
+    # realised impact (e.g. "3 days went into rebuilding the sync layer").
+    # Kept separate from description so the narrative about what changed
+    # is distinct from the narrative about what we're now doing about it.
+    resultant_work: str = ""
 
 
 class RiskFeature(BaseModel):

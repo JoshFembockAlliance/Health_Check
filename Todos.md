@@ -5,15 +5,13 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
-* [x] Ensure that the overall hero card is deducting budget allocated to overheads when it is deciding total budget that contributes to comparisons as unlike budget lost to risks, overheads are never expected to contribute toward feature completion directly.
 
-* [x] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. 
+* [ ] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. Similarly, Budget that is at risk due to unrealised risks should be shown beside the unallocated budget number in the standard unrealised risk colour as that budget would be slightly unsafe to allocate until the issues are dealt with. 
 
 ### Features & Deliverables
 
 ### Risks
-* [x] A little padding between the cards at the top and the risk information.
-* [ ] display or even 3 risk cards per row as there will likely be a few and the horizontal space doesn't make them easier to read.
+* [ ] display or even 3 risk cards per row on the risks page as there will likely be a few and the horizontal space doesn't make them easier to read. If this would squash them enough that text would be hard to read, consider using modals to display risks full-size when necessary. 
 * [ ] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
 * [ ] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
 * [ ] Right now we have a single field for impact which pertains to days the risk will cost the budget. There is usually also a timeline impact which is separate to that and doesn't need to be included in calculations, but allows the project manager to tell a story. For example, a realised risk has resulted in a sequencing hiccup that costs only 3 days of billable time but that has 10 days of timeline impact. That information is worth noting when discussing the risk.  
@@ -51,4 +49,4 @@ Review all user interface elements across the different pages. Ensure that each 
 Last Addressed: 14/04/2026
 
 ### Readme Review
-Check that the readme is up to date. Ensure any recent changes that require revisions to the document have been adjusted for. If there have been significant changes, synchronise the readme with the true current state. If you update screenshots, ensure mock data is in use.  
+Check that the readme is up to date. Ensure any recent changes that require revisions to the document have been adjusted for. If there have been significant changes, synchronise the readme with the true current state. If the Readme is getting crowded, consider ading one or more purpose-specific multiple documents and linking them to essentially maintain a multi-page readme in a way that is friendly with GitHub. If you update screenshots, ensure mock data is in use instead of actual data as it could contain sensitive customer information. 

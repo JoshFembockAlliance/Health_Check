@@ -74,6 +74,11 @@
     <p class="risk-description">{{ risk.description }}</p>
     {% endif %}
 
+    {# Resultant work narrative — only shown when populated #}
+    {% if risk.resultant_work %}
+    <p class="risk-resultant-work"><span class="text-muted">Resultant work:</span> {{ risk.resultant_work }}</p>
+    {% endif %}
+
     {# Linked features #}
     {% if risk.linked_features %}
     <div class="risk-linked-features">
@@ -104,6 +109,10 @@
                     <label>
                         Description <span class="text-muted">(optional)</span>
                         <textarea name="description" rows="5" placeholder="Original expectation:&#10;What changed / was revealed:&#10;Notable timeline and sequencing impacts:">{{ risk.description }}</textarea>
+                    </label>
+                    <label>
+                        Resultant Work <span class="text-muted">(work items that came out of realised impact)</span>
+                        <textarea name="resultant_work" rows="3" placeholder="e.g., 3 days went into rebuilding the sync layer; 2 days of rework on the import flow">{{ risk.resultant_work }}</textarea>
                     </label>
                     <div class="grid">
                         <label>
@@ -171,6 +180,10 @@
         <label>
             Description <span class="text-muted">(optional detail)</span>
             <textarea name="description" rows="5" placeholder="Original expectation:&#10;What changed / was revealed:&#10;Notable timeline and sequencing impacts:"></textarea>
+        </label>
+        <label>
+            Resultant Work <span class="text-muted">(optional — work items that came out of realised impact)</span>
+            <textarea name="resultant_work" rows="3" placeholder="e.g., 3 days went into rebuilding the sync layer; 2 days of rework on the import flow"></textarea>
         </label>
         <div class="grid">
             <label>

@@ -116,6 +116,7 @@ def init_db():
             "impact_days": float,
             "sort_order": int,
             "realised_percentage": float,
+            "resultant_work": str,
         }, pk="id")
 
     # Migration: reshape legacy (resolution_type, mitigation_percentage) columns
@@ -124,6 +125,8 @@ def init_db():
         risk_cols = {col.name for col in db["risks"].columns}
         if "name" not in risk_cols:
             db["risks"].add_column("name", str, not_null_default="")
+        if "resultant_work" not in risk_cols:
+            db["risks"].add_column("resultant_work", str, not_null_default="")
         if "realised_percentage" not in risk_cols:
             db["risks"].add_column("realised_percentage", float, not_null_default=0.0)
             # Back-fill from the legacy columns if they are still present.

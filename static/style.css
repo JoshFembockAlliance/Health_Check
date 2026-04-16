@@ -781,6 +781,16 @@ nav.container-fluid a:focus-visible {
     font-size: 0.9rem;
 }
 
+.risk-resultant-work {
+    margin: 0.25rem 0 0.5rem;
+    color: var(--pico-color);
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
+    border-left: 3px solid var(--pico-muted-border-color);
+    background: var(--pico-card-sectioning-background-color, #f8f9fa);
+    border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+}
+
 .risk-header-meta {
     display: flex;
     align-items: center;
