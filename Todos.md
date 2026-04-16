@@ -7,7 +7,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Dashboard 
 * [ ] Ensure that the overall hero card is deducting budget allocated to overheads when it is deciding total budget that contributes to comparisons as unlike budget lost to risks, overheads are never expected to contribute toward feature completion directly.
 
-* [ ] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more. 
+* [ ] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. 
 
 ### Features & Deliverables
 
@@ -52,3 +52,6 @@ Last Addressed: 14/04/2026
 ### UI / UX Clarity and Accessibility Review
 Review all user interface elements across the different pages. Ensure that each element's purpose is clear and visually legible. Consider accessibility metrics like those that would be used by the Lighthouse chrome plugin. 
 Last Addressed: 14/04/2026
+
+### Readme Review
+* [ ] Is the readme up to date? Do recent changes require revisions? If there have been significant changes, synchronise the readme with the true current state. 
