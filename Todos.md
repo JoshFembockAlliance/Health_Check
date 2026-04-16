@@ -7,7 +7,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Dashboard 
 * [x] Ensure that the overall hero card is deducting budget allocated to overheads when it is deciding total budget that contributes to comparisons as unlike budget lost to risks, overheads are never expected to contribute toward feature completion directly.
 
-* [ ] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. 
+* [x] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. 
 
 ### Features & Deliverables
 

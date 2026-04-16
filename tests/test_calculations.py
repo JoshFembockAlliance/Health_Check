@@ -238,8 +238,25 @@ class TestProjectSummary:
         ]
         result = project_summary(proj, features, [], default_day_rate=1_000.0, overhead_dollars=20_000.0)
         assert result["unallocated_budget"] == 50_000.0
-        # Identity check: features + overheads + unallocated == current_budget
-        assert result["allocated_dollars"] + result["overhead_dollars"] + result["unallocated_budget"] == pytest.approx(result["current_budget"])
+        # Identity: features + overheads + realised_risks + unallocated == current_budget
+        assert (result["allocated_dollars"] + result["overhead_dollars"]
+                + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["current_budget"])
+
+    def test_realised_risk_excluded_from_unallocated(self):
+        # Realised risk dollars must not appear as unallocated budget.
+        # $100k budget, $10k risk, $20k overhead, $30k features → $40k unallocated
+        proj = self._make_project(budget=100_000)
+        features = [
+            {"total_days": 30, "total_dollars": 30_000, "remaining_days": 30,
+             "remaining_dollars": 30_000, "weighted_completion": 0.0},
+        ]
+        result = project_summary(
+            proj, features, [], default_day_rate=1_000.0,
+            realised_risk_dollars=10_000.0, overhead_dollars=20_000.0,
+        )
+        assert result["unallocated_budget"] == pytest.approx(40_000.0)
+        assert (result["allocated_dollars"] + result["overhead_dollars"]
+                + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["current_budget"])
 
     def test_overhead_and_risk_both_reduce_accessible(self):
         # Both deductions stack: $100k - $5k risk - $10k overhead → $85k accessible

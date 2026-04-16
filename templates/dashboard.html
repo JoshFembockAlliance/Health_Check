@@ -139,7 +139,7 @@
             <span class="detail-label">Expected Burn %</span>
             <span class="detail-value">{{ summary.expected_burn_pct | pct }}</span>
         </div>
-        {# Allocation trio: features / overheads / unallocated — tile to current_budget #}
+        {# Allocation quartet: features / overheads / realised risks / unallocated — tile to current_budget #}
         <div class="detail-row">
             <span class="detail-label">Allocated to Features</span>
             <span class="detail-value">{{ summary.allocated_dollars | currency }}</span>
@@ -148,6 +148,12 @@
             <span class="detail-label">Allocated to Overheads</span>
             <span class="detail-value">{{ summary.overhead_dollars | currency }}</span>
         </div>
+        {% if summary.realised_risk_dollars > 0 %}
+        <div class="detail-row">
+            <span class="detail-label">Absorbed by Realised Risks</span>
+            <span class="detail-value health-red">{{ summary.realised_risk_dollars | currency }}</span>
+        </div>
+        {% endif %}
         <div class="detail-row">
             <span class="detail-label">Unallocated Budget</span>
             <span class="detail-value {% if summary.unallocated_budget < 0 %}health-red{% elif summary.unallocated_budget > 0 %}health-green{% endif %}">

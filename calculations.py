@@ -162,9 +162,9 @@ def project_summary(
     else:
         overall_completion = 0
 
-    # Unallocated budget tiles cleanly with allocated_dollars and overhead_dollars:
-    # current_budget = allocated_to_features + allocated_to_overheads + unallocated
-    unallocated_budget = current_budget - allocated_dollars - overhead_dollars
+    # Unallocated budget tiles cleanly with allocated_dollars, overhead_dollars, and realised risks:
+    # current_budget = allocated_to_features + allocated_to_overheads + realised_risks + unallocated
+    unallocated_budget = current_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
     # Days remaining is based on accessible budget (after realised risk and overhead deductions)
     budget_days_remaining = (accessible_budget - project["actual_spend"]) / daily_burn if daily_burn else 0
 
