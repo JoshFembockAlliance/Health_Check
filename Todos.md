@@ -7,12 +7,16 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Dashboard 
 * [ ] Ensure that the overall hero card is deducting budget allocated to overheads when it is deciding total budget that contributes to comparisons as unlike budget lost to risks, overheads are never expected to contribute toward feature completion directly.
 
+* [ ] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more. 
+
 ### Features & Deliverables
 
 ### Risks
 * [ ] A little padding between the cards at the top and the risk information.
 * [ ] display or even 3 risk cards per row as there will likely be a few and the horizontal space doesn't make them easier to read.
 * [ ] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
+* [ ] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
+* [ ] Right now we have a single field for impact which pertains to days the risk will cost the budget. There is usually also a timeline impact which is separate to that and doesn't need to be included in calculations, but allows the project manager to tell a story. For example, a realised risk has resulted in a sequencing hiccup that costs only 3 days of billable time but that has 10 days of timeline impact. That information is worth noting when discussing the risk.  
 
 ### Project Readme.md enhancements
 * [ ] The readme is a visitor's first look at the application. Add a little more information that explains the different tabs and the way they interact with the dashboard to paint a holistic project health picture, maybe with a few enticing screenshots like the current picture of the dashboard would look good.  As the audience is project managers who are unlikely to be technically inclined, ensuring clarity in instructions about how a layman project manager who can access their terminal but has limited knowledge about code can get set up and running the app locally on a mac would be nice. 
