@@ -18,9 +18,6 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 * [ ] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
 * [ ] Right now we have a single field for impact which pertains to days the risk will cost the budget. There is usually also a timeline impact which is separate to that and doesn't need to be included in calculations, but allows the project manager to tell a story. For example, a realised risk has resulted in a sequencing hiccup that costs only 3 days of billable time but that has 10 days of timeline impact. That information is worth noting when discussing the risk.  
 
-### Project Readme.md enhancements
-* [ ] The readme is a visitor's first look at the application. Add a little more information that explains the different tabs and the way they interact with the dashboard to paint a holistic project health picture, maybe with a few enticing screenshots like the current picture of the dashboard would look good.  As the audience is project managers who are unlikely to be technically inclined, ensuring clarity in instructions about how a layman project manager who can access their terminal but has limited knowledge about code can get set up and running the app locally on a mac would be nice. 
-
 
 ## New Feature Items
 
@@ -54,4 +51,4 @@ Review all user interface elements across the different pages. Ensure that each 
 Last Addressed: 14/04/2026
 
 ### Readme Review
-* [ ] Is the readme up to date? Do recent changes require revisions? If there have been significant changes, synchronise the readme with the true current state. 
+Check that the readme is up to date. Ensure any recent changes that require revisions to the document have been adjusted for. If there have been significant changes, synchronise the readme with the true current state. If you update screenshots, ensure mock data is in use.  
