@@ -1,29 +1,125 @@
 # Project Health Check
 
-A lightweight web app for tracking project delivery health — budgets, features, requirements, deliverables, and completion status.
+**One live view of your project's budget, delivery, risks, and notes — no spreadsheet required.**
 
-![A screenshot of the Project Health Check Dashboard](./readme_screenshots/Dashboard.png) 
+![The Project Health Check Dashboard showing budget, completion, and feature health](./readme_screenshots/Dashboard.png)
 
-## Quick Start
+---
 
-```bash
-pip install -r requirements.txt
+## What is Project Health Check?
+
+Project Health Check is a lightweight web app built for project managers who want a single, always-up-to-date picture of how their project is tracking. You enter your budget, team, features, and risks once, then update completion percentages as work progresses. The Dashboard does the rest — calculating burn rate, flagging features that are falling behind, and surfacing anything that needs your attention today.
+
+No formulas to maintain. No pivot tables. Just open your browser and see where things stand.
+
+---
+
+## The Six Tabs at a Glance
+
+| Tab | What it does |
+|---|---|
+| **Dashboard** | Your live executive summary — budget health, completion progress, risk exposure, and urgent notes, all calculated automatically from the other tabs |
+| **Features** | Define the top-level work areas of your project, each with its own budget allocation and completion rollup |
+| **Feature Detail** | Break each feature into requirements and individual deliverables; set budget (in days), priority, and update completion % as work progresses |
+| **Capacity Planning** | Record your team composition week by week; this drives the burn rate and "days remaining" figures on the Dashboard |
+| **Risks** | Log risks with their potential impact; the Dashboard shows open risks as warnings and deducts the impact of closed (realised) risks from your accessible budget |
+| **PM Notes** | Capture sticky reminders and action items with a to-do/doing/done lifecycle; sticky notes and anything due within two weeks appear on the Dashboard automatically |
+| **Settings** | Set your project name, dates, initial budget, team defaults, day rates, and health thresholds; also where you export or import all your data |
+
+---
+
+## How the Tabs Feed the Dashboard
+
+The Dashboard is a read-only summary — you never type directly into it. Everything it shows is calculated live from the data you enter across the other tabs.
+
+**Features drive the health traffic lights.** For each feature, the Dashboard compares how much of the budget has been spent against how much of the work is complete. Features that are burning budget faster than they're delivering turn amber or red. Green means on track.
+
+**Capacity Planning drives burn rate and days remaining.** The app uses your team size and the day rate of your default role to calculate how much budget is consumed each working day. If your team changes in a given week — someone joins, someone goes on leave — you record that in Capacity Planning and the Dashboard adjusts automatically.
+
+**Risks adjust your accessible budget.** A risk that has been closed and realised (it actually happened) has its impact deducted from your remaining budget on the Dashboard. Risks that are still open show as a warning overlay on the progress bars, so you can see your worst-case exposure at a glance.
+
+**PM Notes surface what's urgent.** Any note marked Sticky, or any note with a due date in the next two weeks, appears as a card on the Dashboard. If there are more than three, the Dashboard shows a count so nothing gets buried.
+
+<!-- Future screenshot: Features tab with completion rollup table -->
+
+<!-- Future screenshot: Risks tab showing open vs. realised impact -->
+
+---
+
+## Getting Started on a Mac
+
+These instructions are written for someone who has not used the command line before. Follow each step in order and you will have the app running in under five minutes.
+
+### Step 1 — Open Terminal
+
+Press **Cmd + Space** to open Spotlight Search, type **Terminal**, and press **Enter**. A window with a blinking cursor will appear — this is the command prompt, where you type instructions for your Mac.
+
+### Step 2 — Check that Python 3 is installed
+
+Click inside the Terminal window, paste the following, and press **Enter**:
+
+```
+python3 --version
+```
+
+If you see a version number starting with 3 (for example, `Python 3.11.4`), you are ready for the next step.
+
+If you see an error message instead, you need to install Python 3. Go to **https://www.python.org/downloads/** in your browser, click the big yellow download button, and run the installer. Accept all defaults. Then come back here.
+
+### Step 3 — Navigate to the project folder
+
+Type `cd ` (the letters c and d, then a space) in the Terminal window — **do not press Enter yet**. Now open **Finder**, locate the **Health_Check** folder, and drag it into the Terminal window. The folder's path will appear automatically after your `cd `. Now press **Enter**.
+
+### Step 4 — Install dependencies (one-time only)
+
+Paste the following and press **Enter**:
+
+```
+pip3 install -r requirements.txt
+```
+
+You will see a series of lines appear as the app's libraries are downloaded. Wait until the cursor returns and you see no error in red. You only need to do this once — skip this step on future startups.
+
+> If you see `command not found: pip3`, try `pip install -r requirements.txt` instead.
+
+### Step 5 — Start the app
+
+Paste the following and press **Enter**:
+
+```
 uvicorn main:app --reload
 ```
 
-Then open http://127.0.0.1:8000
+When you see the line `Application startup complete`, the app is running. Open your browser and go to:
 
-## Setup
+**http://127.0.0.1:8000**
 
-1. Go to **Settings** to configure your project name, dates, budget, team size, and roles
-2. Add **Features**, then add **Requirements** under each feature
-3. Add **Deliverables** under each requirement with budget (in days) and priority
-4. Update **% Complete** as work progresses
-5. View the **Dashboard** for executive summary and health indicators
+The app will stay running as long as the Terminal window is open.
+
+### Step 6 — Stop the app
+
+When you are done, click the Terminal window and press **Ctrl + C** (hold the Control key and press C). The app will shut down.
+
+> **Tip:** Next time you want to start the app, just open Terminal, repeat Step 3 to navigate to the folder, then run Step 5. You do not need to reinstall dependencies again.
+
+---
+
+## First-Time Project Setup
+
+Once the app is open in your browser, follow these steps to get your project configured:
+
+1. Go to **Settings** and fill in your project name, start date, and initial budget. Add at least one **Role** (for example, "Project Manager") with a day rate — this is used to calculate your daily burn rate.
+2. Go to **Features** and add the major work areas of your project (for example, "Design", "Development", "Testing"). These are the top-level buckets that appear on the Dashboard.
+3. Click into each feature to open its **Feature Detail** page. Add **Requirements** (what needs to be done) and **Deliverables** under each requirement (the specific tasks), including budget in days and a priority level.
+4. As work progresses, return to each feature's detail page and update the **% Complete** on individual deliverables. The Dashboard completion figures update immediately.
+5. Visit the **Dashboard** whenever you need a summary — it reflects the current state of everything you have entered.
+
+---
 
 ## Key Concepts
 
-- **Roles** have day rates. A default role is auto-assigned to new deliverables.
-- **Budget Adjustments** track changes to the initial budget over time.
-- **Daily Burn Rate** = team size x default role day rate.
-- **Health indicators** compare completion % against budget spent % per feature.
+- **Roles and day rates** — Each role (e.g. Senior Developer, Business Analyst) has a daily cost. Assign roles to deliverables to track where budget is going. The default role's day rate determines your daily burn.
+- **Budget Adjustments** — If your budget changes mid-project, record it in Settings rather than overwriting the original figure. This preserves a history of how the budget evolved.
+- **Burn rate** — The amount of budget consumed each working day, calculated as your team size multiplied by the default role's day rate. Adjust this by updating Capacity Planning when your team changes.
+- **Health indicators** — Each feature on the Dashboard is colour-coded: green (on track), amber (at risk), or red (behind). The thresholds are configurable in Settings — by default, a feature is "on track" if its completion % matches or exceeds the expected spend %, and "at risk" if it falls within 80% of that target.
+- **Accessible budget** — Your remaining budget after deducting realised risk impacts and any fixed overhead costs (such as software licences or a PM retainer) that you have recorded in Settings.
