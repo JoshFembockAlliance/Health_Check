@@ -267,6 +267,20 @@ class TestProjectSummary:
         result = project_summary(proj, [], [], default_day_rate=1_000.0)
         assert result["expected_burn_pct"] == pytest.approx(5.0)
 
+    def test_feature_expected_burn_pct_excludes_overhead(self):
+        # $100k budget, $20k overhead → feature budget = $80k
+        # 1 person, $1k/day, 5 days elapsed → expected_spend = $5k
+        # feature_expected_burn_pct = 5_000 / 80_000 * 100 = 6.25%
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = project_summary(proj, [], [], default_day_rate=1_000.0, overhead_dollars=20_000.0)
+        assert result["feature_expected_burn_pct"] == pytest.approx(6.25)
+
+    def test_feature_expected_burn_pct_no_overhead_matches_expected(self):
+        # With no overhead, feature_expected_burn_pct should equal expected_burn_pct
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = project_summary(proj, [], [], default_day_rate=1_000.0)
+        assert result["feature_expected_burn_pct"] == pytest.approx(result["expected_burn_pct"])
+
     def test_overall_completion_weighted_by_days(self):
         proj = self._make_project()
         features = [

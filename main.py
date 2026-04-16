@@ -166,20 +166,21 @@ def dashboard(request: Request):
 
     # Adjust the target for started features: they must carry the full project
     # completion load since non-started features contribute nothing.
-    # adjusted_target = min(100, expected_burn_pct × total_days / started_days)
+    # adjusted_target = min(100, feature_expected_burn_pct × total_days / started_days)
     total_feature_days = sum(f["total_days"] for f in features if f["total_days"] > 0)
+    feature_burn_pct = summary["feature_expected_burn_pct"]
     if started_total_days > 0 and total_feature_days > 0:
         started_adjusted_target = min(
             100.0,
-            summary["expected_burn_pct"] * total_feature_days / started_total_days,
+            feature_burn_pct * total_feature_days / started_total_days,
         )
     else:
-        started_adjusted_target = summary["expected_burn_pct"]
+        started_adjusted_target = feature_burn_pct
 
     for f in features:
         effective_target = (
             started_adjusted_target if (f.get("started", 0) and f["total_days"] > 0)
-            else summary["expected_burn_pct"]
+            else feature_burn_pct
         )
         f["health"] = feature_health(f, effective_target, on_track_pct, at_risk_pct)
 

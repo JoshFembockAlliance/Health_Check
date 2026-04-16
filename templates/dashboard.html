@@ -41,7 +41,7 @@
     </div>
     <div class="summary-card hero-card">
         <dt class="label">Overall Completion</dt>
-        <dd class="value {% if summary.overall_completion >= summary.expected_burn_pct %}health-green{% elif summary.overall_completion >= summary.expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
+        <dd class="value {% if summary.overall_completion >= summary.feature_expected_burn_pct %}health-green{% elif summary.overall_completion >= summary.feature_expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
             {{ summary.overall_completion | pct }}
         </dd>
         <dd>
@@ -49,11 +49,11 @@
                  role="progressbar"
                  aria-valuenow="{{ summary.overall_completion | round(1) }}"
                  aria-valuemin="0" aria-valuemax="100"
-                 aria-label="Overall completion {{ summary.overall_completion | pct }}, target {{ summary.expected_burn_pct | pct }}">
-                {% if summary.expected_burn_pct > 0 and summary.expected_burn_pct <= 100 %}
-                <div class="progress-target-marker" style="left: {{ summary.expected_burn_pct }}%"></div>
+                 aria-label="Overall completion {{ summary.overall_completion | pct }}, target {{ summary.feature_expected_burn_pct | pct }}">
+                {% if summary.feature_expected_burn_pct > 0 and summary.feature_expected_burn_pct <= 100 %}
+                <div class="progress-target-marker" style="left: {{ summary.feature_expected_burn_pct }}%"></div>
                 {% endif %}
-                <div class="progress-bar {% if summary.overall_completion >= summary.expected_burn_pct %}progress-fill-on_track{% elif summary.overall_completion >= summary.expected_burn_pct * 0.8 %}progress-fill-at_risk{% else %}progress-fill-behind{% endif %}" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
+                <div class="progress-bar {% if summary.overall_completion >= summary.feature_expected_burn_pct %}progress-fill-on_track{% elif summary.overall_completion >= summary.feature_expected_burn_pct * 0.8 %}progress-fill-at_risk{% else %}progress-fill-behind{% endif %}" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
                 {% if risk_summary and risk_summary.locked_risk_pct > 0 %}
                 <div class="risk-overlay risk-overlay-effective" style="width: {{ risk_summary.locked_risk_pct }}%"></div>
                 {% endif %}
@@ -62,7 +62,7 @@
                 {% endif %}
             </div>
         </dd>
-        <dd class="text-muted">target: {{ summary.expected_burn_pct | pct }}</dd>
+        <dd class="text-muted">target: {{ summary.feature_expected_burn_pct | pct }}</dd>
     </div>
     <div class="summary-card hero-card">
         <dt class="label">Full Team Budget Days Remaining</dt>
@@ -253,10 +253,10 @@
         {% if summary.started_feature_count > 0 %}
         <span class="text-muted">
             Started ({{ summary.started_feature_count }}/{{ summary.total_feature_count }}) &mdash;
-            <strong class="{% if summary.started_completion >= summary.expected_burn_pct %}health-green{% elif summary.started_completion >= summary.expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
+            <strong class="{% if summary.started_completion >= summary.feature_expected_burn_pct %}health-green{% elif summary.started_completion >= summary.feature_expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
                 {{ summary.started_completion | pct }}
             </strong>
-            weighted vs {{ summary.expected_burn_pct | pct }} expected
+            weighted vs {{ summary.feature_expected_burn_pct | pct }} expected
         </span>
         {% endif %}
     </div>

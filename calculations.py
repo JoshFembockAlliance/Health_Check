@@ -143,6 +143,10 @@ def project_summary(
     daily_burn = project["team_size"] * default_day_rate
     expected_spend = daily_burn * elapsed_days
     expected_burn_pct = (expected_spend / current_budget * 100) if current_budget else 0
+    # For feature completion comparisons, overhead budget is excluded — it never
+    # contributes to feature delivery, so including it would understate the target.
+    feature_budget = current_budget - overhead_dollars
+    feature_expected_burn_pct = (expected_spend / feature_budget * 100) if feature_budget > 0 else 0
     current_burn_pct = (project["actual_spend"] / current_budget * 100) if current_budget else 0
     burn_delta = project["actual_spend"] - expected_spend
 
@@ -175,6 +179,7 @@ def project_summary(
         "daily_burn": daily_burn,
         "expected_spend": expected_spend,
         "expected_burn_pct": expected_burn_pct,
+        "feature_expected_burn_pct": feature_expected_burn_pct,
         "actual_spend": project["actual_spend"],
         "current_burn_pct": current_burn_pct,
         "burn_delta": burn_delta,
