@@ -71,6 +71,15 @@
                 Timeline: {{ risk.timeline_impact_days | days }} days
             </span>
             {% endif %}
+            {% if risk.status != 'done' and risk.date_identified %}
+            {% set age = risk.date_identified | age_days %}
+            {% if age is not none %}
+            <span class="text-muted {% if age >= 30 %}health-amber{% endif %}"
+                  title="Identified {{ risk.date_identified }}">
+                Open for {{ age }}d
+            </span>
+            {% endif %}
+            {% endif %}
         </div>
     </div>
 
@@ -127,6 +136,10 @@
                                 <option value="doing" {% if risk.status == 'doing' %}selected{% endif %}>Doing</option>
                                 <option value="done" {% if risk.status == 'done' %}selected{% endif %}>Done</option>
                             </select>
+                        </label>
+                        <label>
+                            Identified
+                            <input type="date" name="date_identified" value="{{ risk.date_identified }}">
                         </label>
                         <label>
                             Due Date
@@ -202,6 +215,10 @@
                     <option value="doing">Doing</option>
                     <option value="done">Done</option>
                 </select>
+            </label>
+            <label>
+                Identified <span class="text-muted">(defaults to today)</span>
+                <input type="date" name="date_identified">
             </label>
             <label>
                 Due Date

@@ -6,6 +6,7 @@ automatically gains new fields on the next server start.
 """
 import sqlite_utils
 import os
+from datetime import date as _date
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "health_check.db")
 
@@ -112,6 +113,7 @@ def init_db():
             "name": str,
             "description": str,
             "status": str,
+            "date_identified": str,
             "due_date": str,
             "impact_days": float,
             "timeline_impact_days": float,
@@ -130,6 +132,12 @@ def init_db():
             db["risks"].add_column("resultant_work", str, not_null_default="")
         if "timeline_impact_days" not in risk_cols:
             db["risks"].add_column("timeline_impact_days", float, not_null_default=0.0)
+        if "date_identified" not in risk_cols:
+            # Seed existing rows with today's date so the age counter starts
+            # "now" rather than showing an implausible 0-day age for risks
+            # that have actually been open a while.
+            today = _date.today().isoformat()
+            db["risks"].add_column("date_identified", str, not_null_default=today)
         if "realised_percentage" not in risk_cols:
             db["risks"].add_column("realised_percentage", float, not_null_default=0.0)
             # Back-fill from the legacy columns if they are still present.

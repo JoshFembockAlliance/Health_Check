@@ -58,6 +58,10 @@ class Risk(BaseModel):
     name: str
     description: str = ""
     status: str = "todo"  # todo, doing, done
+    # date_identified: ISO date (YYYY-MM-DD) the risk was raised. Used to
+    # compute the "Open for Xd" age indicator on open risks, helping the PM
+    # spot stale risks that have been lingering.
+    date_identified: str = ""
     due_date: str = ""
     impact_days: float = 0.0
     # timeline_impact_days: schedule slip in days, separate from impact_days
