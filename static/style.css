@@ -781,6 +781,13 @@ nav.container-fluid a:focus-visible {
     font-size: 0.9rem;
 }
 
+.risk-at-risk-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
 .risk-resultant-work {
     margin: 0.25rem 0 0.5rem;
     color: var(--pico-color);

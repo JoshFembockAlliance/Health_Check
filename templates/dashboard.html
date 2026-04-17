@@ -158,6 +158,12 @@
             <span class="detail-label">Unallocated Budget</span>
             <span class="detail-value {% if summary.unallocated_budget < 0 %}health-red{% elif summary.unallocated_budget > 0 %}health-green{% endif %}">
                 {{ summary.unallocated_budget | currency }}
+                {% if summary.open_risk_dollars > 0 %}
+                <span class="risk-at-risk-badge health-amber"
+                      title="Unrealised risk exposure — unsafe to allocate until resolved">
+                    &#9888; {{ summary.open_risk_dollars | currency }} at risk
+                </span>
+                {% endif %}
             </span>
         </div>
     </div>
