@@ -1212,10 +1212,6 @@ button.print-btn:hover {
         display: none !important;
     }
 
-    body {
-        background: #fff !important;
-    }
-
     main.container {
         max-width: 100% !important;
         padding: 0 !important;
@@ -1232,7 +1228,6 @@ button.print-btn:hover {
     .dashboard-section {
         break-inside: avoid;
         box-shadow: none;
-        border: 1px solid #ccc !important;
     }
 
     .feature-health-card {
