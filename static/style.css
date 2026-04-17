@@ -903,13 +903,216 @@ dialog.confirm-dialog .dialog-actions {
     justify-content: flex-end;
 }
 
-/* ── Risk resolution fields ── */
-.resolution-group {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
-    background: var(--pico-card-sectioning-background-color, #f8f9fa);
+/* ── Risks page: card grid, modal, severity tint ── */
+
+/* Sort/filter bar above the grid */
+.risk-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+.risk-controls-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.85rem;
+    margin: 0;
+}
+.risk-controls-field select {
+    margin: 0;
+    min-width: 12rem;
+}
+
+/* Responsive card grid: 3 cols desktop, 2 tablet, 1 mobile */
+.risk-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+@media (max-width: 1199px) {
+    .risk-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .risk-card-grid { grid-template-columns: 1fr; }
+}
+
+.risk-card {
     border: 1px solid var(--pico-muted-border-color);
     border-radius: var(--pico-border-radius);
+    padding: 0.9rem 1rem 0.75rem;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: var(--pico-background-color);
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: var(--pico-muted-border-color);
+}
+
+/* Severity bands — left-border accent, subtle card tint */
+.risk-card-severity-none { border-left-color: var(--pico-muted-border-color); }
+.risk-card-severity-low {
+    border-left-color: #c9a227;
+    background: rgba(201, 162, 39, 0.04);
+}
+.risk-card-severity-med {
+    border-left-color: #e65100;
+    background: rgba(230, 81, 0, 0.06);
+}
+.risk-card-severity-high {
+    border-left-color: #b71c1c;
+    background: rgba(183, 28, 28, 0.07);
+}
+
+.risk-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.risk-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+.realised-chip {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--pico-muted-border-color);
+    color: var(--pico-color);
+}
+
+.risk-card-title {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.25;
+}
+.risk-card-title-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+}
+.risk-card-title-btn:hover { text-decoration: underline; }
+
+.risk-card-description,
+.risk-card-resultant {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--pico-muted-color);
+    /* Clamp description to 3 lines so cards stay compact */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.risk-card-resultant {
+    color: var(--pico-color);
+    padding: 0.3rem 0.5rem;
+    border-left: 3px solid var(--pico-muted-border-color);
+    background: var(--pico-card-sectioning-background-color, #f8f9fa);
+    border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+    -webkit-line-clamp: 2;
+}
+
+.risk-card-meta {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.8rem;
+    font-size: 0.8rem;
+}
+.risk-card-meta li { margin: 0; }
+
+.risk-card-linked {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.risk-card-inline-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+    margin-top: auto;
+    padding-top: 0.4rem;
+    border-top: 1px dashed var(--pico-muted-border-color);
+}
+.risk-card-inline-controls .inline-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.75rem;
+    flex: 1;
+    margin: 0;
+}
+.risk-card-inline-controls select,
+.risk-card-inline-controls input[type="number"] {
+    margin: 0;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+}
+.risk-card-inline-controls button {
+    margin: 0;
+}
+
+/* Edit modal */
+dialog.risk-modal {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 0;
+    max-width: 640px;
+    width: 95vw;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+dialog.risk-modal::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+dialog.risk-modal article {
+    padding: 1rem 1.25rem 1.25rem;
+    margin: 0;
+}
+.risk-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.risk-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--pico-muted-color);
+    padding: 0;
+}
+.risk-modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+}
+.risk-modal-actions .risk-modal-delete {
+    margin-right: auto;
+}
+.risk-modal-link-form {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--pico-muted-border-color);
 }
 
 /* ── PM Notes ── */

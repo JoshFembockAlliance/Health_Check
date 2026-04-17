@@ -636,8 +636,48 @@ def delete_deliverable(del_id: int):
 
 # ── Risks ──
 
+def _severity_band(risk: dict) -> str:
+    """Bucket a risk into a severity band for visual tinting.
+
+    Score = realised_days + 0.5 × unrealised_days. Realised time weighs
+    more than at-risk time because it's actually gone. Avoided/zero-impact
+    risks get no accent ("none"); otherwise thresholds at 2d/5d separate
+    low/med/high.
+    """
+    score = risk["effective_impact_days"] + 0.5 * risk["unrealised_days"]
+    if score <= 0:
+        return "none"
+    if score >= 5:
+        return "high"
+    if score >= 2:
+        return "med"
+    return "low"
+
+
+def _sort_risks(risks: list[dict], sort_key: str) -> list[dict]:
+    """Return a new list of risks ordered by sort_key.
+
+    Recognised keys: status (default), impact (desc), age (desc), name.
+    Unknown keys fall back to status.
+    """
+    if sort_key == "impact":
+        return sorted(risks, key=lambda r: -r["impact_days"])
+    if sort_key == "age":
+        today = _date.today()
+
+        def _age(r):
+            d = parse_date(r["date_identified"])
+            return (today - d).days if d else -1
+        return sorted(risks, key=lambda r: -_age(r))
+    if sort_key == "name":
+        return sorted(risks, key=lambda r: r["name"].lower())
+    # Default: todo → doing → done, then by existing sort_order
+    status_order = {"todo": 0, "doing": 1, "done": 2}
+    return sorted(risks, key=lambda r: (status_order.get(r["status"], 3), r["sort_order"]))
+
+
 @app.get("/risks")
-def risks_page(request: Request):
+def risks_page(request: Request, sort: str = "status", filter: str = "all"):
     db = get_db()
     project = get_project()
     roles = get_roles()
@@ -668,6 +708,7 @@ def risks_page(request: Request):
         )
         rdict["unrealised_dollars"] = rdict["unrealised_days"] * default_role_rate
         rdict["resolution_label"] = resolution_label(rdict["status"], rdict["realised_percentage"])
+        rdict["severity_band"] = _severity_band(rdict)
         # Get linked features
         links = list(db.execute(
             "SELECT f.id, f.name FROM risk_features rf JOIN features f ON rf.feature_id = f.id WHERE rf.risk_id = ?",
@@ -676,7 +717,7 @@ def risks_page(request: Request):
         rdict["linked_features"] = [{"id": l[0], "name": l[1]} for l in links]
         enriched_risks.append(rdict)
 
-    # Summary counts
+    # Summary counts — always reflect the full set, not the filtered view.
     todo_count = sum(1 for r in enriched_risks if r["status"] == "todo")
     doing_count = sum(1 for r in enriched_risks if r["status"] == "doing")
     done_count = sum(1 for r in enriched_risks if r["status"] == "done")
@@ -689,10 +730,19 @@ def risks_page(request: Request):
         if r["status"] == "done" and r["realised_percentage"] == 0
     )
 
+    # Apply filter, then sort.
+    if filter == "open":
+        visible_risks = [r for r in enriched_risks if r["status"] != "done"]
+    elif filter == "closed":
+        visible_risks = [r for r in enriched_risks if r["status"] == "done"]
+    else:
+        visible_risks = list(enriched_risks)
+    visible_risks = _sort_risks(visible_risks, sort)
+
     return templates.TemplateResponse("risks.html", {
         "request": request,
         "active": "risks",
-        "risks": enriched_risks,
+        "risks": visible_risks,
         "all_features": all_features,
         "summary": {
             "todo": todo_count,
@@ -705,6 +755,8 @@ def risks_page(request: Request):
             "avoided_days": avoided_days,
         },
         "default_rate": default_role_rate,
+        "sort_key": sort,
+        "filter_key": filter,
     })
 
 
