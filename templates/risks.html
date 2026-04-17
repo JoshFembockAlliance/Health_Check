@@ -2,7 +2,10 @@
 {% block title %}Risks - Project Health Check{% endblock %}
 
 {% block content %}
-<h2>Risks</h2>
+<div class="dashboard-title-row">
+    <h2 style="margin:0">Risks</h2>
+    <button type="button" id="toggle-add-risk" class="btn-small outline no-print" aria-expanded="false" aria-controls="add-risk-panel">+ Add Risk</button>
+</div>
 
 {# ── Summary cards ── #}
 <dl class="summary-grid risk-summary-grid" style="grid-template-columns: repeat(7, 1fr); margin-bottom: 2rem;">
@@ -37,6 +40,60 @@
         <dd class="text-muted" style="font-size:0.75rem;">all risks</dd>
     </div>
 </dl>
+
+{# ── Add risk panel (hidden by default, toggled via button) ── #}
+<div id="add-risk-panel" class="add-requirement-section" style="display:none; margin-bottom:1.25rem;">
+    <form method="post" action="/risks/add">
+        <label>
+            Name <span class="text-muted">(short, at-a-glance)</span>
+            <input type="text" name="name" placeholder="e.g., Third-party API dependency" required>
+        </label>
+        <label>
+            Description <span class="text-muted">(optional detail)</span>
+            <textarea name="description" rows="4" placeholder="Original expectation:&#10;What changed / was revealed:&#10;Notable timeline and sequencing impacts:"></textarea>
+        </label>
+        <label>
+            Resultant Work <span class="text-muted">(work that came out of realised impact)</span>
+            <textarea name="resultant_work" rows="2" placeholder="e.g., 3 days went into rebuilding the sync layer"></textarea>
+        </label>
+        <div class="grid">
+            <label>
+                Status
+                <select name="status">
+                    <option value="todo" selected>To Do</option>
+                    <option value="doing">Doing</option>
+                    <option value="done">Done</option>
+                </select>
+            </label>
+            <label>
+                Identified <span class="text-muted">(defaults to today)</span>
+                <input type="date" name="date_identified">
+            </label>
+            <label>
+                Due Date
+                <input type="date" name="due_date">
+            </label>
+        </div>
+        <div class="grid">
+            <label>
+                Budget Impact (days)
+                <input type="number" name="impact_days" value="0" step="0.5" min="0">
+            </label>
+            <label>
+                Timeline Impact (days)
+                <input type="number" name="timeline_impact_days" value="0" step="0.5" min="0">
+            </label>
+            <label>
+                % Realised <span class="text-muted">(usually 0)</span>
+                <input type="number" name="realised_percentage" value="0" step="1" min="0" max="100">
+            </label>
+        </div>
+        <div style="display:flex; gap:0.75rem; align-items:center;">
+            <button type="submit" class="btn-add">+ Add Risk</button>
+            <button type="button" id="cancel-add-risk" class="btn-small outline secondary">Cancel</button>
+        </div>
+    </form>
+</div>
 
 {# ── Sort & filter controls ── #}
 {% if risks or filter_key != 'all' %}
@@ -169,58 +226,6 @@
 <p class="text-muted">{% if filter_key != 'all' %}No risks match the current filter.{% else %}No risks tracked yet. Add one below.{% endif %}</p>
 {% endif %}
 
-{# ── Add risk ── #}
-<div class="add-requirement-section">
-    <h3>Add Risk</h3>
-    <form method="post" action="/risks/add">
-        <label>
-            Name <span class="text-muted">(short, at-a-glance)</span>
-            <input type="text" name="name" placeholder="e.g., Third-party API dependency" required>
-        </label>
-        <label>
-            Description <span class="text-muted">(optional detail)</span>
-            <textarea name="description" rows="4" placeholder="Original expectation:&#10;What changed / was revealed:&#10;Notable timeline and sequencing impacts:"></textarea>
-        </label>
-        <label>
-            Resultant Work <span class="text-muted">(work that came out of realised impact)</span>
-            <textarea name="resultant_work" rows="2" placeholder="e.g., 3 days went into rebuilding the sync layer"></textarea>
-        </label>
-        <div class="grid">
-            <label>
-                Status
-                <select name="status">
-                    <option value="todo" selected>To Do</option>
-                    <option value="doing">Doing</option>
-                    <option value="done">Done</option>
-                </select>
-            </label>
-            <label>
-                Identified <span class="text-muted">(defaults to today)</span>
-                <input type="date" name="date_identified">
-            </label>
-            <label>
-                Due Date
-                <input type="date" name="due_date">
-            </label>
-        </div>
-        <div class="grid">
-            <label>
-                Budget Impact (days)
-                <input type="number" name="impact_days" value="0" step="0.5" min="0">
-            </label>
-            <label>
-                Timeline Impact (days)
-                <input type="number" name="timeline_impact_days" value="0" step="0.5" min="0">
-            </label>
-            <label>
-                % Realised <span class="text-muted">(usually 0)</span>
-                <input type="number" name="realised_percentage" value="0" step="1" min="0" max="100">
-            </label>
-        </div>
-        <button type="submit" class="btn-add">+ Add Risk</button>
-    </form>
-</div>
-
 {# ── Edit modal ── #}
 <dialog id="risk-edit-modal" class="risk-modal">
     <article>
@@ -302,6 +307,27 @@
 {% block scripts %}
 <script>
 (function() {
+    // Toggle the Add Risk panel via the button in the title row.
+    const toggleBtn = document.getElementById('toggle-add-risk');
+    const addPanel = document.getElementById('add-risk-panel');
+    const cancelBtn = document.getElementById('cancel-add-risk');
+    if (toggleBtn && addPanel) {
+        toggleBtn.addEventListener('click', () => {
+            const isOpen = addPanel.style.display !== 'none';
+            addPanel.style.display = isOpen ? 'none' : 'block';
+            toggleBtn.textContent = isOpen ? '+ Add Risk' : '✕ Cancel';
+            toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+            if (!isOpen) addPanel.querySelector('input[name="name"]').focus();
+        });
+    }
+    if (cancelBtn && addPanel) {
+        cancelBtn.addEventListener('click', () => {
+            addPanel.style.display = 'none';
+            toggleBtn.textContent = '+ Add Risk';
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
     // Gather all risk payloads at load so the modal can open instantly.
     const payloads = {};
     document.querySelectorAll('.risk-payload').forEach(el => {

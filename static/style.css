@@ -916,9 +916,13 @@ dialog.confirm-dialog .dialog-actions {
 .risk-controls {
     display: flex;
     gap: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
     align-items: flex-end;
     flex-wrap: wrap;
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 0.65rem 1rem;
 }
 .risk-controls-field {
     display: flex;
@@ -1059,8 +1063,14 @@ dialog.confirm-dialog .dialog-actions {
     gap: 0.5rem;
     align-items: flex-end;
     margin-top: auto;
-    padding-top: 0.4rem;
-    border-top: 1px dashed var(--pico-muted-border-color);
+    /* Extend to card edges and give a distinct footer panel look */
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-bottom: -0.75rem;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--pico-muted-border-color);
+    background: var(--pico-card-sectioning-background-color, rgba(0,0,0,0.03));
+    border-radius: 0 0 calc(var(--pico-border-radius) - 1px) calc(var(--pico-border-radius) - 1px);
 }
 .risk-card-inline-controls .inline-control {
     display: flex;

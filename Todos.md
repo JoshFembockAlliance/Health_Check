@@ -10,8 +10,8 @@ Export to PDF is never going to be printed so it does not need to use a blank ba
 ### Features & Deliverables
 
 ### Risks
-* [ ] The Risks cards are visually a little ugly, cleanly different visual sections for example around the filters and anywhere else would make readability better. 
-* [ ] The Add Risk form should be visually hidden most of the time to limit visual clutter and accessible via a button around the top of the risks page so that a user doesn't have to scroll past all the existing risks to the bottom of the page to add a new risk. 
+* [x] The Risks cards are visually a little ugly, cleanly different visual sections for example around the filters and anywhere else would make readability better. 
+* [x] The Add Risk form should be visually hidden most of the time to limit visual clutter and accessible via a button around the top of the risks page so that a user doesn't have to scroll past all the existing risks to the bottom of the page to add a new risk. 
 * [ ] A rich text editor for the larger text area field like the notes description that allows for dot points and headings etc, especially when the modal is open
 
 ## Notes
