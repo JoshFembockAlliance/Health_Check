@@ -74,7 +74,7 @@ dl.summary-grid {
 }
 
 .health-green { color: #2e7d32; }
-.health-amber { color: #e65100; }
+.health-amber { color: #b04000; }
 .health-red { color: #b71c1c; }
 
 .inline-edit {
@@ -656,9 +656,9 @@ details:not([open]) .collapse-arrow {
 }
 
 .badge-green { background: #e8f5e9; color: #2e7d32; }
-.badge-amber { background: #fff8e1; color: #e65100; }
+.badge-amber { background: #fff8e1; color: #b04000; }
 .badge-red { background: #fce4ec; color: #c62828; }
-.badge-grey { background: #f5f5f5; color: #757575; }
+.badge-grey { background: #f5f5f5; color: #595959; }
 
 /* ── Feature started/not-started toggle ── */
 .started-toggle {
@@ -1011,6 +1011,11 @@ dialog.confirm-dialog .dialog-actions {
     width: 100%;
 }
 .risk-card-title-btn:hover { text-decoration: underline; }
+.risk-card-title-btn:focus-visible {
+    outline: 2px solid var(--pico-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
 
 .risk-card-description,
 .risk-card-resultant {
@@ -1106,6 +1111,11 @@ dialog.risk-modal article {
     color: var(--pico-muted-color);
     padding: 0;
 }
+.risk-modal-close:focus-visible {
+    outline: 2px solid var(--pico-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
 .risk-modal-actions {
     display: flex;
     gap: 0.5rem;
@@ -1141,7 +1151,7 @@ dialog.risk-modal article {
 
 .note-badge-sticky  { background: #ede7f6; color: #4527a0; }
 .note-badge-todo    { background: #fce4ec; color: #c62828; }
-.note-badge-doing   { background: #fff8e1; color: #e65100; }
+.note-badge-doing   { background: #fff8e1; color: #b04000; }
 .note-badge-done    { background: #e8f5e9; color: #2e7d32; }
 
 .note-status-sticky  { border-left: 3px solid #5c6bc0; }

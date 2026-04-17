@@ -5,19 +5,25 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
-
-* [x] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. Similarly, Budget that is at risk due to unrealised risks should be shown beside the unallocated budget number in the standard unrealised risk colour as that budget would be slightly unsafe to allocate until the issues are dealt with. 
+Export to PDF is never going to be printed so it does not need to use a blank background, make sure it looks similar to the dashboard itself and provides a representative export of the page. 
 
 ### Features & Deliverables
 
 ### Risks
-* [x] display or even 3 risk cards per row on the risks page as there will likely be a few and the horizontal space doesn't make them easier to read. If this would squash them enough that text would be hard to read, consider using modals to display risks full-size when necessary. 
-* [x] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
-* [x] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
-* [x] Right now we have a single field for impact which pertains to days the risk will cost the budget. There is usually also a timeline impact which is separate to that and doesn't need to be included in calculations, but allows the project manager to tell a story. For example, a realised risk has resulted in a sequencing hiccup that costs only 3 days of billable time but that has 10 days of timeline impact. That information is worth noting when discussing the risk.  
+* [ ] The Risks cards are visually a little ugly, cleanly different visual sections for example around the filters and anywhere else would make readability better. 
+* [ ] The Add Risk form should be visually hidden most of the time to limit visual clutter and accessible via a button around the top of the risks page so that a user doesn't have to scroll past all the existing risks to the bottom of the page to add a new risk. 
+* [ ] A rich text editor for the larger text area field like the notes description that allows for dot points and headings etc, especially when the modal is open
+
+## Notes
+* [ ] Bring the design language into line with Risks. Filters, multiple items per line with modals, etc.
+* [ ] If Risks have a rich text editor copying that would be good.
+
 
 
 ## New Feature Items
+
+### Rework to be based on Alliance Platform 2 - Very Low Priority, will consume lots of tokens 
+Alliance Platform 2 (https://github.com/AllianceSoftware/alliance-platform-py) provides a lot of tools and a uniform visual design. A redesign onto AP2 might provide more structure than our current flask-based setup.
 
 ### Multiple Projects - Low Priority
 * [ ] This application is currently set up to help a Project Manager track the health of one and only one project at a time. The ability to create more than one project and to swap between them would allow a PM to keep track of multiple projects at once. Each project would need a name and description and its financials and settings etc should be entirely separate from other projects. I expect this would break imports and exports as they currently exist, so those may need to be removed.

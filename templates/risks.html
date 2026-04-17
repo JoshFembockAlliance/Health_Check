@@ -8,7 +8,7 @@
 <dl class="summary-grid risk-summary-grid" style="grid-template-columns: repeat(7, 1fr); margin-bottom: 2rem;">
     <div class="summary-card">
         <dt class="label">To Do</dt>
-        <dd class="value health-red">{{ summary.todo }}</dd>
+        <dd class="value">{{ summary.todo }}</dd>
     </div>
     <div class="summary-card">
         <dt class="label">Doing</dt>
@@ -68,8 +68,8 @@
     <article class="risk-card risk-card-severity-{{ risk.severity_band }}" data-risk-id="{{ risk.id }}">
         <header class="risk-card-header">
             <div class="risk-card-badges">
-                <span class="health-badge {% if risk.status == 'done' %}badge-green{% elif risk.status == 'doing' %}badge-amber{% else %}badge-red{% endif %}">
-                    {% if risk.status == 'done' %}&#10003;{% elif risk.status == 'doing' %}&#9888;{% else %}&#9675;{% endif %} {{ risk.status | upper }}
+                <span class="health-badge {% if risk.status == 'done' %}badge-green{% elif risk.status == 'doing' %}badge-amber{% else %}badge-grey{% endif %}">
+                    <span aria-hidden="true">{% if risk.status == 'done' %}&#10003;{% elif risk.status == 'doing' %}&#9888;{% else %}&#9675;{% endif %}</span> {{ risk.status | upper }}
                 </span>
                 {% if risk.resolution_label %}
                 <span class="health-badge {% if risk.resolution_label == 'Avoided' %}badge-green{% elif risk.resolution_label == 'Mitigated' %}badge-amber{% else %}badge-red{% endif %}">
