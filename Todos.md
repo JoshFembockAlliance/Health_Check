@@ -6,15 +6,15 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ### Dashboard 
 
-* [ ] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. Similarly, Budget that is at risk due to unrealised risks should be shown beside the unallocated budget number in the standard unrealised risk colour as that budget would be slightly unsafe to allocate until the issues are dealt with. 
+* [x] Review the budget and spend section and ensure that time lost to risks is not being shown as unallocated budget since it isn't really accessible any more and it would not be reasonable for a project manager to see it included and decide that they should allocate more work to account for it. Similarly, Budget that is at risk due to unrealised risks should be shown beside the unallocated budget number in the standard unrealised risk colour as that budget would be slightly unsafe to allocate until the issues are dealt with. 
 
 ### Features & Deliverables
 
 ### Risks
-* [ ] display or even 3 risk cards per row on the risks page as there will likely be a few and the horizontal space doesn't make them easier to read. If this would squash them enough that text would be hard to read, consider using modals to display risks full-size when necessary. 
-* [ ] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
-* [ ] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
-* [ ] Right now we have a single field for impact which pertains to days the risk will cost the budget. There is usually also a timeline impact which is separate to that and doesn't need to be included in calculations, but allows the project manager to tell a story. For example, a realised risk has resulted in a sequencing hiccup that costs only 3 days of billable time but that has 10 days of timeline impact. That information is worth noting when discussing the risk.  
+* [x] display or even 3 risk cards per row on the risks page as there will likely be a few and the horizontal space doesn't make them easier to read. If this would squash them enough that text would be hard to read, consider using modals to display risks full-size when necessary. 
+* [x] Splitting out the % realised from the Risk completion status to account for the fact that sometimes a risk is still open but some of the time it has cost the team is no longer recoverable. This would mean that any risk could have some amount realised but by default pre-fill it to 0% when creating open risks. This is more likely to come up after a few days of the risk being active. For the migration associated with this change, you can set it to 0% if there is not relevant data. 
+* [x] The risks with realised impacts have resulted in different work, not in entirely lost time. Add a new text area section to write out information that I can use to explain any resultant work items associated with a risk. For example, if a risk has cost 5d in realised impact, then I would like a space separate to the description to elaborate on what work is included in that time.
+* [x] Right now we have a single field for impact which pertains to days the risk will cost the budget. There is usually also a timeline impact which is separate to that and doesn't need to be included in calculations, but allows the project manager to tell a story. For example, a realised risk has resulted in a sequencing hiccup that costs only 3 days of billable time but that has 10 days of timeline impact. That information is worth noting when discussing the risk.  
 
 
 ## New Feature Items
@@ -34,11 +34,11 @@ Last Addressed: 14/04/2026
 
 ### In-Code Unit Test Coverage
 Reviewing and enhancing unit test coverage within the project to ensure that regressions resulting from changes to models are caught and addressed. 
-Last Addressed: 14/04/2026
+Last Addressed: 17/04/2026
 
 ### Playwright Unit Test Coverage
 Reviewing and enhancing Playwright coverage within the project to reinforce end-to-end coverage.
-Last Addressed: 14/04/2026
+Last Addressed: 17/04/2026
 
 ### Version Bumps
 Outdated dependencies can often result in vulnerabilities. Ensure that dependencies are up-to-date and check that the version increase has not broken anything. If things have become broken as a result, rever the change and make a note of it here for manual investigation. This will keep the codebase clean and secure. 

@@ -129,23 +129,79 @@ def test_add_and_delete_risk(page: Page):
     page.locator("form[action='/risks/add'] input[name='impact_days']").fill("5")
     page.locator("form[action='/risks/add'] button[type='submit']").click()
 
-    expect(page.locator("h3:has-text('E2E Test Risk')").first).to_be_visible()
+    expect(page.locator(".risk-card-title-btn", has_text="E2E Test Risk").first).to_be_visible()
 
     # Delete all E2E Test Risk entries (handles leftover state from previous runs)
-    while page.locator("h3:has-text('E2E Test Risk')").count() > 0:
-        delete_url = page.locator(
-            "article:has(h3:has-text('E2E Test Risk')) button[formaction*='/delete']"
-        ).last.get_attribute("formaction")
+    while page.locator(".risk-card-title-btn", has_text="E2E Test Risk").count() > 0:
+        card = page.locator(".risk-card", has=page.locator(".risk-card-title-btn", has_text="E2E Test Risk")).last
+        risk_id = card.get_attribute("data-risk-id")
         with page.expect_navigation():
             page.evaluate(f"""() => {{
                 const f = document.createElement('form');
                 f.method = 'post';
-                f.action = '{delete_url}';
+                f.action = '/risks/{risk_id}/delete';
                 document.body.appendChild(f);
                 f.submit();
             }}""")
 
-    expect(page.locator("text=E2E Test Risk")).not_to_be_visible()
+    expect(page.locator(".risk-card-title-btn", has_text="E2E Test Risk")).not_to_be_visible()
+
+
+def test_risk_modal_opens_with_prefilled_data(page: Page):
+    """Clicking a risk card title opens the edit modal with pre-filled fields."""
+    page.goto(f"{BASE}/risks")
+
+    # Add a risk to test with
+    page.locator("form[action='/risks/add'] input[name='name']").fill("E2E Modal Risk")
+    page.locator("form[action='/risks/add'] input[name='impact_days']").fill("3")
+    page.locator("form[action='/risks/add'] button[type='submit']").click()
+    expect(page.locator(".risk-card-title-btn", has_text="E2E Modal Risk").first).to_be_visible()
+
+    # Open modal by clicking the card title
+    page.locator(".risk-card-title-btn", has_text="E2E Modal Risk").first.click()
+    modal = page.locator("#risk-edit-modal")
+    expect(modal).to_be_visible()
+
+    # Name field should be pre-filled
+    expect(modal.locator("input[name='name']")).to_have_value("E2E Modal Risk")
+    expect(modal.locator("input[name='impact_days']")).to_have_value("3")
+
+    # Close modal
+    modal.locator(".risk-modal-close").click()
+
+    # Clean up
+    card = page.locator(".risk-card", has=page.locator(".risk-card-title-btn", has_text="E2E Modal Risk")).last
+    risk_id = card.get_attribute("data-risk-id")
+    with page.expect_navigation():
+        page.evaluate(f"""() => {{
+            const f = document.createElement('form');
+            f.method = 'post';
+            f.action = '/risks/{risk_id}/delete';
+            document.body.appendChild(f);
+            f.submit();
+        }}""")
+
+
+def test_risks_sort_by_impact(page: Page):
+    """Sort=impact returns the card grid in high-to-low order."""
+    page.goto(f"{BASE}/risks?sort=impact")
+    # Grid is rendered (even if empty)
+    grid_or_empty = page.locator(".risk-card-grid, p.text-muted")
+    expect(grid_or_empty.first).to_be_visible()
+
+    cards = page.locator(".risk-card")
+    count = cards.count()
+    if count < 2:
+        return  # Not enough data to assert ordering
+
+    # Collect impact_days values from the hidden payloads to verify descending order
+    impacts = page.evaluate("""() =>
+        Array.from(document.querySelectorAll('.risk-payload')).map(el => {
+            try { return JSON.parse(el.textContent).impact_days; } catch { return 0; }
+        })
+    """)
+    for i in range(len(impacts) - 1):
+        assert impacts[i] >= impacts[i + 1], f"Cards not sorted by impact: {impacts}"
 
 
 # ── Capacity Planning ──────────────────────────────────────────────────────

@@ -269,6 +269,27 @@ class TestProjectSummary:
         assert (result["allocated_dollars"] + result["overhead_dollars"]
                 + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["current_budget"])
 
+    def test_open_risk_dollars_default_zero(self):
+        # open_risk_dollars defaults to 0 when not supplied and the summary
+        # still carries the field for the dashboard template.
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = project_summary(proj, [], [], default_day_rate=1_000.0)
+        assert result["open_risk_dollars"] == 0.0
+
+    def test_open_risk_dollars_round_trips(self):
+        # open_risk_dollars is pass-through metadata — does not affect other
+        # computed values, only reported for the 'at risk' badge.
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = project_summary(
+            proj, [], [], default_day_rate=1_000.0,
+            realised_risk_dollars=5_000.0, open_risk_dollars=8_000.0,
+        )
+        assert result["open_risk_dollars"] == 8_000.0
+        # Accessible budget still excludes only realised_risk + overhead
+        assert result["accessible_budget"] == 95_000.0
+        # Unallocated still excludes realised_risk + overhead + features
+        assert result["unallocated_budget"] == 95_000.0
+
     def test_realised_risk_excluded_from_unallocated(self):
         # Realised risk dollars must not appear as unallocated budget.
         # $100k budget, $10k risk, $20k overhead, $30k features → $40k unallocated
