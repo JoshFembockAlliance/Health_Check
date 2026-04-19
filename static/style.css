@@ -1330,6 +1330,22 @@ dialog.risk-modal .ql-editor {
 dialog.risk-modal .rich-editor-compact .ql-editor {
     min-height: 80px;
 }
+/* Side-by-side description / resultant-work layout inside the risks modal */
+.risk-modal-fields-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+/* Give resultant work the same generous height as description in side-by-side */
+.risk-modal-fields-row .rich-editor-compact .ql-editor {
+    min-height: 200px;
+}
+@media (max-width: 768px) {
+    .risk-modal-fields-row {
+        grid-template-columns: 1fr;
+    }
+}
 /* Normalize Quill HTML output rendered in risk card previews */
 .risk-card-description > p,
 .risk-card-description > ul,
