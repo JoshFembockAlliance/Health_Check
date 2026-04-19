@@ -305,6 +305,12 @@
         if (trigger) {
             e.preventDefault();
             openNoteModal(trigger.dataset.noteId);
+            return;
+        }
+        // Clicking anywhere on a card (outside interactive controls) opens modal
+        const card = e.target.closest('.note-card[data-note-id]');
+        if (card && !e.target.closest('button, input, select, a, form')) {
+            openNoteModal(card.dataset.noteId);
         }
     });
 

@@ -449,6 +449,12 @@
         if (trigger) {
             e.preventDefault();
             openModal(trigger.dataset.riskId);
+            return;
+        }
+        // Clicking anywhere on a card (outside interactive controls) opens modal
+        const card = e.target.closest('.risk-card[data-risk-id]');
+        if (card && !e.target.closest('button, input, select, a, form')) {
+            openModal(card.dataset.riskId);
         }
     });
 

@@ -962,6 +962,7 @@ dialog.confirm-dialog .dialog-actions {
     border-left-width: 4px;
     border-left-style: solid;
     border-left-color: var(--pico-muted-border-color);
+    cursor: pointer;
 }
 
 /* Severity bands — left-border accent, subtle card tint */
