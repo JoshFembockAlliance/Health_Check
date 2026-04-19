@@ -828,9 +828,18 @@ input:focus, select:focus, textarea:focus {
 .tweaks-swatch.active { border-color: var(--text-strong); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
 
 /* ===================== PRINT ===================== */
+
+/* @page must live at top level — nesting inside @media print causes parse failures */
+@page { margin: 1.5cm 1.8cm; }
+
 @media print {
-  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  @page { margin: 1.5cm 1.8cm; }
+  /* Force background/colour printing on every element.
+     Set on * AND on the specific background-bearing elements because some
+     browsers don't cascade this property reliably. */
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
 
   .sidebar, .topbar, .tweaks-drawer, .page-actions { display: none !important; }
   .app { display: block; }
@@ -854,32 +863,75 @@ input:focus, select:focus, textarea:focus {
   /* Hero grid — keep 3-col on print */
   .hero-grid { grid-template-columns: 1.25fr 1fr 1fr !important; gap: 10px; }
 
+  /* Hero primary card — re-declare gradient explicitly so print engines render it */
+  .hero-card.primary {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    background: #1e3a7a !important;
+    background: linear-gradient(145deg, oklch(38% 0.14 258) 0%, oklch(30% 0.15 268) 100%) !important;
+    color: white !important;
+    border-color: transparent !important;
+  }
+  .hero-card.primary .label  { color: rgba(255,255,255,0.72) !important; }
+  .hero-card.primary .value  { color: white !important; }
+  .hero-card.primary .sub-row .lbl { color: rgba(255,255,255,0.78) !important; }
+  .hero-card.primary .sub-row .val { color: white !important; }
+
   /* Stats */
   .stat-grid .stat { border-left: 1px solid #e0e0e0; }
 
-  /* Progress bars — force colours */
-  .progress { background: #eee; border-radius: 4px; }
-  .progress .fill { border-radius: 4px; }
-  .progress .fill-good, .progress .fill-on_track { background: oklch(55% 0.14 150) !important; }
-  .progress .fill-warn, .progress .fill-at_risk  { background: oklch(73% 0.17 80)  !important; }
-  .progress .fill-bad,  .progress .fill-behind   { background: oklch(58% 0.2 25)   !important; }
-  .progress .risk-open     { background: oklch(73% 0.17 80 / 0.45) !important; }
-  .progress .risk-realised { background: oklch(58% 0.2 25 / 0.55) !important; }
+  /* Progress bar track */
+  .progress {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    background: #e2e2e2 !important;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
 
-  /* Hero primary card gradient */
-  .hero-card.primary { color: white; }
+  /* Filled segments — use both oklch and a hex fallback colour */
+  .progress .fill,
+  .progress .fill-good, .progress .fill-on_track,
+  .progress .fill-warn, .progress .fill-at_risk,
+  .progress .fill-bad,  .progress .fill-behind,
+  .progress .risk-open, .progress .risk-realised,
+  .progress > div {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .progress .fill-good,  .progress .fill-on_track { background: #29854e !important; }
+  .progress .fill-warn,  .progress .fill-at_risk  { background: #c07d00 !important; }
+  .progress .fill-bad,   .progress .fill-behind   { background: #c73b1f !important; }
+  .progress .risk-open     { background: rgba(192,125,0,0.45) !important; }
+  .progress .risk-realised { background: rgba(199,59,31,0.55) !important; }
+
+  /* Risk cards use anonymous child <div>s with inline background styles;
+     override them by position in the stacking order */
+  .progress > div:first-child  { background: #c73b1f !important; }
+  .progress > div:nth-child(2) { background: rgba(192,125,0,0.45) !important; }
 
   /* Chips */
-  .chip-good { background: oklch(96% 0.05 150) !important; }
-  .chip-warn { background: oklch(96% 0.07 85)  !important; }
-  .chip-bad  { background: oklch(96% 0.05 25)  !important; }
-  .chip-info { background: oklch(96% 0.035 240) !important; }
+  .chip {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .chip-good { background: #e6f7ed !important; color: #1a6b37 !important; }
+  .chip-warn { background: #fff8e1 !important; color: #7d5100 !important; }
+  .chip-bad  { background: #fdecea !important; color: #c73b1f !important; }
+  .chip-info { background: #e8f0fe !important; color: #1a4da0 !important; }
+  .chip-soft { background: #f5f5f5 !important; }
 
   /* Feature health rows */
   .feat-row .item { border-bottom: 1px solid #eee; }
 
   /* Risk/note cards */
-  .risk-card { break-inside: avoid; box-shadow: none; }
+  .risk-card {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    break-inside: avoid;
+    box-shadow: none;
+  }
 
   /* Hide interactive-only elements */
   .btn:not(.print-show), a.btn, button.btn, details > summary { display: none !important; }
