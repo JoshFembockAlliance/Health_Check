@@ -7,6 +7,7 @@ import os
 import csv
 import io
 import zipfile
+import html as _html_module
 from datetime import datetime, date as _date, timedelta
 
 from database import init_db, get_db
@@ -62,10 +63,26 @@ def fmt_age_days(iso_date_str):
     return (_date.today() - d).days
 
 
+def render_rich(value):
+    """Render content that may be Quill HTML or legacy plain text.
+
+    Quill stores content as HTML (e.g. <p>…</p>). Older rows are plain text.
+    Plain text is HTML-escaped and newlines converted to <br> so the display
+    remains correct. The caller must apply | safe after this filter.
+    """
+    if not value:
+        return ""
+    stripped = value.strip()
+    if stripped.startswith("<"):
+        return stripped
+    return _html_module.escape(stripped).replace("\n", "<br>")
+
+
 templates.env.filters["currency"] = fmt_currency
 templates.env.filters["pct"] = fmt_pct
 templates.env.filters["days"] = fmt_days
 templates.env.filters["age_days"] = fmt_age_days
+templates.env.filters["render_rich"] = render_rich
 
 
 @app.on_event("startup")

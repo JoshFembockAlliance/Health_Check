@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Risks - Project Health Check{% endblock %}
 
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <div class="dashboard-title-row">
     <h2 style="margin:0">Risks</h2>
@@ -50,11 +54,13 @@
         </label>
         <label>
             Description <span class="text-muted">(optional detail)</span>
-            <textarea name="description" rows="4" placeholder="Original expectation:&#10;What changed / was revealed:&#10;Notable timeline and sequencing impacts:"></textarea>
+            <input type="hidden" name="description" id="add-desc-hidden">
+            <div id="add-desc-editor"></div>
         </label>
         <label>
             Resultant Work <span class="text-muted">(work that came out of realised impact)</span>
-            <textarea name="resultant_work" rows="2" placeholder="e.g., 3 days went into rebuilding the sync layer"></textarea>
+            <input type="hidden" name="resultant_work" id="add-resultant-hidden">
+            <div id="add-resultant-editor" class="rich-editor-compact"></div>
         </label>
         <div class="grid">
             <label>
@@ -143,11 +149,11 @@
         </header>
 
         {% if risk.description %}
-        <p class="risk-card-description">{{ risk.description }}</p>
+        <div class="risk-card-description">{{ risk.description | render_rich | safe }}</div>
         {% endif %}
 
         {% if risk.resultant_work %}
-        <p class="risk-card-resultant"><span class="text-muted">Resultant:</span> {{ risk.resultant_work }}</p>
+        <div class="risk-card-resultant"><span class="text-muted">Resultant:</span> {{ risk.resultant_work | render_rich | safe }}</div>
         {% endif %}
 
         <ul class="risk-card-meta">
@@ -240,11 +246,13 @@
             </label>
             <label>
                 Description
-                <textarea name="description" rows="4"></textarea>
+                <input type="hidden" name="description" id="modal-desc-hidden">
+                <div id="modal-desc-editor"></div>
             </label>
             <label>
                 Resultant Work
-                <textarea name="resultant_work" rows="3" placeholder="e.g., 3 days went into rebuilding the sync layer"></textarea>
+                <input type="hidden" name="resultant_work" id="modal-resultant-hidden">
+                <div id="modal-resultant-editor" class="rich-editor-compact"></div>
             </label>
             <div class="grid">
                 <label>
@@ -305,9 +313,55 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.js"></script>
 <script>
 (function() {
-    // Toggle the Add Risk panel via the button in the title row.
+    // ── Quill helpers ──
+    const TOOLBAR = [
+        ['bold', 'italic'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ header: [2, 3, false] }],
+        ['clean'],
+    ];
+
+    function makeQuill(selector, placeholder) {
+        return new Quill(selector, {
+            theme: 'snow',
+            placeholder: placeholder || '',
+            modules: { toolbar: TOOLBAR },
+        });
+    }
+
+    function quillSet(quill, value) {
+        if (!value || !value.trim()) {
+            quill.setContents([]);
+        } else if (value.trim().startsWith('<')) {
+            quill.clipboard.dangerouslyPasteHTML(0, value);
+        } else {
+            quill.setText(value);
+        }
+    }
+
+    function quillGet(quill) {
+        const h = quill.root.innerHTML;
+        return (h === '<p><br></p>' || h === '') ? '' : h;
+    }
+
+    // ── Add-form Quill editors (initialized at page load) ──
+    const addDescQuill = makeQuill('#add-desc-editor',
+        'Original expectation:\nWhat changed / was revealed:\nNotable timeline and sequencing impacts:');
+    const addResultantQuill = makeQuill('#add-resultant-editor',
+        'e.g., 3 days went into rebuilding the sync layer');
+
+    const addForm = document.querySelector('#add-risk-panel form');
+    if (addForm) {
+        addForm.addEventListener('submit', () => {
+            document.getElementById('add-desc-hidden').value = quillGet(addDescQuill);
+            document.getElementById('add-resultant-hidden').value = quillGet(addResultantQuill);
+        });
+    }
+
+    // ── Toggle Add Risk panel ──
     const toggleBtn = document.getElementById('toggle-add-risk');
     const addPanel = document.getElementById('add-risk-panel');
     const cancelBtn = document.getElementById('cancel-add-risk');
@@ -328,7 +382,7 @@
         });
     }
 
-    // Gather all risk payloads at load so the modal can open instantly.
+    // ── Gather risk payloads ──
     const payloads = {};
     document.querySelectorAll('.risk-payload').forEach(el => {
         try { payloads[el.dataset.riskId] = JSON.parse(el.textContent); } catch (e) {}
@@ -339,14 +393,29 @@
     const linkForm = document.getElementById('risk-link-form');
     const deleteBtn = document.getElementById('risk-modal-delete-btn');
 
+    // ── Modal Quill editors — lazily initialized on first open ──
+    let modalDescQuill = null, modalResultantQuill = null;
+
+    function ensureModalQuills() {
+        if (modalDescQuill) return;
+        modalDescQuill = makeQuill('#modal-desc-editor', '');
+        modalResultantQuill = makeQuill('#modal-resultant-editor',
+            'e.g., 3 days went into rebuilding the sync layer');
+    }
+
+    form.addEventListener('submit', () => {
+        if (modalDescQuill) {
+            document.getElementById('modal-desc-hidden').value = quillGet(modalDescQuill);
+            document.getElementById('modal-resultant-hidden').value = quillGet(modalResultantQuill);
+        }
+    });
+
     function openModal(riskId) {
         const r = payloads[riskId];
         if (!r) return;
         form.action = '/risks/' + r.id + '/update';
         if (linkForm) linkForm.action = '/risks/' + r.id + '/link-feature';
         form.elements['name'].value = r.name;
-        form.elements['description'].value = r.description || '';
-        form.elements['resultant_work'].value = r.resultant_work || '';
         form.elements['status'].value = r.status;
         form.elements['date_identified'].value = r.date_identified || '';
         form.elements['due_date'].value = r.due_date || '';
@@ -362,8 +431,12 @@
                 f.submit();
             }
         };
+        // Show modal before initializing Quill so the container is visible.
         if (modal.showModal) modal.showModal();
         else modal.setAttribute('open', '');
+        ensureModalQuills();
+        quillSet(modalDescQuill, r.description || '');
+        quillSet(modalResultantQuill, r.resultant_work || '');
     }
 
     window.closeRiskModal = function() {
@@ -371,7 +444,6 @@
         else modal.removeAttribute('open');
     };
 
-    // Click-delegate card title / edit button to open modal.
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-modal"]');
         if (trigger) {
@@ -380,12 +452,10 @@
         }
     });
 
-    // Close on backdrop click.
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeRiskModal();
     });
 
-    // Inline status change → POST /api/risks/{id}/status and reload.
     document.addEventListener('change', (e) => {
         const sel = e.target.closest('[data-action="inline-status"]');
         if (sel) {

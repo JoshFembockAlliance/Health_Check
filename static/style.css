@@ -1240,6 +1240,74 @@ button.print-btn:hover {
     }
 }
 
+/* ── Quill rich-text editor integration ── */
+/* Reset Pico button styles inside the Quill toolbar */
+.ql-toolbar.ql-snow button {
+    width: 28px !important;
+    height: 24px !important;
+    padding: 2px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+}
+.ql-toolbar.ql-snow button:hover {
+    background: rgba(0, 0, 0, 0.08) !important;
+    border-radius: 3px;
+}
+.ql-toolbar.ql-snow button.ql-active {
+    background: rgba(0, 0, 0, 0.12) !important;
+    border-radius: 3px;
+}
+.ql-toolbar.ql-snow {
+    border: 1px solid var(--pico-form-element-border-color, #ccc);
+    border-bottom: none;
+    border-radius: var(--pico-border-radius, 4px) var(--pico-border-radius, 4px) 0 0;
+    padding: 4px 6px;
+    background: var(--pico-card-background-color, #fff);
+}
+.ql-container.ql-snow {
+    border: 1px solid var(--pico-form-element-border-color, #ccc);
+    border-radius: 0 0 var(--pico-border-radius, 4px) var(--pico-border-radius, 4px);
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+.ql-editor {
+    min-height: 90px;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+.ql-editor.ql-blank::before {
+    color: var(--pico-muted-color, #888);
+    font-style: normal;
+    left: 0.75rem;
+}
+/* Compact variant for shorter fields (resultant work) */
+.rich-editor-compact .ql-editor {
+    min-height: 55px;
+}
+/* Normalize Quill HTML output rendered in risk card previews */
+.risk-card-description > p,
+.risk-card-description > ul,
+.risk-card-description > ol,
+.risk-card-resultant > p,
+.risk-card-resultant > ul,
+.risk-card-resultant > ol {
+    margin: 0;
+    padding: 0;
+}
+.risk-card-description > ul,
+.risk-card-description > ol,
+.risk-card-resultant > ul,
+.risk-card-resultant > ol {
+    padding-left: 1.25em;
+}
+
 /* ── Resolve dialog ── */
 #resolve-dialog {
     border: 1px solid var(--pico-muted-border-color);
