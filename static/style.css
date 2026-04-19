@@ -1095,7 +1095,7 @@ dialog.risk-modal {
     border: 1px solid var(--pico-muted-border-color);
     border-radius: var(--pico-border-radius);
     padding: 0;
-    max-width: 640px;
+    max-width: 880px;
     width: 95vw;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
@@ -1290,6 +1290,13 @@ button.print-btn:hover {
 /* Compact variant for shorter fields (resultant work) */
 .rich-editor-compact .ql-editor {
     min-height: 55px;
+}
+/* Modal description editors get generous vertical space */
+dialog.risk-modal .ql-editor {
+    min-height: 200px;
+}
+dialog.risk-modal .rich-editor-compact .ql-editor {
+    min-height: 80px;
 }
 /* Normalize Quill HTML output rendered in risk card previews */
 .risk-card-description > p,
