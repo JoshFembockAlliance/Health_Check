@@ -42,7 +42,7 @@ Last Addressed: 17/04/2026
 
 ### Version Bumps
 Outdated dependencies can often result in vulnerabilities. Ensure that dependencies are up-to-date and check that the version increase has not broken anything. If things have become broken as a result, rever the change and make a note of it here for manual investigation. This will keep the codebase clean and secure. 
-Last Addressed: 14/04/2026
+Last Addressed: 19/04/2026
 
 ### UI / UX Clarity and Accessibility Review
 Review all user interface elements across the different pages. Ensure that each element's purpose is clear and visually legible. Consider accessibility metrics like those that would be used by the Lighthouse chrome plugin. 
