@@ -17,7 +17,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 * [x] The Risks modal field labels could be shortened to use (d) instead of (days) and not wrap to take up two lines, it looks messy. 
 
 ### Risks grid changes
-* [ ] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
+* [x] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
 
 
 ## New Feature Items

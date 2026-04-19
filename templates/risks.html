@@ -178,6 +178,22 @@
             {% endif %}
         </ul>
 
+        {% if risk.impact_days > 0 %}
+        {# Progress bar: red = realised (unrecoverable), amber = still at risk, grey = avoided #}
+        {% set realised_pct = risk.realised_percentage | int %}
+        {% set remaining_pct = 100 - realised_pct %}
+        <div class="risk-budget-bar"
+             title="{{ realised_pct }}% realised · {{ remaining_pct }}% {% if risk.status == 'done' %}avoided{% else %}at risk{% endif %}">
+            {% if realised_pct > 0 %}
+            <div class="risk-budget-bar-realised" style="width:{{ realised_pct }}%"></div>
+            {% endif %}
+            {% if remaining_pct > 0 %}
+            <div class="{% if risk.status == 'done' %}risk-budget-bar-avoided{% else %}risk-budget-bar-atrisk{% endif %}"
+                 style="width:{{ remaining_pct }}%"></div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% if risk.linked_features %}
         <div class="risk-card-linked">
             {% for f in risk.linked_features %}
