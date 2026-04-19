@@ -829,8 +829,63 @@ input:focus, select:focus, textarea:focus {
 
 /* ===================== PRINT ===================== */
 @media print {
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  @page { margin: 1.5cm 1.8cm; }
+
   .sidebar, .topbar, .tweaks-drawer, .page-actions { display: none !important; }
-  .app { grid-template-columns: 1fr !important; }
+  .app { display: block; }
+  body { background: white; font-size: 12px; }
   .content { padding: 0; }
-  body { background: white; }
+
+  /* Cards */
+  .card { box-shadow: none; border: 1px solid #ddd; margin-bottom: 12px; break-inside: avoid; }
+  .hero-card { box-shadow: none; break-inside: avoid; }
+  .card-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+  /* Page title area */
+  .page-head { margin-bottom: 12px; }
+  .page-title { font-size: 18px; }
+
+  /* Section headings */
+  .section-title { margin: 12px 0 6px; }
+  .section-title h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+  .section-title .link { display: none; }
+
+  /* Hero grid — keep 3-col on print */
+  .hero-grid { grid-template-columns: 1.25fr 1fr 1fr !important; gap: 10px; }
+
+  /* Stats */
+  .stat-grid .stat { border-left: 1px solid #e0e0e0; }
+
+  /* Progress bars — force colours */
+  .progress { background: #eee; border-radius: 4px; }
+  .progress .fill { border-radius: 4px; }
+  .progress .fill-good, .progress .fill-on_track { background: oklch(55% 0.14 150) !important; }
+  .progress .fill-warn, .progress .fill-at_risk  { background: oklch(73% 0.17 80)  !important; }
+  .progress .fill-bad,  .progress .fill-behind   { background: oklch(58% 0.2 25)   !important; }
+  .progress .risk-open     { background: oklch(73% 0.17 80 / 0.45) !important; }
+  .progress .risk-realised { background: oklch(58% 0.2 25 / 0.55) !important; }
+
+  /* Hero primary card gradient */
+  .hero-card.primary { color: white; }
+
+  /* Chips */
+  .chip-good { background: oklch(96% 0.05 150) !important; }
+  .chip-warn { background: oklch(96% 0.07 85)  !important; }
+  .chip-bad  { background: oklch(96% 0.05 25)  !important; }
+  .chip-info { background: oklch(96% 0.035 240) !important; }
+
+  /* Feature health rows */
+  .feat-row .item { border-bottom: 1px solid #eee; }
+
+  /* Risk/note cards */
+  .risk-card { break-inside: avoid; box-shadow: none; }
+
+  /* Hide interactive-only elements */
+  .btn:not(.print-show), a.btn, button.btn, details > summary { display: none !important; }
+  details[open] > summary { display: none !important; }
+
+  /* Tables */
+  .data-table { font-size: 11px; }
+  .data-table .cell-actions { display: none; }
 }
