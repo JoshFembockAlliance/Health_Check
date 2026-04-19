@@ -14,6 +14,7 @@
 <div style="display:grid; grid-template-columns: 180px 1fr; gap: 24px;">
     <nav class="settings-nav">
         <a href="#project" class="active">Project</a>
+        <a href="#visual">Visual</a>
         <a href="#budget">Budget</a>
         <a href="#roles">Team &amp; Roles</a>
         <a href="#overheads">Overheads</a>
@@ -49,6 +50,58 @@
                 <button type="submit" class="btn btn-primary" style="margin-top:12px;">Save project</button>
             </form>
             <p class="tiny muted" style="margin-top:10px;">Default team size and role are configured in <a class="link" href="/p/{{ pid }}/capacity">Capacity Planning</a>.</p>
+        </div>
+
+        {# ── Visual card ── #}
+        {% set accents = [
+            ('cyan',    'oklch(48% 0.14 220)'),
+            ('indigo',  'oklch(45% 0.18 278)'),
+            ('emerald', 'oklch(48% 0.14 160)'),
+            ('violet',  'oklch(48% 0.2 300)'),
+            ('rose',    'oklch(55% 0.2 10)'),
+            ('amber',   'oklch(58% 0.17 55)'),
+            ('forest',  'oklch(38% 0.1 145)'),
+            ('plum',    'oklch(35% 0.12 330)'),
+            ('slate',   'oklch(40% 0.04 240)'),
+            ('coral',   'oklch(62% 0.17 30)'),
+            ('mono',    'oklch(22% 0.01 260)'),
+        ] %}
+        <div class="card" id="visual">
+            <div class="card-head"><h3>Visual</h3></div>
+            <p class="small muted" style="margin-top:0;">Accent colour and light/dark mode are stored per-project and applied whenever this project is open.</p>
+            <form method="post" action="/p/{{ pid }}/settings/visual">
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div>
+                        <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:8px;">Accent colour</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            {% for name, color in accents %}
+                            <label style="cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px;">
+                                <input type="radio" name="accent" value="{{ name }}" {% if project.accent == name or (not project.accent and name == 'cyan') %}checked{% endif %} style="position:absolute; opacity:0; width:0; height:0;">
+                                <span class="tweaks-swatch {% if project.accent == name or (not project.accent and name == 'cyan') %}active{% endif %}"
+                                      style="background:{{ color }}; width:28px; height:28px; border-radius:50%; display:block; border:2px solid transparent; transition:border-color 0.15s; cursor:pointer;"
+                                      onclick="this.previousElementSibling.checked=true; document.querySelectorAll('.accent-swatch').forEach(s=>s.classList.remove('active')); this.classList.add('active');"
+                                      title="{{ name }}"></span>
+                                <span class="tiny muted" style="font-size:10px; text-transform:capitalize;">{{ name }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:8px;">Theme</div>
+                        <div style="display:flex; gap:8px;">
+                            <label class="field" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                                <input type="radio" name="theme" value="light" {% if not project.theme or project.theme == 'light' %}checked{% endif %}>
+                                <span>Light</span>
+                            </label>
+                            <label class="field" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                                <input type="radio" name="theme" value="dark" {% if project.theme == 'dark' %}checked{% endif %}>
+                                <span>Dark</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:12px;">Save visual settings</button>
+            </form>
         </div>
 
         {# ── Budget card ── #}

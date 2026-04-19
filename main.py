@@ -538,6 +538,22 @@ def update_project(
     return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
+VALID_ACCENTS = {"cyan","indigo","emerald","mono","violet","rose","amber","forest","plum","slate","coral"}
+VALID_THEMES = {"light", "dark"}
+
+@app.post("/p/{project_id}/settings/visual")
+def update_visual(
+    project_id: int,
+    accent: str = Form("cyan"),
+    theme: str = Form("light"),
+):
+    db = get_db()
+    safe_accent = accent if accent in VALID_ACCENTS else "cyan"
+    safe_theme = theme if theme in VALID_THEMES else "light"
+    db["projects"].update(project_id, {"accent": safe_accent, "theme": safe_theme})
+    return RedirectResponse(f"/p/{project_id}/settings#visual", status_code=303)
+
+
 @app.post("/p/{project_id}/settings/roles/add")
 def add_role(project_id: int, name: str = Form(...), day_rate: float = Form(0)):
     db = get_db()

@@ -2,7 +2,7 @@
    Renders the design from healthcheck-ui/HealthCheck UI.html using server-rendered
    Jinja markup (no React). Sidebar collapse state persists in localStorage. #}
 <!DOCTYPE html>
-<html lang="en" data-theme="light" data-density="balanced" data-accent="cyan">
+<html lang="en" data-theme="{{ active_project.theme if active_project and active_project.theme else 'light' }}" data-density="balanced" data-accent="{{ active_project.accent if active_project and active_project.accent else 'cyan' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

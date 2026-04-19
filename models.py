@@ -14,6 +14,8 @@ class Project(BaseModel):
     default_role_id: int = 1
     health_on_track_pct: float = 100.0
     health_at_risk_pct: float = 80.0
+    accent: str = "cyan"
+    theme: str = "light"
 
 
 class Role(BaseModel):

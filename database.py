@@ -75,6 +75,10 @@ def init_db():
         db["projects"].add_column("health_on_track_pct", float, not_null_default=100.0)
     if "health_at_risk_pct" not in existing_cols:
         db["projects"].add_column("health_at_risk_pct", float, not_null_default=80.0)
+    if "accent" not in existing_cols:
+        db["projects"].add_column("accent", str, not_null_default="cyan")
+    if "theme" not in existing_cols:
+        db["projects"].add_column("theme", str, not_null_default="light")
 
     # roles — named day-rate buckets. Now per-project so each engagement can
     # have its own rate card.
