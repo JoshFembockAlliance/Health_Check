@@ -7,11 +7,11 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Features & Deliverables
 
 ### Risks & Notes UI changes
-* [ ] The pop-up modal should be larger, particularly horizontally for risks and just in general for notes. The intent of having this kind of modal is to let the user see more details, after all. Id the text entry areas were very full then this would not be enough to displa them. Consider using 75% of the horizontal space available and 90% of the vertical. 
+* [x] The pop-up modal should be larger, particularly horizontally for risks and just in general for notes. The intent of having this kind of modal is to let the user see more details, after all. Id the text entry areas were very full then this would not be enough to displa them. Consider using 75% of the horizontal space available and 90% of the vertical. 
 * [ ] Laptop screens are usually quite wide. For Risks, placing the description area beside the resultant work would allow both to be quite tall and show a lot of useful information at once. Of the two, 2/3 of the horizontal space should go to the description which will be larger and contain more text than the resultant work field. 
 
 ### Risks grid changes
-* [ ] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
+* [x] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
 
 
 ## New Feature Items

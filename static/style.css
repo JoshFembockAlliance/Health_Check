@@ -1112,9 +1112,17 @@ dialog.risk-modal {
     border: 1px solid var(--pico-muted-border-color);
     border-radius: var(--pico-border-radius);
     padding: 0;
-    max-width: 880px;
-    width: 95vw;
+    width: 75vw;
+    max-width: 75vw;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+@media (max-width: 768px) {
+    dialog.risk-modal {
+        width: 95vw;
+        max-width: 95vw;
+    }
 }
 dialog.risk-modal::backdrop {
     background: rgba(0, 0, 0, 0.45);
