@@ -3,6 +3,12 @@
 All tables are created here if they don't exist. Additive migrations
 (new columns) are also applied here so that an existing database
 automatically gains new fields on the next server start.
+
+Multi-project: the former singleton `project` table now holds one row
+per project. Every project-scoped table (features, risks, pm_notes,
+budget_adjustments, capacity_periods, overheads, roles) carries a
+`project_id` column. Requirements/deliverables inherit scope through
+features; risk_features through risks.
 """
 import sqlite_utils
 import os
@@ -10,32 +16,47 @@ from datetime import date as _date
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "health_check.db")
 
+# Tables that are scoped to a single project via a project_id column.
+PROJECT_SCOPED_TABLES = [
+    "roles",
+    "features",
+    "risks",
+    "pm_notes",
+    "budget_adjustments",
+    "capacity_periods",
+    "overheads",
+]
+
 
 def get_db() -> sqlite_utils.Database:
     """Return a sqlite_utils Database handle. A new connection is opened each call."""
     return sqlite_utils.Database(DB_PATH)
 
 
+def _ensure_project_id_column(db, table_name: str, default_project_id: int = 1):
+    """Backfill a project_id column on an existing table, defaulting to project 1."""
+    if table_name not in db.table_names():
+        return
+    cols = {col.name for col in db[table_name].columns}
+    if "project_id" not in cols:
+        db[table_name].add_column("project_id", int, not_null_default=default_project_id)
+
+
 def init_db():
     """Create all tables and run additive migrations. Safe to call on every startup."""
     db = get_db()
 
-    # roles — named day-rate buckets (e.g. "Developer $1,435/day").
-    # The project has a default_role_id; deliverables can override with a specific role.
-    if "roles" not in db.table_names():
-        db["roles"].create({
+    # projects — one row per tracked engagement. The singleton `project` table
+    # has been renamed; the row with id=1 is preserved on migration so existing
+    # databases stay intact.
+    if "projects" not in db.table_names() and "project" in db.table_names():
+        # Migrate old singleton `project` table → `projects` multi-row table.
+        db.execute("ALTER TABLE project RENAME TO projects")
+    if "projects" not in db.table_names():
+        db["projects"].create({
             "id": int,
             "name": str,
-            "day_rate": float,
-        }, pk="id")
-
-    # project — singleton row (id=1). All financial settings live here.
-    # health_on_track_pct / health_at_risk_pct are percentage thresholds used by
-    # feature_health() to colour-code each feature's progress badge.
-    if "project" not in db.table_names():
-        db["project"].create({
-            "id": int,
-            "name": str,
+            "description": str,
             "start_date": str,
             "as_of_date": str,
             "initial_budget": float,
@@ -46,28 +67,35 @@ def init_db():
             "health_at_risk_pct": float,
         }, pk="id")
 
-    # budget_adjustments — one row per change event (e.g. scope increase, contingency).
-    # current_budget = initial_budget + SUM(adjustments.amount)
-    if "budget_adjustments" not in db.table_names():
-        db["budget_adjustments"].create({
+    # Additive migrations on projects table
+    existing_cols = {col.name for col in db["projects"].columns}
+    if "description" not in existing_cols:
+        db["projects"].add_column("description", str, not_null_default="")
+    if "health_on_track_pct" not in existing_cols:
+        db["projects"].add_column("health_on_track_pct", float, not_null_default=100.0)
+    if "health_at_risk_pct" not in existing_cols:
+        db["projects"].add_column("health_at_risk_pct", float, not_null_default=80.0)
+
+    # roles — named day-rate buckets. Now per-project so each engagement can
+    # have its own rate card.
+    if "roles" not in db.table_names():
+        db["roles"].create({
             "id": int,
-            "amount": float,
-            "date": str,
-            "description": str,
-        }, pk="id")
+            "project_id": int,
+            "name": str,
+            "day_rate": float,
+        }, pk="id", foreign_keys=[("project_id", "projects")])
 
     # features → requirements → deliverables: three-tier work breakdown structure.
-    # started=1 means the PM has acknowledged this feature is in flight,
-    # which affects the adjusted health target on the dashboard.
     if "features" not in db.table_names():
         db["features"].create({
             "id": int,
+            "project_id": int,
             "name": str,
             "sort_order": int,
-            "started": int,  # 0 = not started, 1 = started
-        }, pk="id")
+            "started": int,
+        }, pk="id", foreign_keys=[("project_id", "projects")])
 
-    # Migration: add started column if missing
     feat_cols = {col.name for col in db["features"].columns}
     if "started" not in feat_cols:
         db["features"].add_column("started", int, not_null_default=0)
@@ -92,24 +120,21 @@ def init_db():
             "sort_order": int,
         }, pk="id", foreign_keys=[("requirement_id", "requirements"), ("role_id", "roles")])
 
-    # Seed default role and project if empty
-    if db["roles"].count == 0:
-        db["roles"].insert({"name": "Default", "day_rate": 1435.00})
+    # budget_adjustments — one row per change event.
+    if "budget_adjustments" not in db.table_names():
+        db["budget_adjustments"].create({
+            "id": int,
+            "project_id": int,
+            "amount": float,
+            "date": str,
+            "description": str,
+        }, pk="id", foreign_keys=[("project_id", "projects")])
 
-    # Add threshold columns to existing databases that don't have them
-    existing_cols = {col.name for col in db["project"].columns}
-    if "health_on_track_pct" not in existing_cols:
-        db["project"].add_column("health_on_track_pct", float, not_null_default=100.0)
-    if "health_at_risk_pct" not in existing_cols:
-        db["project"].add_column("health_at_risk_pct", float, not_null_default=80.0)
-
-    # risks — project risks with impact measured in days.
-    # status drives the lifecycle (todo/doing/done); realised_percentage
-    # (0-100, independent of status) determines how many impact_days
-    # have already been absorbed into the budget via effective_impact_days().
+    # risks
     if "risks" not in db.table_names():
         db["risks"].create({
             "id": int,
+            "project_id": int,
             "name": str,
             "description": str,
             "status": str,
@@ -120,10 +145,8 @@ def init_db():
             "sort_order": int,
             "realised_percentage": float,
             "resultant_work": str,
-        }, pk="id")
+        }, pk="id", foreign_keys=[("project_id", "projects")])
 
-    # Migration: reshape legacy (resolution_type, mitigation_percentage) columns
-    # into a single realised_percentage field.
     if "risks" in db.table_names():
         risk_cols = {col.name for col in db["risks"].columns}
         if "name" not in risk_cols:
@@ -133,23 +156,16 @@ def init_db():
         if "timeline_impact_days" not in risk_cols:
             db["risks"].add_column("timeline_impact_days", float, not_null_default=0.0)
         if "date_identified" not in risk_cols:
-            # Seed existing rows with today's date so the age counter starts
-            # "now" rather than showing an implausible 0-day age for risks
-            # that have actually been open a while.
             today = _date.today().isoformat()
             db["risks"].add_column("date_identified", str, not_null_default=today)
         if "realised_percentage" not in risk_cols:
             db["risks"].add_column("realised_percentage", float, not_null_default=0.0)
-            # Back-fill from the legacy columns if they are still present.
             if "resolution_type" in risk_cols and "mitigation_percentage" in risk_cols:
                 db.execute("UPDATE risks SET realised_percentage = 0 WHERE resolution_type = 'avoided'")
                 db.execute("UPDATE risks SET realised_percentage = mitigation_percentage WHERE resolution_type = 'mitigated'")
                 db.execute("UPDATE risks SET realised_percentage = 100 WHERE resolution_type = 'realised'")
-                # Conservative default — any closed risk without a resolution
-                # previously counted as fully realised; match that.
                 db.execute("UPDATE risks SET realised_percentage = 100 WHERE status = 'done' AND (resolution_type IS NULL OR resolution_type = '')")
                 db.conn.commit()
-        # Drop legacy columns once migration has run.
         current_cols = {col.name for col in db["risks"].columns}
         legacy_cols = {c for c in ("resolution_type", "mitigation_percentage") if c in current_cols}
         if legacy_cols:
@@ -161,52 +177,72 @@ def init_db():
             "feature_id": int,
         }, foreign_keys=[("risk_id", "risks"), ("feature_id", "features")])
 
-    # Capacity planning: one row per (week, role) pair.
-    # Multiple rows can exist for the same week to represent different roles.
-    # NULL role_id means use the project's default role/rate for that team_size.
+    # Capacity planning
     if "capacity_periods" not in db.table_names():
         db["capacity_periods"].create({
             "id": int,
-            "week_start_date": str,  # ISO date of Monday of the week
-            "role_id": int,          # NULL = default role
-            "team_size": int,        # number of people with this role this week
-        }, pk="id", foreign_keys=[("role_id", "roles")])
+            "project_id": int,
+            "week_start_date": str,
+            "role_id": int,
+            "team_size": int,
+        }, pk="id", foreign_keys=[("role_id", "roles"), ("project_id", "projects")])
 
-    # PM Notes: freeform notes with status lifecycle and optional due dates.
-    # Status "sticky" notes always appear on the dashboard regardless of due date.
+    # PM Notes
     if "pm_notes" not in db.table_names():
         db["pm_notes"].create({
             "id": int,
+            "project_id": int,
             "name": str,
             "description": str,
-            "status": str,       # "todo" | "doing" | "done" | "sticky"
-            "due_date": str,     # ISO date; NULL/empty for sticky notes is fine
+            "status": str,
+            "due_date": str,
             "sort_order": int,
-        }, pk="id")
+        }, pk="id", foreign_keys=[("project_id", "projects")])
 
-    # overheads — fixed dollar costs that reduce the budget pool available for
-    # feature delivery (e.g. PM salary, tool licences, cloud hosting).
-    # Sum of amount is deducted from accessible_budget in project_summary().
+    # overheads
     if "overheads" not in db.table_names():
         db["overheads"].create({
             "id": int,
+            "project_id": int,
             "name": str,
             "description": str,
             "amount": float,
             "sort_order": int,
-        }, pk="id")
+        }, pk="id", foreign_keys=[("project_id", "projects")])
 
-    if db["project"].count == 0:
-        default_role = list(db["roles"].rows)[0]
-        db["project"].insert({
+    # Backfill project_id on every project-scoped table (for DBs migrated from
+    # the pre-multi-project schema).
+    for tbl in PROJECT_SCOPED_TABLES:
+        _ensure_project_id_column(db, tbl, default_project_id=1)
+
+    # Seed the first project + default role if the DB is empty.
+    if db["projects"].count == 0:
+        db["projects"].insert({
             "id": 1,
             "name": "New Project",
+            "description": "",
             "start_date": "",
             "as_of_date": "",
             "initial_budget": 0.0,
             "team_size": 1,
             "actual_spend": 0.0,
-            "default_role_id": default_role["id"],
+            "default_role_id": 1,
             "health_on_track_pct": 100.0,
             "health_at_risk_pct": 80.0,
         })
+
+    if db["roles"].count == 0:
+        db["roles"].insert({"project_id": 1, "name": "Default", "day_rate": 1435.00})
+
+
+def seed_project_defaults(project_id: int) -> int:
+    """Seed a newly created project with a Default role, returning the role_id.
+    Also sets the project's default_role_id to that role."""
+    db = get_db()
+    role_id = db["roles"].insert({
+        "project_id": project_id,
+        "name": "Default",
+        "day_rate": 1435.00,
+    }).last_pk
+    db["projects"].update(project_id, {"default_role_id": role_id})
+    return role_id

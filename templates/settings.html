@@ -1,236 +1,262 @@
 {% extends "base.html" %}
-{% block title %}Settings - Project Health Check{% endblock %}
+{% block title %}Settings · {{ project.name }}{% endblock %}
 
 {% block content %}
-<h2>Project Settings</h2>
+{% set pid = project.id %}
 
-<article class="dashboard-section">
-    <form method="post" action="/settings/project">
-        <fieldset>
-            <legend>Project Details</legend>
-            <div class="grid">
-                <label>
-                    Project Name
-                    <input type="text" name="name" value="{{ project.name }}" required>
-                </label>
-            </div>
-            <div class="grid">
-                <label>
-                    Start Date
-                    <input type="date" name="start_date" value="{{ project.start_date }}">
-                </label>
-                <label>
-                    As-of Date
-                    <input type="date" name="as_of_date" value="{{ project.as_of_date }}">
-                </label>
-            </div>
-            <div class="grid">
-                <label>
-                    Initial Budget ($)
-                    <input type="number" name="initial_budget" value="{{ project.initial_budget }}" step="0.01" min="0">
-                </label>
-                <label>
-                    Actual Spend to Date ($)
-                    <input type="number" name="actual_spend" value="{{ project.actual_spend }}" step="0.01" min="0">
-                </label>
-            </div>
-            <p class="text-muted" style="margin:0; font-size:0.9rem;">Default team size and role are configured in <a href="/capacity">Capacity Planning</a>.</p>
-        </fieldset>
-        <fieldset>
-            <legend>Health Thresholds</legend>
-            <p class="text-muted">Feature health is determined by comparing each feature's completion % against the project's expected burn %.
-                A feature is "On Track" if its completion is at or above the on-track threshold of expected burn, "At Risk" if between the two thresholds, and "Behind" if below the at-risk threshold.</p>
-            <div class="grid">
-                <label>
-                    On Track threshold (%)
-                    <input type="number" name="health_on_track_pct" value="{{ project.health_on_track_pct|default(100) }}" step="1" min="0" max="200">
-                    <small class="text-muted">Completion >= expected burn x this% = On Track</small>
-                </label>
-                <label>
-                    At Risk threshold (%)
-                    <input type="number" name="health_at_risk_pct" value="{{ project.health_at_risk_pct|default(80) }}" step="1" min="0" max="200">
-                    <small class="text-muted">Completion >= expected burn x this% = At Risk, below = Behind</small>
-                </label>
-            </div>
-        </fieldset>
-        <button type="submit">Save Project Settings</button>
-    </form>
-</article>
+<div class="page-head">
+    <div>
+        <div class="page-title">Settings</div>
+        <div class="page-sub">Project details, budget, health thresholds, roles, and data import/export.</div>
+    </div>
+</div>
 
-<article class="dashboard-section">
-    <h3 style="margin-top:0;">Roles</h3>
-    <table>
-        <caption class="text-muted">Team roles and day rates</caption>
-        <thead>
-            <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Day Rate</th>
-                <th scope="col">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for role in roles %}
-            <tr>
-                <form method="post" action="/settings/roles/{{ role.id }}/update">
-                    <td><input type="text" name="name" value="{{ role.name }}" required aria-label="Role name"></td>
-                    <td><input type="number" name="day_rate" value="{{ role.day_rate }}" step="0.01" min="0" required aria-label="Day rate for {{ role.name }}"></td>
-                    <td class="actions">
-                        <button type="submit" class="btn-small outline">Save</button>
-                        <button type="submit" formaction="/settings/roles/{{ role.id }}/delete" class="btn-small outline secondary"
-                                aria-label="Delete role {{ role.name }}"
-                                onclick="event.preventDefault(); showConfirm('Delete role &quot;{{ role.name }}&quot;?', this.closest('form'), '/settings/roles/{{ role.id }}/delete')">Delete</button>
-                    </td>
-                </form>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <details>
-        <summary>Add Role</summary>
-        <form method="post" action="/settings/roles/add">
-            <div class="grid">
-                <label>
-                    Name
-                    <input type="text" name="name" placeholder="e.g., Senior Developer" required>
-                </label>
-                <label>
-                    Day Rate ($)
-                    <input type="number" name="day_rate" placeholder="1435" step="0.01" min="0" required>
-                </label>
-            </div>
-            <button type="submit" class="btn-add">+ Add Role</button>
-        </form>
-    </details>
-</article>
+<div style="display:grid; grid-template-columns: 180px 1fr; gap: 24px;">
+    <nav class="settings-nav">
+        <a href="#project" class="active">Project</a>
+        <a href="#budget">Budget</a>
+        <a href="#roles">Team &amp; Roles</a>
+        <a href="#overheads">Overheads</a>
+        <a href="#thresholds">Health Thresholds</a>
+        <a href="#data">Data</a>
+        <a href="#danger" style="color:var(--bad);">Danger zone</a>
+    </nav>
 
-<article class="dashboard-section">
-    <h3 style="margin-top:0;">Budget Adjustments</h3>
-    {% if adjustments %}
-    <table>
-        <caption class="text-muted">Budget adjustment history</caption>
-        <thead>
-            <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Description</th>
-                <th scope="col">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for adj in adjustments %}
-            <tr>
-                <td>{{ adj.date }}</td>
-                <td>{{ adj.amount | currency }}</td>
-                <td>{{ adj.description }}</td>
-                <td>
-                    <form method="post" action="/settings/adjustments/{{ adj.id }}/delete" style="margin:0">
-                        <button type="submit" class="btn-small outline secondary"
-                                aria-label="Delete adjustment {{ adj.description }}"
-                                onclick="event.preventDefault(); showConfirm('Delete this budget adjustment?', this.closest('form'))">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted">No budget adjustments yet.</p>
-    {% endif %}
-    <details>
-        <summary>Add Budget Adjustment</summary>
-        <form method="post" action="/settings/adjustments/add">
-            <div class="grid">
-                <label>
-                    Date
-                    <input type="date" name="date" required>
-                </label>
-                <label>
-                    Amount ($)
-                    <input type="number" name="amount" placeholder="100000" step="0.01" required>
-                </label>
-            </div>
-            <label>
-                Description
-                <input type="text" name="description" placeholder="e.g., +100k for visualisations">
-            </label>
-            <button type="submit" class="btn-add">+ Add Adjustment</button>
-        </form>
-    </details>
-</article>
+    <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
 
-<article class="dashboard-section">
-    <h3 style="margin-top:0;">Overheads</h3>
-    <p class="text-muted">Fixed dollar costs that don't directly deliver features but draw from the same budget (e.g., Project Manager, tooling licences, cloud hosting). The total is deducted from the budget pool available for feature delivery.</p>
-    {% if overheads %}
-    <table>
-        <caption class="text-muted">Project overheads</caption>
-        <thead>
-            <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Description</th>
-                <th scope="col">Amount ($)</th>
-                <th scope="col">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for oh in overheads %}
-            <tr>
-                <form method="post" action="/settings/overheads/{{ oh.id }}/update">
-                    <td><input type="text" name="name" value="{{ oh.name }}" required aria-label="Overhead name"></td>
-                    <td><input type="text" name="description" value="{{ oh.description }}" aria-label="Overhead description for {{ oh.name }}"></td>
-                    <td><input type="number" name="amount" value="{{ oh.amount }}" step="0.01" min="0" required aria-label="Amount for {{ oh.name }}"></td>
-                    <td class="actions">
-                        <button type="submit" class="btn-small outline">Save</button>
-                        <button type="submit" formaction="/settings/overheads/{{ oh.id }}/delete" class="btn-small outline secondary"
-                                aria-label="Delete overhead {{ oh.name }}"
-                                onclick="event.preventDefault(); showConfirm('Delete overhead &quot;{{ oh.name }}&quot;?', this.closest('form'), '/settings/overheads/{{ oh.id }}/delete')">Delete</button>
-                    </td>
-                </form>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted">No overheads yet.</p>
-    {% endif %}
-    <details>
-        <summary>Add Overhead</summary>
-        <form method="post" action="/settings/overheads/add">
-            <div class="grid">
-                <label>
-                    Name
-                    <input type="text" name="name" placeholder="e.g., Project Manager" required>
-                </label>
-                <label>
-                    Amount ($)
-                    <input type="number" name="amount" placeholder="50000" step="0.01" min="0" required>
-                </label>
-            </div>
-            <label>
-                Description
-                <input type="text" name="description" placeholder="e.g., PM for 6 months">
-            </label>
-            <button type="submit" class="btn-add">+ Add Overhead</button>
-        </form>
-    </details>
-</article>
-
-<article class="dashboard-section">
-    <h3 style="margin-top:0;">Export / Import</h3>
-    <p class="text-muted">Export all project data as a zip of CSVs, or import from a previously exported zip to restore or switch projects. Importing will <strong>replace all existing data</strong>.</p>
-    <div class="grid">
-        <div>
-            <a href="/export" role="button" class="outline">&#x2B07; Export Project Data</a>
+        {# ── Project card ── #}
+        <div class="card" id="project">
+            <div class="card-head"><h3>Project</h3></div>
+            <form method="post" action="/p/{{ pid }}/settings/project">
+                <div class="field-grid">
+                    <label class="field full">Project Name
+                        <input type="text" name="name" value="{{ project.name }}" required>
+                    </label>
+                    <label class="field full">Description
+                        <textarea name="description" rows="2" placeholder="Short summary of the engagement…">{{ project.description or '' }}</textarea>
+                    </label>
+                    <label class="field">Start Date
+                        <input type="date" name="start_date" value="{{ project.start_date }}">
+                    </label>
+                    <label class="field">As-of Date
+                        <input type="date" name="as_of_date" value="{{ project.as_of_date }}">
+                    </label>
+                </div>
+                <input type="hidden" name="initial_budget" value="{{ project.initial_budget }}">
+                <input type="hidden" name="actual_spend" value="{{ project.actual_spend }}">
+                <input type="hidden" name="health_on_track_pct" value="{{ project.health_on_track_pct|default(100) }}">
+                <input type="hidden" name="health_at_risk_pct" value="{{ project.health_at_risk_pct|default(80) }}">
+                <button type="submit" class="btn btn-primary" style="margin-top:12px;">Save project</button>
+            </form>
+            <p class="tiny muted" style="margin-top:10px;">Default team size and role are configured in <a class="link" href="/p/{{ pid }}/capacity">Capacity Planning</a>.</p>
         </div>
-        <div>
-            <form method="post" action="/import" enctype="multipart/form-data">
-                <label>
-                    Import from ZIP
+
+        {# ── Budget card ── #}
+        <div class="card" id="budget">
+            <div class="card-head"><h3>Budget</h3></div>
+            <form method="post" action="/p/{{ pid }}/settings/project">
+                <input type="hidden" name="name" value="{{ project.name }}">
+                <input type="hidden" name="description" value="{{ project.description or '' }}">
+                <input type="hidden" name="start_date" value="{{ project.start_date }}">
+                <input type="hidden" name="as_of_date" value="{{ project.as_of_date }}">
+                <input type="hidden" name="health_on_track_pct" value="{{ project.health_on_track_pct|default(100) }}">
+                <input type="hidden" name="health_at_risk_pct" value="{{ project.health_at_risk_pct|default(80) }}">
+                <div class="field-grid">
+                    <label class="field">Initial Budget ($)
+                        <input type="number" name="initial_budget" value="{{ project.initial_budget }}" step="0.01" min="0">
+                    </label>
+                    <label class="field">Actual Spend to Date ($)
+                        <input type="number" name="actual_spend" value="{{ project.actual_spend }}" step="0.01" min="0">
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:12px;">Save budget</button>
+            </form>
+            <hr class="hr">
+            <h4 style="margin:0 0 10px;">Budget adjustments</h4>
+            {% if adjustments %}
+            <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Date</th><th class="right">Amount</th><th>Description</th><th></th></tr></thead>
+                <tbody>
+                    {% for adj in adjustments %}
+                    <tr>
+                        <td class="mono">{{ adj.date }}</td>
+                        <td class="cell-num">{{ adj.amount | currency }}</td>
+                        <td>{{ adj.description }}</td>
+                        <td class="cell-actions">
+                            <form method="post" action="/p/{{ pid }}/settings/adjustments/{{ adj.id }}/delete" style="margin:0; display:inline;">
+                                <button type="button" class="btn btn-danger-ghost btn-sm btn-icon"
+                                        onclick="showConfirm('Delete this budget adjustment?', this.form)" aria-label="Delete adjustment">✕</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="muted small" style="margin:0;">No adjustments yet.</p>
+            {% endif %}
+            <details style="margin-top:10px;">
+                <summary class="btn btn-sm" style="display:inline-block;">+ Record adjustment</summary>
+                <form method="post" action="/p/{{ pid }}/settings/adjustments/add" style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr 2fr auto; gap:10px; align-items:end;">
+                    <label class="field">Date<input type="date" name="date" required></label>
+                    <label class="field">Amount ($)<input type="number" name="amount" step="0.01" required></label>
+                    <label class="field">Description<input type="text" name="description" placeholder="e.g., +100k for visualisations"></label>
+                    <button type="submit" class="btn btn-primary">+ Add</button>
+                </form>
+            </details>
+        </div>
+
+        {# ── Roles card ── #}
+        <div class="card" id="roles">
+            <div class="card-head">
+                <h3>Team &amp; Roles</h3>
+            </div>
+            {% if roles %}
+            <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Role</th><th class="right">Day Rate</th><th></th></tr></thead>
+                <tbody>
+                    {% for role in roles %}
+                    <tr>
+                        <form method="post" action="/p/{{ pid }}/settings/roles/{{ role.id }}/update">
+                            <td><input type="text" name="name" value="{{ role.name }}" required></td>
+                            <td class="cell-num"><input type="number" name="day_rate" value="{{ role.day_rate }}" step="0.01" min="0" required style="width:100px; text-align:right;"></td>
+                            <td class="cell-actions">
+                                <button type="submit" class="btn btn-sm">Save</button>
+                                <button type="submit" formaction="/p/{{ pid }}/settings/roles/{{ role.id }}/delete" class="btn btn-danger-ghost btn-sm"
+                                        onclick="event.preventDefault(); showConfirm('Delete role &quot;{{ role.name }}&quot;?', this.closest('form'), '/p/{{ pid }}/settings/roles/{{ role.id }}/delete')">Delete</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% endif %}
+            <details style="margin-top:10px;">
+                <summary class="btn btn-sm" style="display:inline-block;">+ Add role</summary>
+                <form method="post" action="/p/{{ pid }}/settings/roles/add" style="margin-top:12px; display:grid; grid-template-columns: 2fr 1fr auto; gap:10px; align-items:end;">
+                    <label class="field">Role name<input type="text" name="name" placeholder="e.g., Senior Developer" required></label>
+                    <label class="field">Day rate ($)<input type="number" name="day_rate" placeholder="1435" step="0.01" min="0" required></label>
+                    <button type="submit" class="btn btn-primary">+ Add role</button>
+                </form>
+            </details>
+        </div>
+
+        {# ── Overheads card ── #}
+        <div class="card" id="overheads">
+            <div class="card-head"><h3>Overheads</h3></div>
+            <p class="small muted" style="margin-top:0;">Fixed dollar costs that don't directly deliver features but draw from the same budget (e.g., PM retainer, tooling licences). Deducted from the accessible budget.</p>
+            {% if overheads %}
+            <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Name</th><th>Description</th><th class="right">Amount</th><th></th></tr></thead>
+                <tbody>
+                    {% for oh in overheads %}
+                    <tr>
+                        <form method="post" action="/p/{{ pid }}/settings/overheads/{{ oh.id }}/update">
+                            <td><input type="text" name="name" value="{{ oh.name }}" required></td>
+                            <td><input type="text" name="description" value="{{ oh.description }}"></td>
+                            <td class="cell-num"><input type="number" name="amount" value="{{ oh.amount }}" step="0.01" min="0" required style="width:110px; text-align:right;"></td>
+                            <td class="cell-actions">
+                                <button type="submit" class="btn btn-sm">Save</button>
+                                <button type="submit" formaction="/p/{{ pid }}/settings/overheads/{{ oh.id }}/delete" class="btn btn-danger-ghost btn-sm"
+                                        onclick="event.preventDefault(); showConfirm('Delete overhead &quot;{{ oh.name }}&quot;?', this.closest('form'), '/p/{{ pid }}/settings/overheads/{{ oh.id }}/delete')">Delete</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="muted small" style="margin:0;">No overheads yet.</p>
+            {% endif %}
+            <details style="margin-top:10px;">
+                <summary class="btn btn-sm" style="display:inline-block;">+ Add overhead</summary>
+                <form method="post" action="/p/{{ pid }}/settings/overheads/add" style="margin-top:12px; display:grid; grid-template-columns: 2fr 2fr 1fr auto; gap:10px; align-items:end;">
+                    <label class="field">Name<input type="text" name="name" required></label>
+                    <label class="field">Description<input type="text" name="description"></label>
+                    <label class="field">Amount ($)<input type="number" name="amount" step="0.01" min="0" required></label>
+                    <button type="submit" class="btn btn-primary">+ Add</button>
+                </form>
+            </details>
+        </div>
+
+        {# ── Health thresholds card ── #}
+        <div class="card" id="thresholds">
+            <div class="card-head"><h3>Health Thresholds</h3></div>
+            <p class="small muted" style="margin-top:0;">
+                Feature is "On Track" if completion ≥ <span class="mono">(expected burn %) × (On-track %)</span>,
+                "At Risk" if between thresholds, "Behind" otherwise.
+            </p>
+            <form method="post" action="/p/{{ pid }}/settings/project">
+                <input type="hidden" name="name" value="{{ project.name }}">
+                <input type="hidden" name="description" value="{{ project.description or '' }}">
+                <input type="hidden" name="start_date" value="{{ project.start_date }}">
+                <input type="hidden" name="as_of_date" value="{{ project.as_of_date }}">
+                <input type="hidden" name="initial_budget" value="{{ project.initial_budget }}">
+                <input type="hidden" name="actual_spend" value="{{ project.actual_spend }}">
+                <div class="field-grid">
+                    <label class="field">On Track threshold (%)
+                        <input type="number" name="health_on_track_pct" value="{{ project.health_on_track_pct|default(100) }}" step="1" min="0" max="200">
+                    </label>
+                    <label class="field">At Risk threshold (%)
+                        <input type="number" name="health_at_risk_pct" value="{{ project.health_at_risk_pct|default(80) }}" step="1" min="0" max="200">
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:12px;">Save thresholds</button>
+            </form>
+        </div>
+
+        {# ── Data card ── #}
+        <div class="card" id="data">
+            <div class="card-head"><h3>Data</h3></div>
+            <p class="small muted" style="margin-top:0;">Export this project's data as a zip of CSVs, or import a previously exported zip. Importing replaces <strong>this project's</strong> data only — other projects are untouched.</p>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <a class="btn" href="/p/{{ pid }}/export">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+                    Export project data
+                </a>
+                <form method="post" action="/p/{{ pid }}/import" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center;">
                     <input type="file" name="file" accept=".zip" required>
-                </label>
-                <button type="submit" class="secondary">&#x2B06; Import &amp; Replace</button>
+                    <button type="submit" class="btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M7 14l5-5 5 5"/><path d="M5 3h14"/></svg>
+                        Import &amp; replace
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {# ── Danger zone ── #}
+        <div class="card" id="danger" style="border-color: oklch(from var(--bad) l calc(c * 0.4) h / 0.3);">
+            <div class="card-head"><h3 style="color:var(--bad);">Danger zone</h3></div>
+            <p class="small muted" style="margin-top:0;">Deleting a project permanently removes all its features, risks, notes, capacity, overheads, and adjustments. The last remaining project cannot be deleted.</p>
+            <form method="post" action="/projects/{{ pid }}/delete" style="margin:0;">
+                <button type="button" class="btn btn-danger-ghost" style="border: 1px solid oklch(from var(--bad) l calc(c * 0.5) h / 0.4);"
+                        onclick="showConfirm('Permanently delete project &quot;{{ project.name }}&quot; and all its data?', this.form)">
+                    Delete project
+                </button>
             </form>
         </div>
     </div>
-</article>
+</div>
+
+<script>
+// Settings-nav scroll-to-section + active highlight
+document.querySelectorAll('.settings-nav a').forEach(a => {
+    a.addEventListener('click', (e) => {
+        const href = a.getAttribute('href');
+        if (href && href.startsWith('#')) {
+            e.preventDefault();
+            document.querySelectorAll('.settings-nav a').forEach(x => x.classList.remove('active'));
+            a.classList.add('active');
+            const target = document.querySelector(href);
+            if (target) target.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+    });
+});
+</script>
 {% endblock %}

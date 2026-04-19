@@ -1,343 +1,292 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - {{ project.name }}{% endblock %}
+{% block title %}Dashboard · {{ project.name }}{% endblock %}
 
 {% block content %}
-<div class="dashboard-title-row">
-    <h2 style="margin:0">{{ project.name }}
-        {% if project.as_of_date %}
-        <span class="text-muted" style="font-size: 1rem; font-weight: normal;">&mdash; as of {{ project.as_of_date }}</span>
-        {% endif %}
-    </h2>
-    <button onclick="window.print()" class="print-btn no-print" title="Export to PDF" aria-label="Export dashboard to PDF">
-        &#128196;
-    </button>
-</div>
+{% set p = project %}
+{% set s = summary %}
+{% set rs = risk_summary %}
+{% set pid = project.id %}
 
-{% if not project.start_date or not project.as_of_date or summary.current_budget == 0 %}
-<article>
-    <p>Configure your project in <a href="/settings">Settings</a> to see the full dashboard (start date, as-of date, budget, and at least one role).</p>
-</article>
-{% endif %}
-
-{# ── Hero metrics: the 3 numbers a PM looks at first ── #}
-<dl class="summary-grid hero-grid">
-    <div class="summary-card hero-card">
-        <dt class="label">Net Accessible Budget</dt>
-        <dd class="value">{{ summary.accessible_budget | currency }}</dd>
-        <dd class="text-muted">{{ summary.current_budget | currency }} total budget
-            {% if summary.total_adjustments != 0 %}
-            &mdash; {{ summary.initial_budget | currency }} initial + {{ summary.total_adjustments | currency }} adj.
-            {% endif %}
-        </dd>
-        {% if summary.overhead_dollars > 0 %}
-        <dd class="text-muted">less {{ summary.overhead_dollars | currency }} in overheads</dd>
-        {% endif %}
-        {% if summary.realised_risk_dollars > 0 %}
-        <dd class="text-muted health-red">less {{ summary.realised_risk_dollars | currency }} absorbed by realised risks</dd>
-        {% endif %}
-        {% if risk_summary and risk_summary.open_impact_dollars > 0 %}
-        <dd class="text-muted health-amber">&#x26A0; {{ risk_summary.open_impact_dollars | currency }} unrealised risk exposure (open, may still be mitigated)</dd>
-        {% endif %}
-    </div>
-    <div class="summary-card hero-card">
-        <dt class="label">Overall Completion</dt>
-        <dd class="value {% if summary.overall_completion >= summary.feature_expected_burn_pct %}health-green{% elif summary.overall_completion >= summary.feature_expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
-            {{ summary.overall_completion | pct }}
-        </dd>
-        <dd>
-            <div class="progress-bar-container progress-bar-with-target"
-                 role="progressbar"
-                 aria-valuenow="{{ summary.overall_completion | round(1) }}"
-                 aria-valuemin="0" aria-valuemax="100"
-                 aria-label="Overall completion {{ summary.overall_completion | pct }}, target {{ summary.feature_expected_burn_pct | pct }}">
-                {% if summary.feature_expected_burn_pct > 0 and summary.feature_expected_burn_pct <= 100 %}
-                <div class="progress-target-marker" style="left: {{ summary.feature_expected_burn_pct }}%"></div>
-                {% endif %}
-                <div class="progress-bar {% if summary.overall_completion >= summary.feature_expected_burn_pct %}progress-fill-on_track{% elif summary.overall_completion >= summary.feature_expected_burn_pct * 0.8 %}progress-fill-at_risk{% else %}progress-fill-behind{% endif %}" style="width: {{ [summary.overall_completion, 100] | min }}%"></div>
-                {% if risk_summary and risk_summary.locked_risk_pct > 0 %}
-                <div class="risk-overlay risk-overlay-effective" style="width: {{ risk_summary.locked_risk_pct }}%"></div>
-                {% endif %}
-                {% if risk_summary and risk_summary.open_risk_pct > 0 %}
-                <div class="risk-overlay risk-overlay-open" style="width: {{ risk_summary.open_risk_pct }}%; right: {{ risk_summary.locked_risk_pct }}%"></div>
-                {% endif %}
-            </div>
-        </dd>
-        <dd class="text-muted">target: {{ summary.feature_expected_burn_pct | pct }}</dd>
-    </div>
-    <div class="summary-card hero-card">
-        <dt class="label">Full Team Budget Days Remaining</dt>
-        <dd class="value {% if summary.budget_days_remaining < 20 %}health-red{% elif summary.budget_days_remaining < 60 %}health-amber{% else %}health-green{% endif %}">
-            {{ summary.budget_days_remaining | days }}
-        </dd>
-        <dd class="text-muted">at {{ summary.daily_burn | currency }}/day ({{ project.team_size }} people)</dd>
-        {% if summary.realised_risk_dollars > 0 and summary.daily_burn > 0 %}
-        <dd class="text-muted">after {{ (summary.realised_risk_dollars / summary.daily_burn) | days }} lost to realised risks</dd>
-        {% endif %}
-        {% if risk_summary and risk_summary.open_impact_days > 0 %}
-        <dd class="text-muted health-amber">&#x26A0; Up to {{ risk_summary.open_impact_days | days }} person-days / {{ risk_summary.open_impact_budget_days | days }} budget days in open risks (not yet lost)</dd>
-        {% endif %}
-    </div>
-</dl>
-
-{# ── Capacity Plan summary cards (always shown when project is configured) ── #}
-{% if cap_summary %}
-<dl class="summary-grid hero-grid" style="margin-top: 1.5rem; grid-template-columns: 1fr 1fr;">
-    <div class="summary-card hero-card">
-        <dt class="label">Capacity Remaining</dt>
-        <dd class="value">{{ cap_budget.budget_days | days }}</dd>
-        <dd class="text-muted">business days the budget can fund</dd>
-        <dd class="text-muted">{{ cap_budget.person_days | days }} person-days total</dd>
-        {% if not cap_summary.has_periods %}
-        <dd class="text-muted" style="font-size:0.82rem;">based on default team size &mdash; <a href="/capacity">add weekly overrides &rarr;</a></dd>
-        {% else %}
-        <dd class="text-muted" style="font-size:0.82rem;"><a href="/capacity">Manage capacity &rarr;</a></dd>
-        {% endif %}
-    </div>
-    <div class="summary-card hero-card">
-        <dt class="label">Next 2 Weeks</dt>
-        {% if cap_summary.two_week_by_role %}
-        {% for role, days in cap_summary.two_week_by_role.items() %}
-        <dd><strong>{{ role }}</strong> <span class="text-muted">{{ days | days }} person-days</span></dd>
-        {% endfor %}
-        {% else %}
-        <dd class="text-muted">No capacity entries in the next 2 weeks</dd>
-        {% endif %}
-    </div>
-</dl>
-{% endif %}
-
-<hr class="section-divider">
-
-{# ── Budget & Spend detail ── #}
-<article class="dashboard-section">
-    <h3>Budget & Spend</h3>
-    <div class="detail-grid">
-        {# Spend pair: actual vs expected side-by-side #}
-        <div class="detail-row">
-            <span class="detail-label">Actual Spend to Date</span>
-            <span class="detail-value">{{ summary.actual_spend | currency }}</span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Expected Spend to Date</span>
-            <span class="detail-value">{{ summary.expected_spend | currency }}
-                <span class="text-muted">({{ summary.elapsed_days }} business days)</span>
-            </span>
-        </div>
-        {# Delta spans both columns to summarise the spend pair above #}
-        <div class="detail-row" style="grid-column: 1 / -1">
-            <span class="detail-label">Spend Delta (actual vs expected)</span>
-            <span class="detail-value {% if summary.burn_delta > 0 %}delta-positive{% elif summary.burn_delta < 0 %}delta-negative{% else %}delta-zero{% endif %}">
-                {{ summary.burn_delta | currency }}
-            </span>
-        </div>
-        {# Burn rate pair: current vs expected side-by-side #}
-        <div class="detail-row">
-            <span class="detail-label">Current Burn %</span>
-            <span class="detail-value">{{ summary.current_burn_pct | pct }}</span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Expected Burn %</span>
-            <span class="detail-value">{{ summary.expected_burn_pct | pct }}</span>
-        </div>
-        {# Allocation quartet: features / overheads / realised risks / unallocated — tile to current_budget #}
-        <div class="detail-row">
-            <span class="detail-label">Allocated to Features</span>
-            <span class="detail-value">{{ summary.allocated_dollars | currency }}</span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Allocated to Overheads</span>
-            <span class="detail-value">{{ summary.overhead_dollars | currency }}</span>
-        </div>
-        {% if summary.realised_risk_dollars > 0 %}
-        <div class="detail-row">
-            <span class="detail-label">Absorbed by Realised Risks</span>
-            <span class="detail-value health-red">{{ summary.realised_risk_dollars | currency }}</span>
-        </div>
-        {% endif %}
-        <div class="detail-row">
-            <span class="detail-label">Unallocated Budget</span>
-            <span class="detail-value {% if summary.unallocated_budget < 0 %}health-red{% elif summary.unallocated_budget > 0 %}health-green{% endif %}">
-                {{ summary.unallocated_budget | currency }}
-                {% if summary.open_risk_dollars > 0 %}
-                <span class="risk-at-risk-badge health-amber"
-                      title="Unrealised risk exposure — unsafe to allocate until resolved">
-                    &#9888; {{ summary.open_risk_dollars | currency }} at risk
-                </span>
-                {% endif %}
-            </span>
+<div class="page-head">
+    <div>
+        <div class="page-title">{{ p.name }}</div>
+        <div class="page-sub">
+            {% if p.as_of_date %}As of {{ p.as_of_date }} · {% endif %}
+            {{ p.team_size }}-person team{% if s.elapsed_days %} · {{ s.elapsed_days }} business days elapsed{% endif %}
         </div>
     </div>
-
-    {% if adjustments %}
-    <details class="mt-1">
-        <summary>Budget Adjustment History</summary>
-        <table>
-            <thead>
-                <tr><th scope="col">Date</th><th scope="col">Amount</th><th scope="col">Description</th></tr>
-            </thead>
-            <tbody>
-                {% for adj in adjustments %}
-                <tr>
-                    <td>{{ adj.date }}</td>
-                    <td>{{ adj.amount | currency }}</td>
-                    <td>{{ adj.description }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </details>
-    {% endif %}
-</article>
-
-{# ── Risk Exposure ── #}
-{% if risk_summary and (risk_summary.open_count + risk_summary.done_count) > 0 %}
-<article class="dashboard-section">
-    <div class="section-title-row">
-        <h3>Risk Exposure</h3>
-        <a href="/risks" class="text-muted section-detail-link">Full detail &rarr;</a>
-    </div>
-    <div class="detail-grid">
-        <div class="detail-row">
-            <span class="detail-label">Open Risks (todo / doing)</span>
-            <span class="detail-value">{{ risk_summary.open_count }}</span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Open Risk Impact</span>
-            <span class="detail-value {% if risk_summary.open_impact_days > 0 %}health-amber{% endif %}">
-                {{ risk_summary.open_impact_days | days }} days ({{ risk_summary.open_impact_dollars | currency }})
-            </span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Closed Risks</span>
-            <span class="detail-value">{{ risk_summary.done_count }}</span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Effective Realised Impact</span>
-            <span class="detail-value {% if risk_summary.effective_impact_days > 0 %}health-red{% endif %}">
-                {{ risk_summary.effective_impact_days | days }} days ({{ risk_summary.effective_impact_dollars | currency }})
-            </span>
-        </div>
-        {% if risk_summary.avoided_days > 0 %}
-        <div class="detail-row">
-            <span class="detail-label">Avoided (closed risks)</span>
-            <span class="detail-value health-green">{{ risk_summary.avoided_days | days }} days saved</span>
-        </div>
-        {% endif %}
-    </div>
-</article>
-{% endif %}
-
-{# ── PM Notes dashboard strip ── #}
-{% if dashboard_notes %}
-<article class="dashboard-section">
-    <div class="section-title-row">
-        <h3>PM Notes</h3>
-        <a href="/pm-notes" class="text-muted section-detail-link">
-            All notes &rarr;
-            {% if notes_overflow > 0 %}<span class="health-badge badge-grey" style="margin-left:0.25rem">+{{ notes_overflow }} more</span>{% endif %}
+    <div class="page-actions">
+        <a class="btn" href="/p/{{ pid }}/export">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            Export
+        </a>
+        <a class="btn btn-primary" href="/p/{{ pid }}/settings">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            Edit project
         </a>
     </div>
-    <div class="notes-strip">
-        {% for note in dashboard_notes %}
-        <div class="note-strip-card note-status-{{ note.status }}">
-            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem">
-                <span class="health-badge note-badge-{{ note.status }}">
-                    {% if note.status == "sticky" %}&#x1F4CC;
-                    {% elif note.status == "todo" %}To Do
-                    {% elif note.status == "doing" %}Doing
-                    {% else %}Done{% endif %}
-                </span>
-                <strong style="font-size:0.9rem">{{ note.name }}</strong>
-            </div>
-            {% if note.due_date and note.status != "sticky" %}
-            <div class="text-muted" style="font-size:0.8rem">Due: {{ note.due_date }}</div>
+</div>
+
+{% if not p.start_date or not p.as_of_date or s.current_budget == 0 %}
+<div class="card" style="margin-bottom:16px;">
+    <p style="margin:0;">Configure your project in <a href="/p/{{ pid }}/settings" class="link">Settings</a> to see the full dashboard (start date, as-of date, budget, and at least one role).</p>
+</div>
+{% endif %}
+
+{# ── Hero trio ── #}
+{% set comp_fill = 'fill-good' if s.overall_completion >= s.feature_expected_burn_pct else ('fill-warn' if s.overall_completion >= s.feature_expected_burn_pct * 0.8 else 'fill-bad') %}
+{% set comp_color = 'var(--good)' if s.overall_completion >= s.feature_expected_burn_pct else ('var(--warn)' if s.overall_completion >= s.feature_expected_burn_pct * 0.8 else 'var(--bad)') %}
+{% set days_color = 'var(--bad)' if s.budget_days_remaining < 20 else ('var(--warn)' if s.budget_days_remaining < 60 else 'var(--good)') %}
+
+<div class="hero-grid">
+    <div class="hero-card primary">
+        <div class="label">Net Accessible Budget</div>
+        <div class="value">{{ s.accessible_budget | currency }}</div>
+        <div class="sub-row">
+            <div class="row"><span class="lbl">Current budget</span><span class="val">{{ s.current_budget | currency }}</span></div>
+            {% if s.overhead_dollars > 0 %}
+            <div class="row"><span class="lbl">Overheads</span><span class="val">− {{ s.overhead_dollars | currency }}</span></div>
+            {% endif %}
+            {% if s.realised_risk_dollars > 0 %}
+            <div class="row bad-row"><span class="lbl">Realised risks</span><span class="val">− {{ s.realised_risk_dollars | currency }}</span></div>
+            {% endif %}
+            {% if s.open_risk_dollars > 0 %}
+            <div class="row warn-row"><span class="lbl">⚠ Open risk exposure</span><span class="val">{{ s.open_risk_dollars | currency }}</span></div>
             {% endif %}
         </div>
-        {% endfor %}
     </div>
-</article>
+
+    <div class="hero-card">
+        <div class="label">Overall Completion</div>
+        <div class="value" style="color: {{ comp_color }}">{{ s.overall_completion | pct }}</div>
+        <div class="progress progress-lg" role="progressbar" aria-valuenow="{{ s.overall_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100" style="margin-top:2px;">
+            <div class="fill {{ comp_fill }}" style="width: {{ [s.overall_completion, 100] | min }}%"></div>
+            {% if s.feature_expected_burn_pct > 0 and s.feature_expected_burn_pct <= 100 %}
+            <div class="target" style="left: {{ s.feature_expected_burn_pct }}%"></div>
+            {% endif %}
+            {% if rs.locked_risk_pct > 0 %}
+            <div class="risk-realised" style="width: {{ rs.locked_risk_pct }}%; right: 0; left: auto;"></div>
+            {% endif %}
+            {% if rs.open_risk_pct > 0 %}
+            <div class="risk-open" style="width: {{ rs.open_risk_pct }}%; right: {{ rs.locked_risk_pct }}%; left: auto;"></div>
+            {% endif %}
+        </div>
+        <div class="sub-row">
+            <div class="row"><span class="lbl">Target at this point</span><span class="val">{{ s.feature_expected_burn_pct | pct }}</span></div>
+            {% set gap = s.feature_expected_burn_pct - s.overall_completion %}
+            <div class="row"><span class="lbl">Gap</span><span class="val" style="color: {% if gap > 0 %}var(--bad){% else %}var(--good){% endif %}">{{ '%+.1f' % -gap }}%</span></div>
+            <div class="row"><span class="lbl">Features started</span><span class="val">{{ s.started_feature_count }} / {{ s.total_feature_count }}</span></div>
+        </div>
+    </div>
+
+    <div class="hero-card">
+        <div class="label">Full-Team Budget Days Remaining</div>
+        <div class="value" style="color: {{ days_color }}">{{ s.budget_days_remaining | days }}</div>
+        <div class="sub-row">
+            <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day</span></div>
+            <div class="row"><span class="lbl">Team size</span><span class="val">{{ p.team_size }} people</span></div>
+            {% if cap_budget %}
+            <div class="row"><span class="lbl">Person-days total</span><span class="val">{{ cap_budget.person_days | days }}</span></div>
+            {% endif %}
+            {% if rs.open_impact_days > 0 %}
+            <div class="row warn-row"><span class="lbl">⚠ In open risks</span><span class="val">up to {{ rs.open_impact_days | days }}d</span></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── Budget & Spend ── #}
+<div class="section-title"><h2>Budget &amp; Spend</h2></div>
+<div class="card">
+    <div class="stat-grid">
+        <div class="stat">
+            <div class="label">Actual Spend to Date</div>
+            <div class="value val-lg">{{ s.actual_spend | currency }}</div>
+            <div class="meta">{{ s.current_burn_pct | pct }} of current budget</div>
+        </div>
+        <div class="stat">
+            <div class="label">Expected Spend to Date</div>
+            <div class="value val-lg">{{ s.expected_spend | currency }}</div>
+            <div class="meta">{{ s.expected_burn_pct | pct }} · {{ s.elapsed_days }} business days</div>
+        </div>
+        <div class="stat">
+            <div class="label">Spend Delta</div>
+            {% set delta_color = 'var(--good)' if s.burn_delta < 0 else ('var(--bad)' if s.burn_delta > 0 else 'var(--text-strong)') %}
+            <div class="value val-lg" style="color: {{ delta_color }}">{{ s.burn_delta | currency }}</div>
+            <div class="meta">actual vs expected — {% if s.burn_delta < 0 %}under{% elif s.burn_delta > 0 %}over{% else %}on{% endif %} budget</div>
+        </div>
+        <div class="stat">
+            <div class="label">Unallocated Budget</div>
+            <div class="value val-lg">{{ s.unallocated_budget | currency }}</div>
+            {% if s.open_risk_dollars > 0 %}
+            <div class="meta row">
+                <span class="chip chip-warn" style="text-transform:none; font-weight:500; padding:1px 6px;">
+                    ⚠ {{ s.open_risk_dollars | currency }} at risk
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <hr class="hr">
+    <div class="field-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Allocated to Features</div>
+            <div class="mono" style="font-size:15px;">{{ s.allocated_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Allocated to Overheads</div>
+            <div class="mono" style="font-size:15px;">{{ s.overhead_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Absorbed by Realised Risks</div>
+            <div class="mono" style="font-size:15px; color: var(--bad);">{{ s.realised_risk_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Accessible Budget</div>
+            <div class="mono" style="font-size:15px; font-weight:600;">{{ s.accessible_budget | currency }}</div>
+        </div>
+    </div>
+</div>
+
+{# ── Capacity Plan summary ── #}
+{% if cap_summary %}
+<div class="section-title"><h2>Capacity</h2><a class="link" href="/p/{{ pid }}/capacity">Manage capacity →</a></div>
+<div class="card">
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="stat">
+            <div class="label">Capacity Remaining</div>
+            <div class="value val-lg">{{ cap_budget.budget_days | days }}</div>
+            <div class="meta">business days the budget can fund</div>
+        </div>
+        <div class="stat">
+            <div class="label">Person-days total</div>
+            <div class="value val-lg">{{ cap_budget.person_days | days }}</div>
+            <div class="meta">across remaining budget</div>
+        </div>
+        <div class="stat">
+            <div class="label">Next 2 Weeks</div>
+            {% if cap_summary.two_week_by_role %}
+            <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">
+                {% for role, days in cap_summary.two_week_by_role.items() %}
+                <div class="meta"><strong style="color:var(--text-strong);">{{ role }}</strong> · {{ days | days }} person-days</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="meta">No entries in next 2 weeks</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ── Risk Exposure ── #}
+{% if rs and (rs.open_count + rs.done_count) > 0 %}
+<div class="section-title"><h2>Risk Exposure</h2><a class="link" href="/p/{{ pid }}/risks">Full risk register →</a></div>
+<div class="card">
+    <div class="field-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Open risks (todo / doing)</div>
+            <div class="mono" style="font-size:15px;">{{ rs.open_count }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Open impact</div>
+            <div class="mono" style="font-size:15px; color: oklch(from var(--warn) calc(l - 0.2) c h);">{{ rs.open_impact_days | days }}d · {{ rs.open_impact_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Closed risks</div>
+            <div class="mono" style="font-size:15px;">{{ rs.done_count }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Realised impact</div>
+            <div class="mono" style="font-size:15px; color: var(--bad);">{{ rs.effective_impact_days | days }}d · {{ rs.effective_impact_dollars | currency }}</div>
+        </div>
+        {% if rs.avoided_days > 0 %}
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Avoided (closed successfully)</div>
+            <div class="mono" style="font-size:15px; color: oklch(from var(--good) calc(l - 0.1) c h);">{{ rs.avoided_days | days }}d saved</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{# ── PM Notes strip ── #}
+{% if dashboard_notes %}
+<div class="section-title"><h2>PM Notes</h2><a class="link" href="/p/{{ pid }}/pm-notes">All notes →{% if notes_overflow > 0 %} <span class="chip chip-soft" style="margin-left:6px;">+{{ notes_overflow }} more</span>{% endif %}</a></div>
+<div class="card-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+    {% for n in dashboard_notes %}
+    {% set sev = 'med' if n.status == 'sticky' else ('med' if n.status == 'doing' else 'low') %}
+    <div class="risk-card sev-{{ sev }}">
+        <div class="head">
+            <span class="chip chip-{{ {'sticky':'info','todo':'bad','doing':'warn','done':'good'}[n.status] }}">{{ n.status | upper }}</span>
+            {% if n.due_date and n.status != 'sticky' %}
+            <span class="tiny muted mono">due {{ n.due_date }}</span>
+            {% endif %}
+        </div>
+        <div class="title" style="font-size:13px;">{{ n.name }}</div>
+    </div>
+    {% endfor %}
+</div>
 {% endif %}
 
 {# ── Feature Health ── #}
-<article class="dashboard-section">
-    <div class="section-title-row">
-        <h3>Feature Health</h3>
-        {% if summary.started_feature_count > 0 %}
-        <span class="text-muted">
-            Started ({{ summary.started_feature_count }}/{{ summary.total_feature_count }}) &mdash;
-            <strong class="{% if summary.started_completion >= summary.feature_expected_burn_pct %}health-green{% elif summary.started_completion >= summary.feature_expected_burn_pct * 0.8 %}health-amber{% else %}health-red{% endif %}">
-                {{ summary.started_completion | pct }}
-            </strong>
-            weighted vs {{ summary.feature_expected_burn_pct | pct }} expected
-        </span>
-        {% endif %}
-    </div>
+<div class="section-title">
+    <h2>Feature Health</h2>
+    {% if s.started_feature_count > 0 %}
+    <span class="tiny muted">
+        Started ({{ s.started_feature_count }}/{{ s.total_feature_count }}) —
+        <strong style="color: {{ comp_color }};">{{ s.started_completion | pct }}</strong>
+        weighted vs {{ s.feature_expected_burn_pct | pct }} expected
+    </span>
+    {% endif %}
+</div>
+<div class="card" style="padding:14px;">
     {% if features %}
-    {% for f in features %}
-    {% set h = f.health %}
-    <div class="feature-health-card {% if f.started %}feature-started{% else %}feature-not-started{% endif %}">
-        <div class="feature-health-header">
-            <div class="feature-health-name">
-                <button class="started-toggle {% if f.started %}started-on{% else %}started-off{% endif %}"
-                        onclick="toggleStarted({{ f.id }}, this)"
-                        aria-label="{% if f.started %}Mark {{ f.name }} as not started{% else %}Mark {{ f.name }} as started{% endif %}"
-                        aria-pressed="{{ 'true' if f.started else 'false' }}">
-                </button>
-                <a href="/features/{{ f.id }}"><strong>{{ f.name }}</strong></a>
-            </div>
-            <span class="health-badge {{ h.badge_class }}">{{ h.label }}</span>
-        </div>
-        {% if h.status != "not_budgeted" %}
-        <div class="feature-health-body">
-            <div class="feature-health-bar">
-                <div class="progress-bar-container progress-bar-with-target"
-                     role="progressbar"
-                     aria-valuenow="{{ f.weighted_completion | round(1) }}"
-                     aria-valuemin="0" aria-valuemax="100"
-                     aria-label="{{ f.name }} completion {{ f.weighted_completion | pct }}, target {{ h.target_pct | pct }}">
-                    {% if h.target_pct > 0 and h.target_pct <= 100 %}
-                    <div class="progress-target-marker" style="left: {{ h.target_pct }}%"></div>
-                    {% endif %}
-                    <div class="progress-bar progress-fill-{{ h.status }}"
-                         style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
-                </div>
-                <span class="text-muted">{{ f.weighted_completion | pct }}</span>
-            </div>
-            <div class="feature-health-stats">
-                <span>{{ f.total_days | days }} / {{ f.total_dollars | currency }}</span>
-                <span class="text-muted">&rarr;</span>
-                <span>{{ f.remaining_days | days }} / {{ f.remaining_dollars | currency }} remaining</span>
-                {% if h.target_pct > 0 %}
-                <span class="text-muted">&bull; target {{ h.target_pct | pct }}</span>
+    <div class="feat-row">
+        {% for f in features %}
+        {% set h = f.health %}
+        <div class="item" style="opacity: {% if f.started %}1{% else %}0.65{% endif %}">
+            <div class="name">
+                <button class="started-toggle {% if f.started %}on{% endif %}"
+                        onclick="toggleStarted({{ pid }}, {{ f.id }}, this)"
+                        aria-label="Toggle started" aria-pressed="{{ 'true' if f.started else 'false' }}"></button>
+                <a href="/p/{{ pid }}/features/{{ f.id }}">{{ f.name }}</a>
+                {% if h.status == 'on_track' %}<span class="chip chip-good"><span class="chip-dot"></span> On Track</span>
+                {% elif h.status == 'at_risk' %}<span class="chip chip-warn"><span class="chip-dot"></span> At Risk</span>
+                {% elif h.status == 'behind' %}<span class="chip chip-bad"><span class="chip-dot"></span> Behind</span>
+                {% elif h.status == 'not_budgeted' %}<span class="chip chip-soft">Not Budgeted</span>
                 {% endif %}
             </div>
+            <div class="bar">
+                {% if h.status != 'not_budgeted' %}
+                    <div class="progress">
+                        <div class="fill fill-{{ h.status }}" style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
+                        {% if h.target_pct > 0 and h.target_pct <= 100 %}
+                        <div class="target" style="left: {{ h.target_pct }}%"></div>
+                        {% endif %}
+                    </div>
+                    <span class="pct">{{ f.weighted_completion | pct }}</span>
+                {% else %}
+                    <span class="muted tiny" style="flex:1;">No deliverables yet</span>
+                {% endif %}
+            </div>
+            <div class="budget">
+                <strong>{{ f.total_days | days }}d</strong> · <strong>{{ f.total_dollars | currency }}</strong><br>
+                <span>{{ f.remaining_days | days }}d / {{ f.remaining_dollars | currency }} remaining</span>
+            </div>
         </div>
-        {% else %}
-        <div class="feature-health-body">
-            <p class="text-muted" style="margin:0">No deliverables budgeted yet &mdash; <a href="/features/{{ f.id }}">add deliverables</a></p>
-        </div>
-        {% endif %}
-    </div>
-    {% endfor %}
-
-    <div class="feature-health-totals">
-        <span><strong>Totals</strong></span>
-        <span class="text-muted">
-            {{ features | sum(attribute='total_days') | days }} / {{ features | sum(attribute='total_dollars') | currency }}
-            &rarr;
-            {{ features | sum(attribute='remaining_days') | days }} / {{ features | sum(attribute='remaining_dollars') | currency }} remaining
-        </span>
+        {% endfor %}
     </div>
     {% else %}
-    <p class="text-muted">No features yet. <a href="/features">Add some features</a> to see health metrics.</p>
+    <p class="muted">No features yet. <a class="link" href="/p/{{ pid }}/features">Add some features</a> to see health metrics.</p>
     {% endif %}
-</article>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function toggleStarted(featureId, btn) {
-    fetch(`/api/features/${featureId}/toggle-started`, {
+function toggleStarted(projectId, featureId, btn) {
+    fetch(`/api/p/${projectId}/features/${featureId}/toggle-started`, {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     }).then(r => r.json()).then(data => {

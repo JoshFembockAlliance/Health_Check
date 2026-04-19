@@ -1,69 +1,89 @@
 {% extends "base.html" %}
-{% block title %}Features - Project Health Check{% endblock %}
+{% block title %}Features · {{ project.name }}{% endblock %}
 
 {% block content %}
-<h2>Features</h2>
-<p class="text-muted">Project budget: {{ project.initial_budget | currency }} &bull; Allocated below: {{ features | sum(attribute='total_dollars') | currency }} &bull; Unallocated: {{ (project.initial_budget - features | sum(attribute='total_dollars')) | currency }}</p>
-
-{% if features %}
-<table>
-    <caption class="text-muted">Feature allocation and completion summary</caption>
-    <thead>
-        <tr>
-            <th scope="col">Feature</th>
-            <th scope="col" class="text-right">Allocated (days)</th>
-            <th scope="col" class="text-right">Allocated ($)</th>
-            <th scope="col" class="text-right">Completion</th>
-            <th scope="col" class="text-right">Remaining (days)</th>
-            <th scope="col" class="text-right">Remaining ($)</th>
-            <th scope="col">Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for f in features %}
-        <tr>
-            <td><a href="/features/{{ f.id }}">{{ f.name }}</a></td>
-            <td class="text-right">{{ f.total_days | days }}</td>
-            <td class="text-right">{{ f.total_dollars | currency }}</td>
-            <td class="text-right">{{ f.weighted_completion | pct }}</td>
-            <td class="text-right">{{ f.remaining_days | days }}</td>
-            <td class="text-right">{{ f.remaining_dollars | currency }}</td>
-            <td>
-                <form method="post" action="/features/{{ f.id }}/delete" style="margin:0">
-                    <button type="submit" class="btn-small outline secondary"
-                            aria-label="Delete feature {{ f.name }}"
-                            onclick="event.preventDefault(); showConfirm('Delete feature &quot;{{ f.name }}&quot; and all its requirements/deliverables?', this.closest('form'))">Delete</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-    <tfoot>
-        <tr>
-            <th>Total Allocated</th>
-            <th class="text-right">{{ features | sum(attribute='total_days') | days }}</th>
-            <th class="text-right">{{ features | sum(attribute='total_dollars') | currency }}</th>
-            <th></th>
-            <th class="text-right">{{ features | sum(attribute='remaining_days') | days }}</th>
-            <th class="text-right">{{ features | sum(attribute='remaining_dollars') | currency }}</th>
-            <th></th>
-        </tr>
-    </tfoot>
-</table>
-{% else %}
-<p class="text-muted">No features yet. Add one below.</p>
-{% endif %}
-
-<details open>
-    <summary>Add Feature</summary>
-    <form method="post" action="/features/add">
-        <div class="grid">
-            <label>
-                Feature Name
-                <input type="text" name="name" placeholder="e.g., Repricing Tool" required>
-            </label>
+{% set pid = project.id %}
+<div class="page-head">
+    <div>
+        <div class="page-title">Features</div>
+        <div class="page-sub">
+            Project budget: {{ project.initial_budget | currency }} ·
+            Allocated: {{ features | sum(attribute='total_dollars') | currency }} ·
+            Unallocated: {{ (project.initial_budget - features | sum(attribute='total_dollars')) | currency }}
         </div>
-        <button type="submit" class="btn-add">+ Add Feature</button>
+    </div>
+    <div class="page-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('add-feature-dialog').showModal()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add feature
+        </button>
+    </div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+    {% if features %}
+    <div class="table-scroll">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Feature</th>
+                <th class="right">Allocated (days)</th>
+                <th class="right">Allocated ($)</th>
+                <th class="right">Completion</th>
+                <th class="right">Remaining (days)</th>
+                <th class="right">Remaining ($)</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in features %}
+            <tr>
+                <td><a href="/p/{{ pid }}/features/{{ f.id }}" style="color: var(--text-strong); font-weight: 500;">{{ f.name }}</a></td>
+                <td class="cell-num">{{ f.total_days | days }}</td>
+                <td class="cell-num">{{ f.total_dollars | currency }}</td>
+                <td class="cell-num">{{ f.weighted_completion | pct }}</td>
+                <td class="cell-num">{{ f.remaining_days | days }}</td>
+                <td class="cell-num">{{ f.remaining_dollars | currency }}</td>
+                <td class="cell-actions">
+                    <form method="post" action="/p/{{ pid }}/features/{{ f.id }}/delete" style="margin:0; display:inline;">
+                        <button type="submit" class="btn btn-danger-ghost btn-sm"
+                                onclick="event.preventDefault(); showConfirm('Delete feature &quot;{{ f.name }}&quot; and all its requirements/deliverables?', this.closest('form'))"
+                                aria-label="Delete feature {{ f.name }}">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td>Total Allocated</td>
+                <td class="cell-num">{{ features | sum(attribute='total_days') | days }}</td>
+                <td class="cell-num">{{ features | sum(attribute='total_dollars') | currency }}</td>
+                <td></td>
+                <td class="cell-num">{{ features | sum(attribute='remaining_days') | days }}</td>
+                <td class="cell-num">{{ features | sum(attribute='remaining_dollars') | currency }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+    {% else %}
+    <p class="muted" style="padding:20px; margin:0;">No features yet. Click <em>Add feature</em> above.</p>
+    {% endif %}
+</div>
+
+<dialog id="add-feature-dialog">
+    <form method="post" action="/p/{{ pid }}/features/add" style="display:flex; flex-direction:column; gap:12px; min-width:380px;">
+        <strong style="font-size:14px; color: var(--text-strong);">Add feature</strong>
+        <label class="field">Feature Name
+            <input type="text" name="name" required autofocus placeholder="e.g., Repricing Tool">
+        </label>
+        <div class="dialog-actions">
+            <button type="button" class="btn" onclick="document.getElementById('add-feature-dialog').close()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add feature</button>
+        </div>
     </form>
-</details>
+</dialog>
 {% endblock %}

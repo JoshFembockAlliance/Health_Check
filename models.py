@@ -2,27 +2,30 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-class Role(BaseModel):
-    id: Optional[int] = None
-    name: str
-    day_rate: float
-
-
 class Project(BaseModel):
-    id: int = 1
+    id: Optional[int] = None
     name: str = "New Project"
+    description: str = ""
     start_date: str = ""
     as_of_date: str = ""
     initial_budget: float = 0.0
     team_size: int = 1
     actual_spend: float = 0.0
     default_role_id: int = 1
-    health_on_track_pct: float = 100.0   # completion >= expected * this% → On Track
-    health_at_risk_pct: float = 80.0     # completion >= expected * this% → At Risk, below → Behind
+    health_on_track_pct: float = 100.0
+    health_at_risk_pct: float = 80.0
+
+
+class Role(BaseModel):
+    id: Optional[int] = None
+    project_id: int
+    name: str
+    day_rate: float
 
 
 class BudgetAdjustment(BaseModel):
     id: Optional[int] = None
+    project_id: int
     amount: float
     date: str
     description: str
@@ -30,9 +33,10 @@ class BudgetAdjustment(BaseModel):
 
 class Feature(BaseModel):
     id: Optional[int] = None
+    project_id: int
     name: str
     sort_order: int = 0
-    started: int = 0  # 0 = not started, 1 = started
+    started: int = 0
 
 
 class Requirement(BaseModel):
@@ -55,30 +59,16 @@ class Deliverable(BaseModel):
 
 class Risk(BaseModel):
     id: Optional[int] = None
+    project_id: int
     name: str
     description: str = ""
-    status: str = "todo"  # todo, doing, done
-    # date_identified: ISO date (YYYY-MM-DD) the risk was raised. Used to
-    # compute the "Open for Xd" age indicator on open risks, helping the PM
-    # spot stale risks that have been lingering.
+    status: str = "todo"
     date_identified: str = ""
     due_date: str = ""
     impact_days: float = 0.0
-    # timeline_impact_days: schedule slip in days, separate from impact_days
-    # which measures billable/budget cost. A sequencing hiccup might cost 3d
-    # of billable time but slip the schedule by 10d — both are worth noting
-    # but only impact_days flows into budget calculations.
     timeline_impact_days: float = 0.0
     sort_order: int = 0
-    # realised_percentage is independent of status: even an open risk can have
-    # some portion already absorbed. 0 = nothing realised yet, 100 = fully
-    # absorbed. For closed risks the derived label is Avoided (0%),
-    # Mitigated (1-99%), or Realised (100%).
     realised_percentage: float = 0.0
-    # resultant_work: free text describing the work items that flow from
-    # realised impact (e.g. "3 days went into rebuilding the sync layer").
-    # Kept separate from description so the narrative about what changed
-    # is distinct from the narrative about what we're now doing about it.
     resultant_work: str = ""
 
 
@@ -89,6 +79,7 @@ class RiskFeature(BaseModel):
 
 class Overhead(BaseModel):
     id: Optional[int] = None
+    project_id: int
     name: str
     description: str = ""
     amount: float = 0.0

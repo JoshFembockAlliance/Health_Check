@@ -1,24 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Capacity Planning - {{ project.name }}{% endblock %}
+{% block title %}Capacity · {{ project.name }}{% endblock %}
 
 {% block content %}
-<div class="section-title-row" style="margin-bottom:1.5rem">
-    <h2 style="margin:0">Capacity Planning</h2>
+{% set pid = project.id %}
+
+<div class="page-head">
+    <div>
+        <div class="page-title">Capacity Planning</div>
+        <div class="page-sub">Define team composition week by week. Weeks without an override fall back to defaults.</div>
+    </div>
 </div>
 
-<article class="dashboard-section">
-    <p class="text-muted" style="margin-bottom:1rem">
-        Define team composition week by week. Each row represents a group of people in a given role for that week.
-        Weeks without a capacity entry fall back to the default team size and role below.
-    </p>
-    <form method="post" action="/capacity/defaults" style="margin:0">
-        <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end;">
-            <label style="margin:0">
-                Default Team Size
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-head">
+        <h3>Defaults</h3>
+    </div>
+    <form method="post" action="/p/{{ pid }}/capacity/defaults">
+        <div class="field-grid" style="grid-template-columns: 1fr 1fr auto;">
+            <label class="field">Default team size
                 <input type="number" name="team_size" value="{{ project.team_size }}" min="1" required>
             </label>
-            <label style="margin:0">
-                Default Role
+            <label class="field">Default role
                 <select name="default_role_id">
                     {% for role in roles %}
                     <option value="{{ role.id }}" {% if role.id == project.default_role_id %}selected{% endif %}>
@@ -27,80 +29,80 @@
                     {% endfor %}
                 </select>
             </label>
-            <button type="submit" class="btn-small outline" style="margin:0">Save Defaults</button>
+            <button type="submit" class="btn" style="align-self: end;">Save defaults</button>
         </div>
     </form>
-</article>
+</div>
 
-{# ── Capacity period table ── #}
-{% if weeks %}
-<article class="dashboard-section">
-    <h3>Planned Weeks</h3>
-    <table>
+{% set total_weekly = 0 %}
+{% for wk, ps in weeks.items() %}{% for p in ps %}{% set total_weekly = total_weekly + p.team_size * p.day_rate * 5 %}{% endfor %}{% endfor %}
+
+<div class="card" style="padding:0; overflow:hidden; margin-bottom:16px;">
+    <div class="card-head" style="padding: 14px 16px; margin-bottom:0; border-bottom: 1px solid var(--border);">
+        <h3>Planned Weeks</h3>
+        <span class="muted tiny mono">Total weekly cost: {{ total_weekly | currency }}</span>
+    </div>
+    {% if weeks %}
+    <div class="table-scroll">
+    <table class="data-table">
         <thead>
             <tr>
-                <th scope="col">Week of (Monday)</th>
-                <th scope="col">Role</th>
-                <th scope="col" class="text-right">People</th>
-                <th scope="col" class="text-right">Day Rate</th>
-                <th scope="col" class="text-right">Weekly Cost</th>
-                <th scope="col" class="col-actions">Actions</th>
+                <th>Week of (Monday)</th>
+                <th>Role</th>
+                <th class="right">People</th>
+                <th class="right">Day Rate</th>
+                <th class="right">Weekly Cost</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
-        {% for week_date, periods in weeks.items() %}
+            {% for week_date, periods in weeks.items() %}
             {% for period in periods %}
             <tr>
-                {% if loop.first %}
-                <td rowspan="{{ periods|length }}" style="font-weight:600;vertical-align:top;padding-top:0.55rem">{{ week_date }}</td>
-                {% endif %}
+                <td>{% if loop.first %}<strong class="mono">{{ week_date }}</strong>{% endif %}</td>
                 <td>{{ period.role_name }}</td>
-                <td class="text-right">{{ period.team_size }}</td>
-                <td class="text-right">{{ period.day_rate | currency }}/day</td>
-                <td class="text-right">{{ (period.team_size * period.day_rate * 5) | currency }}</td>
-                <td class="actions">
-                    <form method="post" action="/capacity/{{ period.id }}/delete" style="display:inline">
-                        <button type="button" class="btn-small btn-icon outline secondary"
-                                onclick="showConfirm('Remove this capacity entry?', this.form)"
-                                aria-label="Delete capacity entry">&#x2715;</button>
+                <td class="cell-num">{{ period.team_size }}</td>
+                <td class="cell-num">{{ period.day_rate | currency }}/day</td>
+                <td class="cell-num">{{ (period.team_size * period.day_rate * 5) | currency }}</td>
+                <td class="cell-actions">
+                    <form method="post" action="/p/{{ pid }}/capacity/{{ period.id }}/delete" style="display:inline; margin:0;">
+                        <button type="button" class="btn btn-danger-ghost btn-sm btn-icon"
+                                onclick="showConfirm('Remove this capacity entry?', this.form)" aria-label="Delete capacity entry">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                        </button>
                     </form>
                 </td>
             </tr>
             {% endfor %}
-        {% endfor %}
+            {% endfor %}
         </tbody>
     </table>
-</article>
-{% else %}
-<article class="dashboard-section">
-    <p class="text-muted">No capacity periods defined yet. Add one below to start planning.</p>
-</article>
-{% endif %}
+    </div>
+    {% else %}
+    <p class="muted" style="padding:20px; margin:0;">No capacity periods defined yet. Add one below.</p>
+    {% endif %}
+</div>
 
-{# ── Add capacity period form ── #}
-<article class="dashboard-section">
-    <h3>Add Capacity Period</h3>
-    <form method="post" action="/capacity/add">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:1rem;align-items:end">
-            <label>
-                Week (any day in the week)
+<div class="card">
+    <div class="card-head"><h3>Add Capacity Period</h3></div>
+    <form method="post" action="/p/{{ pid }}/capacity/add">
+        <div class="field-grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
+            <label class="field">Week (any day)
                 <input type="date" name="week_start_date" required>
             </label>
-            <label>
-                Role
+            <label class="field">Role
                 <select name="role_id">
-                    <option value="">Project Default</option>
+                    <option value="">Project default</option>
                     {% for role in roles %}
                     <option value="{{ role.id }}">{{ role.name }} ({{ role.day_rate | currency }}/day)</option>
                     {% endfor %}
                 </select>
             </label>
-            <label>
-                Number of People
+            <label class="field">Number of people
                 <input type="number" name="team_size" value="1" min="0" max="100">
             </label>
-            <button type="submit" class="btn-add" style="margin-top:0">+ Add</button>
+            <button type="submit" class="btn btn-primary" style="align-self: end;">+ Add</button>
         </div>
     </form>
-</article>
+</div>
 {% endblock %}

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -10,7 +10,7 @@ import zipfile
 import html as _html_module
 from datetime import datetime, date as _date, timedelta
 
-from database import init_db, get_db
+from database import init_db, get_db, seed_project_defaults, PROJECT_SCOPED_TABLES
 from calculations import (
     deliverable_summary,
     requirement_summary,
@@ -32,6 +32,8 @@ app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 
+# ── Formatting filters ──
+
 def fmt_currency(value):
     if value is None:
         return "$0"
@@ -51,9 +53,6 @@ def fmt_days(value):
 
 
 def fmt_age_days(iso_date_str):
-    """Number of whole days between an ISO date string and today.
-    Returns None for missing/invalid input so templates can hide the age.
-    """
     if not iso_date_str:
         return None
     try:
@@ -64,12 +63,6 @@ def fmt_age_days(iso_date_str):
 
 
 def render_rich(value):
-    """Render content that may be Quill HTML or legacy plain text.
-
-    Quill stores content as HTML (e.g. <p>…</p>). Older rows are plain text.
-    Plain text is HTML-escaped and newlines converted to <br> so the display
-    remains correct. The caller must apply | safe after this filter.
-    """
     if not value:
         return ""
     stripped = value.strip()
@@ -90,52 +83,85 @@ def startup():
     init_db()
 
 
-def get_project():
+# ── Project-scoped helpers ──
+
+def get_project(project_id: int):
+    """Return a single project row or raise 404."""
     db = get_db()
-    return list(db["project"].rows)[0]
+    try:
+        return db["projects"].get(project_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
 
-def get_roles():
+def get_all_projects():
+    """List every project row ordered by id — used for the sidebar."""
     db = get_db()
-    return list(db["roles"].rows)
+    return list(db.execute("SELECT * FROM projects ORDER BY id").fetchall()) if False else [
+        dict(row) for row in db["projects"].rows
+    ]
+
+
+def get_roles(project_id: int):
+    db = get_db()
+    return list(db.execute(
+        "SELECT * FROM roles WHERE project_id = ? ORDER BY id", [project_id]
+    ).fetchall())
 
 
 def get_role_rate(role_id, roles, default_rate):
     for r in roles:
-        if r["id"] == role_id:
-            return r["day_rate"]
+        # sqlite rows support indexing by name when using db.execute; but here
+        # roles may be dicts (from sqlite_utils .rows). Handle both.
+        rid = r["id"] if isinstance(r, dict) else r[0]
+        rate = r["day_rate"] if isinstance(r, dict) else r[2]
+        if rid == role_id:
+            return rate
     return default_rate
 
 
-def build_feature_data(feature_id=None):
+def _roles_as_dicts(project_id: int):
+    """Return roles as plain dicts — the template & role-rate lookups want this shape."""
     db = get_db()
-    project = get_project()
-    roles = get_roles()
+    rows = list(db.execute(
+        "SELECT id, project_id, name, day_rate FROM roles WHERE project_id = ? ORDER BY id",
+        [project_id],
+    ).fetchall())
+    return [{"id": r[0], "project_id": r[1], "name": r[2], "day_rate": r[3]} for r in rows]
+
+
+def build_feature_data(project_id: int, feature_id: Optional[int] = None):
+    db = get_db()
+    project = get_project(project_id)
+    roles = _roles_as_dicts(project_id)
     default_role_rate = get_role_rate(project["default_role_id"], roles, 0)
 
     if feature_id:
-        features_rows = [db["features"].get(feature_id)]
+        features_rows = list(db.execute(
+            "SELECT * FROM features WHERE id = ? AND project_id = ?",
+            [feature_id, project_id],
+        ).fetchall())
     else:
-        features_rows = list(db.execute("SELECT * FROM features ORDER BY sort_order, id").fetchall())
+        features_rows = list(db.execute(
+            "SELECT * FROM features WHERE project_id = ? ORDER BY sort_order, id",
+            [project_id],
+        ).fetchall())
 
+    # features table columns after migration: id, name, sort_order, started, project_id
     enriched_features = []
     for f in features_rows:
-        if isinstance(f, dict):
-            fid = f["id"]
-            fdict = f
-        else:
-            fid = f[0]
-            fdict = {"id": f[0], "name": f[1], "sort_order": f[2], "started": f[3] if len(f) > 3 else 0}
-
+        # sqlite3 Row from raw SELECT * — positional access
+        fdict = {"id": f[0], "name": f[1], "sort_order": f[2], "started": f[3] if len(f) > 3 else 0}
         reqs = list(db.execute(
-            "SELECT * FROM requirements WHERE feature_id = ? ORDER BY sort_order, id", [fid]
+            "SELECT * FROM requirements WHERE feature_id = ? ORDER BY sort_order, id", [fdict["id"]]
         ).fetchall())
 
         enriched_reqs = []
         for r in reqs:
             rdict = {"id": r[0], "feature_id": r[1], "name": r[2], "sort_order": r[3]}
             dels = list(db.execute(
-                "SELECT * FROM deliverables WHERE requirement_id = ? ORDER BY sort_order, id", [rdict["id"]]
+                "SELECT * FROM deliverables WHERE requirement_id = ? ORDER BY sort_order, id",
+                [rdict["id"]],
             ).fetchall())
             enriched_dels = []
             for d in dels:
@@ -154,31 +180,163 @@ def build_feature_data(feature_id=None):
     return enriched_features, project, roles, default_role_rate
 
 
-# ── Dashboard ──
+def _dashboard_counts(project_id: int):
+    """Counts used for topbar nav badges."""
+    db = get_db()
+    feat_count = db.execute(
+        "SELECT COUNT(*) FROM features WHERE project_id = ?", [project_id]
+    ).fetchone()[0]
+    open_risks = db.execute(
+        "SELECT COUNT(*) FROM risks WHERE project_id = ? AND status != 'done'",
+        [project_id],
+    ).fetchone()[0]
+    open_notes = db.execute(
+        "SELECT COUNT(*) FROM pm_notes WHERE project_id = ? AND status != 'done'",
+        [project_id],
+    ).fetchone()[0]
+    return {"features": feat_count, "risks": open_risks, "notes": open_notes}
+
+
+def _project_shell_meta(project_id: int):
+    """Summary meta used by sidebar project list (completion %, status)."""
+    db = get_db()
+    # Use features' weighted completion for a project's completion
+    rows = list(db.execute(
+        "SELECT f.id FROM features f WHERE f.project_id = ?", [project_id]
+    ).fetchall())
+    if not rows:
+        return {"completion": 0, "status": "todo"}
+    features, _, _, _ = build_feature_data(project_id)
+    total_days = sum(f["total_days"] for f in features)
+    if total_days <= 0:
+        return {"completion": 0, "status": "todo"}
+    completion = sum(f["total_days"] * f["weighted_completion"] for f in features) / total_days
+    status = "done" if completion >= 100 else ("doing" if completion > 0 else "todo")
+    return {"completion": round(completion), "status": status}
+
+
+def shell_context(project_id: Optional[int]) -> dict:
+    """Common context for base.html: sidebar project list + per-project counts."""
+    db = get_db()
+    proj_rows = [dict(r) for r in db["projects"].rows]
+    projects_list = []
+    for pr in proj_rows:
+        meta = _project_shell_meta(pr["id"])
+        projects_list.append({
+            "id": pr["id"],
+            "name": pr["name"],
+            "description": pr.get("description", ""),
+            "completion": meta["completion"],
+            "status": meta["status"],
+        })
+
+    active_project = None
+    counts = {"features": 0, "risks": 0, "notes": 0}
+    if project_id is not None:
+        active_project = get_project(project_id)
+        counts = _dashboard_counts(project_id)
+
+    return {
+        "projects_list": projects_list,
+        "active_project": active_project,
+        "active_project_id": project_id,
+        "nav_counts": counts,
+    }
+
+
+# ── Cross-project dashboard ──
 
 @app.get("/")
-def dashboard(request: Request):
+def cross_project_dashboard(request: Request):
+    ctx = {"request": request, "active": "all", "active_page": "all_projects"}
+    ctx.update(shell_context(None))
+    return templates.TemplateResponse("cross_project.html", ctx)
+
+
+# ── Project CRUD ──
+
+@app.post("/projects/add")
+def add_project(name: str = Form(...), description: str = Form("")):
     db = get_db()
-    features, project, roles, default_rate = build_feature_data()
-    adjustments = list(db["budget_adjustments"].rows)
-    overheads = list(db["overheads"].rows)
+    pid = db["projects"].insert({
+        "name": name or "New Project",
+        "description": description,
+        "start_date": "",
+        "as_of_date": "",
+        "initial_budget": 0.0,
+        "team_size": 1,
+        "actual_spend": 0.0,
+        "default_role_id": 0,
+        "health_on_track_pct": 100.0,
+        "health_at_risk_pct": 80.0,
+    }).last_pk
+    seed_project_defaults(pid)
+    return RedirectResponse(f"/p/{pid}/settings", status_code=303)
+
+
+@app.post("/projects/{project_id}/delete")
+def delete_project(project_id: int):
+    db = get_db()
+    # Guard: never delete the last project.
+    count = db["projects"].count
+    if count <= 1:
+        return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
+    # Cascade delete child rows.
+    # Collect feature ids for requirement/deliverable cleanup.
+    feat_ids = [r[0] for r in db.execute(
+        "SELECT id FROM features WHERE project_id = ?", [project_id]
+    ).fetchall()]
+    if feat_ids:
+        placeholders = ",".join("?" * len(feat_ids))
+        req_ids = [r[0] for r in db.execute(
+            f"SELECT id FROM requirements WHERE feature_id IN ({placeholders})", feat_ids
+        ).fetchall()]
+        if req_ids:
+            rp = ",".join("?" * len(req_ids))
+            db.execute(f"DELETE FROM deliverables WHERE requirement_id IN ({rp})", req_ids)
+            db.execute(f"DELETE FROM requirements WHERE id IN ({rp})", req_ids)
+    # Collect risk ids for risk_features cleanup.
+    risk_ids = [r[0] for r in db.execute(
+        "SELECT id FROM risks WHERE project_id = ?", [project_id]
+    ).fetchall()]
+    if risk_ids:
+        rip = ",".join("?" * len(risk_ids))
+        db.execute(f"DELETE FROM risk_features WHERE risk_id IN ({rip})", risk_ids)
+
+    for tbl in PROJECT_SCOPED_TABLES:
+        db.execute(f"DELETE FROM {tbl} WHERE project_id = ?", [project_id])
+    db["projects"].delete(project_id)
+    return RedirectResponse("/", status_code=303)
+
+
+# ── Dashboard ──
+
+@app.get("/p/{project_id}/")
+@app.get("/p/{project_id}")
+def dashboard(request: Request, project_id: int):
+    db = get_db()
+    features, project, roles, default_rate = build_feature_data(project_id)
+    adj_rows = list(db.execute(
+        "SELECT * FROM budget_adjustments WHERE project_id = ? ORDER BY date", [project_id]
+    ).fetchall())
+    adjustments = [
+        {"id": r[0], "amount": r[1], "date": r[2], "description": r[3]} for r in adj_rows
+    ] if adj_rows and len(adj_rows[0]) == 4 else [dict(r) for r in db["budget_adjustments"].rows_where("project_id = ?", [project_id])]
+    overhead_rows = list(db["overheads"].rows_where("project_id = ?", [project_id]))
+    overheads = [dict(r) for r in overhead_rows]
     overhead_total = sum(o["amount"] for o in overheads)
 
-    # Risk rows needed early so realised/open risk dollars can flow into project_summary.
-    # Tuple positions: (status, impact_days, realised_percentage).
     risk_rows = db.execute(
-        "SELECT status, impact_days, realised_percentage FROM risks"
+        "SELECT status, impact_days, realised_percentage FROM risks WHERE project_id = ?",
+        [project_id],
     ).fetchall()
     open_risks = [r for r in risk_rows if r[0] != "done"]
     closed_risks = [r for r in risk_rows if r[0] == "done"]
 
-    # Realised risk days are summed across ALL risks — realised_percentage is
-    # independent of status, so open risks with partial realisation count too.
     realised_risk_days = sum(
         effective_impact_days(r[1], r[2] or 0.0) for r in risk_rows
     )
     realised_risk_dollars = realised_risk_days * default_rate
-    # Open risk exposure = unrealised portion of open risks only.
     open_exposure_days = sum(
         unrealised_exposure_days(r[1], r[0], r[2] or 0.0) for r in risk_rows
     )
@@ -194,7 +352,6 @@ def dashboard(request: Request):
     on_track_pct = project.get("health_on_track_pct", 100.0)
     at_risk_pct = project.get("health_at_risk_pct", 80.0)
 
-    # Compute weighted completion for started features only
     started_features = [f for f in features if f.get("started", 0) and f["total_days"] > 0]
     started_total_days = sum(f["total_days"] for f in started_features)
     if started_total_days > 0:
@@ -204,9 +361,6 @@ def dashboard(request: Request):
     else:
         started_completion = 0
 
-    # Adjust the target for started features: they must carry the full project
-    # completion load since non-started features contribute nothing.
-    # adjusted_target = min(100, feature_expected_burn_pct × total_days / started_days)
     total_feature_days = sum(f["total_days"] for f in features if f["total_days"] > 0)
     feature_burn_pct = summary["feature_expected_burn_pct"]
     if started_total_days > 0 and total_feature_days > 0:
@@ -228,11 +382,6 @@ def dashboard(request: Request):
     summary["started_feature_count"] = len(started_features)
     summary["total_feature_count"] = len([f for f in features if f["total_dollars"] > 0])
 
-    # Risk exposure breakdown for the Risk Exposure section.
-    # open_exposure_days: unrealised portion of open risks (still at risk).
-    # realised_risk_days: already-absorbed portion across ALL risks
-    #   (open-with-partial + closed).
-    # avoided_days: closed risks that landed at 0% — days "saved" vs impact.
     avoided = sum(r[1] for r in closed_risks if (r[2] or 0.0) == 0)
     current_budget = summary["current_budget"]
     open_risk_pct = min(100.0, open_risk_dollars / current_budget * 100) if current_budget else 0.0
@@ -254,7 +403,6 @@ def dashboard(request: Request):
         "locked_risk_pct": round(locked_risk_pct, 1),
     }
 
-    # Capacity planning data for dashboard
     as_of = parse_date(project.get("as_of_date", ""))
     end_dt = parse_date(project.get("end_date", ""))
     cap_rows = list(db.execute(
@@ -263,8 +411,9 @@ def dashboard(request: Request):
         "COALESCE(r.day_rate, ?) as day_rate "
         "FROM capacity_periods cp "
         "LEFT JOIN roles r ON cp.role_id = r.id "
+        "WHERE cp.project_id = ? "
         "ORDER BY cp.week_start_date",
-        [default_rate]
+        [default_rate, project_id]
     ).fetchall())
     enriched_capacity = [
         {
@@ -294,12 +443,10 @@ def dashboard(request: Request):
         project.get("team_size", 1),
     )
 
-    # PM Notes for dashboard: sticky + overdue + due within 14 days, not done.
-    # Stickies always show first; remaining notes sorted ascending by due_date.
-    # Columns: 0=id, 1=name, 2=description, 3=status, 4=due_date
     as_of_str = project.get("as_of_date", "")
     note_rows = list(db.execute(
-        "SELECT id, name, description, status, due_date FROM pm_notes ORDER BY sort_order, id"
+        "SELECT id, name, description, status, due_date FROM pm_notes "
+        "WHERE project_id = ? ORDER BY sort_order, id", [project_id]
     ).fetchall())
     sticky_notes = []
     dated_notes = []
@@ -315,15 +462,15 @@ def dashboard(request: Request):
         ndue = parse_date(nr[4])
         if aof and ndue and (ndue <= aof or ndue <= aof + timedelta(days=14)):
             dated_notes.append(note_dict)
-    # Sort non-sticky notes by due_date ascending (None sorts last)
     dated_notes.sort(key=lambda n: n["due_date"] or "9999-99-99")
     dashboard_notes = sticky_notes + dated_notes
     notes_overflow = max(0, len(dashboard_notes) - 3)
     dashboard_notes = dashboard_notes[:3]
 
-    return templates.TemplateResponse("dashboard.html", {
+    ctx = {
         "request": request,
         "active": "dashboard",
+        "active_page": "dashboard",
         "project": project,
         "features": features,
         "adjustments": adjustments,
@@ -335,35 +482,41 @@ def dashboard(request: Request):
         "cap_budget": cap_budget,
         "dashboard_notes": dashboard_notes,
         "notes_overflow": notes_overflow,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("dashboard.html", ctx)
 
 
 # ── Settings ──
 
-@app.get("/settings")
-def settings_page(request: Request):
+@app.get("/p/{project_id}/settings")
+def settings_page(request: Request, project_id: int):
     db = get_db()
-    project = get_project()
-    roles = get_roles()
-    adjustments = list(db["budget_adjustments"].rows)
-    overheads = list(db.execute("SELECT * FROM overheads ORDER BY sort_order, id").fetchall())
-    overheads = [
-        {"id": o[0], "name": o[1], "description": o[2], "amount": o[3], "sort_order": o[4]}
-        for o in overheads
-    ]
-    return templates.TemplateResponse("settings.html", {
+    project = get_project(project_id)
+    roles = _roles_as_dicts(project_id)
+    adjustments = list(db["budget_adjustments"].rows_where("project_id = ?", [project_id]))
+    adjustments = [dict(a) for a in adjustments]
+    overheads = [dict(o) for o in db["overheads"].rows_where(
+        "project_id = ?", [project_id], order_by="sort_order, id"
+    )]
+    ctx = {
         "request": request,
         "active": "settings",
+        "active_page": "settings",
         "project": project,
         "roles": roles,
         "adjustments": adjustments,
         "overheads": overheads,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("settings.html", ctx)
 
 
-@app.post("/settings/project")
+@app.post("/p/{project_id}/settings/project")
 def update_project(
+    project_id: int,
     name: str = Form(...),
+    description: str = Form(""),
     start_date: str = Form(""),
     as_of_date: str = Form(""),
     initial_budget: float = Form(0),
@@ -372,9 +525,9 @@ def update_project(
     health_at_risk_pct: float = Form(80.0),
 ):
     db = get_db()
-    # team_size and default_role_id are managed via /capacity/defaults
-    db["project"].update(1, {
+    db["projects"].update(project_id, {
         "name": name,
+        "description": description,
         "start_date": start_date,
         "as_of_date": as_of_date,
         "initial_budget": initial_budget,
@@ -382,64 +535,79 @@ def update_project(
         "health_on_track_pct": health_on_track_pct,
         "health_at_risk_pct": health_at_risk_pct,
     })
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/roles/add")
-def add_role(name: str = Form(...), day_rate: float = Form(0)):
+@app.post("/p/{project_id}/settings/roles/add")
+def add_role(project_id: int, name: str = Form(...), day_rate: float = Form(0)):
     db = get_db()
-    db["roles"].insert({"name": name, "day_rate": day_rate})
-    return RedirectResponse("/settings", status_code=303)
+    db["roles"].insert({"project_id": project_id, "name": name, "day_rate": day_rate})
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/roles/{role_id}/update")
-def update_role(role_id: int, name: str = Form(...), day_rate: float = Form(0)):
+@app.post("/p/{project_id}/settings/roles/{role_id}/update")
+def update_role(project_id: int, role_id: int, name: str = Form(...), day_rate: float = Form(0)):
     db = get_db()
     db["roles"].update(role_id, {"name": name, "day_rate": day_rate})
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/roles/{role_id}/delete")
-def delete_role(role_id: int):
+@app.post("/p/{project_id}/settings/roles/{role_id}/delete")
+def delete_role(project_id: int, role_id: int):
     db = get_db()
     db["roles"].delete(role_id)
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/adjustments/add")
-def add_adjustment(amount: float = Form(0), date: str = Form(""), description: str = Form("")):
+@app.post("/p/{project_id}/settings/adjustments/add")
+def add_adjustment(
+    project_id: int,
+    amount: float = Form(0),
+    date: str = Form(""),
+    description: str = Form(""),
+):
     db = get_db()
-    db["budget_adjustments"].insert({"amount": amount, "date": date, "description": description})
-    return RedirectResponse("/settings", status_code=303)
+    db["budget_adjustments"].insert({
+        "project_id": project_id,
+        "amount": amount,
+        "date": date,
+        "description": description,
+    })
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/adjustments/{adj_id}/delete")
-def delete_adjustment(adj_id: int):
+@app.post("/p/{project_id}/settings/adjustments/{adj_id}/delete")
+def delete_adjustment(project_id: int, adj_id: int):
     db = get_db()
     db["budget_adjustments"].delete(adj_id)
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-# ── Overheads ──
-# Fixed dollar costs that reduce the budget pool available for delivery
-# (PM salary, tool licences, etc.). Sum is deducted from accessible_budget
-# in project_summary() so all "remaining budget" displays reflect it.
-
-@app.post("/settings/overheads/add")
-def add_overhead(name: str = Form(...), description: str = Form(""), amount: float = Form(0)):
+@app.post("/p/{project_id}/settings/overheads/add")
+def add_overhead(
+    project_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    amount: float = Form(0),
+):
     db = get_db()
-    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM overheads").fetchone()[0]
+    max_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM overheads WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
     db["overheads"].insert({
+        "project_id": project_id,
         "name": name,
         "description": description,
         "amount": amount,
         "sort_order": max_order + 1,
     })
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/overheads/{overhead_id}/update")
+@app.post("/p/{project_id}/settings/overheads/{overhead_id}/update")
 def update_overhead(
+    project_id: int,
     overhead_id: int,
     name: str = Form(...),
     description: str = Form(""),
@@ -451,39 +619,42 @@ def update_overhead(
         "description": description,
         "amount": amount,
     })
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-@app.post("/settings/overheads/{overhead_id}/delete")
-def delete_overhead(overhead_id: int):
+@app.post("/p/{project_id}/settings/overheads/{overhead_id}/delete")
+def delete_overhead(project_id: int, overhead_id: int):
     db = get_db()
     db["overheads"].delete(overhead_id)
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
 # ── Features ──
 
-@app.get("/features")
-def features_list(request: Request):
-    features, project, roles, default_rate = build_feature_data()
-    return templates.TemplateResponse("features.html", {
+@app.get("/p/{project_id}/features")
+def features_list(request: Request, project_id: int):
+    features, project, roles, default_rate = build_feature_data(project_id)
+    ctx = {
         "request": request,
         "active": "features",
+        "active_page": "features",
         "features": features,
         "project": project,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("features.html", ctx)
 
 
-@app.post("/features/{feature_id}/toggle-started")
-def toggle_started(feature_id: int):
+@app.post("/p/{project_id}/features/{feature_id}/toggle-started")
+def toggle_started(project_id: int, feature_id: int):
     db = get_db()
     f = db["features"].get(feature_id)
     db["features"].update(feature_id, {"started": 0 if f.get("started", 0) else 1})
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/", status_code=303)
 
 
-@app.post("/api/features/{feature_id}/toggle-started")
-def api_toggle_started(feature_id: int):
+@app.post("/api/p/{project_id}/features/{feature_id}/toggle-started")
+def api_toggle_started(project_id: int, feature_id: int):
     db = get_db()
     f = db["features"].get(feature_id)
     new_val = 0 if f.get("started", 0) else 1
@@ -491,82 +662,94 @@ def api_toggle_started(feature_id: int):
     return JSONResponse({"ok": True, "started": new_val})
 
 
-@app.post("/features/add")
-def add_feature(name: str = Form(...)):
+@app.post("/p/{project_id}/features/add")
+def add_feature(project_id: int, name: str = Form(...)):
     db = get_db()
-    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM features").fetchone()[0]
-    db["features"].insert({"name": name, "sort_order": max_order + 1})
-    return RedirectResponse("/features", status_code=303)
+    max_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM features WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
+    db["features"].insert({
+        "project_id": project_id,
+        "name": name,
+        "sort_order": max_order + 1,
+        "started": 0,
+    })
+    return RedirectResponse(f"/p/{project_id}/features", status_code=303)
 
 
-@app.post("/features/{feature_id}/update")
-def update_feature(feature_id: int, name: str = Form(...)):
+@app.post("/p/{project_id}/features/{feature_id}/update")
+def update_feature(project_id: int, feature_id: int, name: str = Form(...)):
     db = get_db()
     db["features"].update(feature_id, {"name": name})
-    return RedirectResponse(f"/features/{feature_id}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{feature_id}", status_code=303)
 
 
-@app.post("/features/{feature_id}/delete")
-def delete_feature(feature_id: int):
+@app.post("/p/{project_id}/features/{feature_id}/delete")
+def delete_feature(project_id: int, feature_id: int):
     db = get_db()
     reqs = list(db.execute("SELECT id FROM requirements WHERE feature_id = ?", [feature_id]).fetchall())
     for r in reqs:
         db.execute("DELETE FROM deliverables WHERE requirement_id = ?", [r[0]])
     db.execute("DELETE FROM requirements WHERE feature_id = ?", [feature_id])
     db["features"].delete(feature_id)
-    return RedirectResponse("/features", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features", status_code=303)
 
 
 # ── Feature Detail ──
 
-@app.get("/features/{feature_id}")
-def feature_detail(request: Request, feature_id: int):
-    features, project, roles, default_rate = build_feature_data(feature_id)
+@app.get("/p/{project_id}/features/{feature_id}")
+def feature_detail(request: Request, project_id: int, feature_id: int):
+    features, project, roles, default_rate = build_feature_data(project_id, feature_id)
     if not features:
-        return RedirectResponse("/features", status_code=303)
-    return templates.TemplateResponse("feature_detail.html", {
+        return RedirectResponse(f"/p/{project_id}/features", status_code=303)
+    ctx = {
         "request": request,
         "active": "features",
+        "active_page": "features",
         "feature": features[0],
         "project": project,
         "roles": roles,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("feature_detail.html", ctx)
 
 
 # ── Requirements ──
 
-@app.post("/features/{feature_id}/requirements/add")
-def add_requirement(feature_id: int, name: str = Form(...)):
+@app.post("/p/{project_id}/features/{feature_id}/requirements/add")
+def add_requirement(project_id: int, feature_id: int, name: str = Form(...)):
     db = get_db()
     max_order = db.execute(
         "SELECT COALESCE(MAX(sort_order), 0) FROM requirements WHERE feature_id = ?", [feature_id]
     ).fetchone()[0]
     db["requirements"].insert({"feature_id": feature_id, "name": name, "sort_order": max_order + 1})
-    return RedirectResponse(f"/features/{feature_id}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{feature_id}", status_code=303)
 
 
-@app.post("/requirements/{req_id}/update")
-def update_requirement(req_id: int, name: str = Form(...)):
+@app.post("/p/{project_id}/requirements/{req_id}/update")
+def update_requirement(project_id: int, req_id: int, name: str = Form(...)):
     db = get_db()
     req = db["requirements"].get(req_id)
     db["requirements"].update(req_id, {"name": name})
-    return RedirectResponse(f"/features/{req['feature_id']}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{req['feature_id']}", status_code=303)
 
 
-@app.post("/requirements/{req_id}/delete")
-def delete_requirement(req_id: int):
+@app.post("/p/{project_id}/requirements/{req_id}/delete")
+def delete_requirement(project_id: int, req_id: int):
     db = get_db()
     req = db["requirements"].get(req_id)
     feature_id = req["feature_id"]
     db.execute("DELETE FROM deliverables WHERE requirement_id = ?", [req_id])
     db["requirements"].delete(req_id)
-    return RedirectResponse(f"/features/{feature_id}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{feature_id}", status_code=303)
 
 
 # ── Deliverables ──
 
-@app.post("/requirements/{req_id}/deliverables/add")
+@app.post("/p/{project_id}/requirements/{req_id}/deliverables/add")
 def add_deliverable(
+    project_id: int,
     req_id: int,
     name: str = Form(...),
     budget_days: float = Form(0),
@@ -587,11 +770,12 @@ def add_deliverable(
         "role_id": role_id,
         "sort_order": max_order + 1,
     })
-    return RedirectResponse(f"/features/{req['feature_id']}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{req['feature_id']}", status_code=303)
 
 
-@app.post("/deliverables/{del_id}/update")
+@app.post("/p/{project_id}/deliverables/{del_id}/update")
 def update_deliverable(
+    project_id: int,
     del_id: int,
     name: str = Form(...),
     budget_days: float = Form(0),
@@ -609,11 +793,11 @@ def update_deliverable(
         "priority": priority,
         "role_id": role_id if role_id else None,
     })
-    return RedirectResponse(f"/features/{req['feature_id']}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{req['feature_id']}", status_code=303)
 
 
-@app.post("/api/deliverables/{del_id}/percent")
-def update_percent(del_id: int, percent_complete: int = Form(0)):
+@app.post("/api/p/{project_id}/deliverables/{del_id}/percent")
+def update_percent(project_id: int, del_id: int, percent_complete: int = Form(0)):
     db = get_db()
     db["deliverables"].update(del_id, {"percent_complete": max(0, min(100, percent_complete))})
     d = db["deliverables"].get(del_id)
@@ -621,8 +805,9 @@ def update_percent(del_id: int, percent_complete: int = Form(0)):
     return JSONResponse({"ok": True, "feature_id": req["feature_id"]})
 
 
-@app.post("/api/deliverables/{del_id}/update")
+@app.post("/api/p/{project_id}/deliverables/{del_id}/update")
 def api_update_deliverable(
+    project_id: int,
     del_id: int,
     name: str = Form(...),
     budget_days: float = Form(0),
@@ -641,26 +826,19 @@ def api_update_deliverable(
     return JSONResponse({"ok": True})
 
 
-@app.post("/deliverables/{del_id}/delete")
-def delete_deliverable(del_id: int):
+@app.post("/p/{project_id}/deliverables/{del_id}/delete")
+def delete_deliverable(project_id: int, del_id: int):
     db = get_db()
     d = db["deliverables"].get(del_id)
     req = db["requirements"].get(d["requirement_id"])
     feature_id = req["feature_id"]
     db["deliverables"].delete(del_id)
-    return RedirectResponse(f"/features/{feature_id}", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/features/{feature_id}", status_code=303)
 
 
 # ── Risks ──
 
 def _severity_band(risk: dict) -> str:
-    """Bucket a risk into a severity band for visual tinting.
-
-    Score = realised_days + 0.5 × unrealised_days. Realised time weighs
-    more than at-risk time because it's actually gone. Avoided/zero-impact
-    risks get no accent ("none"); otherwise thresholds at 2d/5d separate
-    low/med/high.
-    """
     score = risk["effective_impact_days"] + 0.5 * risk["unrealised_days"]
     if score <= 0:
         return "none"
@@ -671,38 +849,37 @@ def _severity_band(risk: dict) -> str:
     return "low"
 
 
-def _sort_risks(risks: list[dict], sort_key: str) -> list[dict]:
-    """Return a new list of risks ordered by sort_key.
-
-    Recognised keys: status (default), impact (desc), age (desc), name.
-    Unknown keys fall back to status.
-    """
+def _sort_risks(risks: list, sort_key: str) -> list:
     if sort_key == "impact":
         return sorted(risks, key=lambda r: -r["impact_days"])
     if sort_key == "age":
         today = _date.today()
-
         def _age(r):
             d = parse_date(r["date_identified"])
             return (today - d).days if d else -1
         return sorted(risks, key=lambda r: -_age(r))
     if sort_key == "name":
         return sorted(risks, key=lambda r: r["name"].lower())
-    # Default: todo → doing → done, then by existing sort_order
     status_order = {"todo": 0, "doing": 1, "done": 2}
     return sorted(risks, key=lambda r: (status_order.get(r["status"], 3), r["sort_order"]))
 
 
-@app.get("/risks")
-def risks_page(request: Request, sort: str = "status", filter: str = "all"):
+@app.get("/p/{project_id}/risks")
+def risks_page(request: Request, project_id: int, sort: str = "status", filter: str = "all"):
     db = get_db()
-    project = get_project()
-    roles = get_roles()
+    project = get_project(project_id)
+    roles = _roles_as_dicts(project_id)
     default_role_rate = get_role_rate(project["default_role_id"], roles, 0)
     risks = list(db.execute(
-        "SELECT id, name, description, status, due_date, impact_days, sort_order, realised_percentage, resultant_work, timeline_impact_days, date_identified FROM risks ORDER BY sort_order, id"
+        "SELECT id, name, description, status, due_date, impact_days, sort_order, "
+        "realised_percentage, resultant_work, timeline_impact_days, date_identified "
+        "FROM risks WHERE project_id = ? ORDER BY sort_order, id",
+        [project_id],
     ).fetchall())
-    features_rows = list(db.execute("SELECT id, name FROM features ORDER BY sort_order, id").fetchall())
+    features_rows = list(db.execute(
+        "SELECT id, name FROM features WHERE project_id = ? ORDER BY sort_order, id",
+        [project_id],
+    ).fetchall())
     all_features = [{"id": f[0], "name": f[1]} for f in features_rows]
 
     enriched_risks = []
@@ -726,7 +903,6 @@ def risks_page(request: Request, sort: str = "status", filter: str = "all"):
         rdict["unrealised_dollars"] = rdict["unrealised_days"] * default_role_rate
         rdict["resolution_label"] = resolution_label(rdict["status"], rdict["realised_percentage"])
         rdict["severity_band"] = _severity_band(rdict)
-        # Get linked features
         links = list(db.execute(
             "SELECT f.id, f.name FROM risk_features rf JOIN features f ON rf.feature_id = f.id WHERE rf.risk_id = ?",
             [rdict["id"]]
@@ -734,7 +910,6 @@ def risks_page(request: Request, sort: str = "status", filter: str = "all"):
         rdict["linked_features"] = [{"id": l[0], "name": l[1]} for l in links]
         enriched_risks.append(rdict)
 
-    # Summary counts — always reflect the full set, not the filtered view.
     todo_count = sum(1 for r in enriched_risks if r["status"] == "todo")
     doing_count = sum(1 for r in enriched_risks if r["status"] == "doing")
     done_count = sum(1 for r in enriched_risks if r["status"] == "done")
@@ -747,7 +922,6 @@ def risks_page(request: Request, sort: str = "status", filter: str = "all"):
         if r["status"] == "done" and r["realised_percentage"] == 0
     )
 
-    # Apply filter, then sort.
     if filter == "open":
         visible_risks = [r for r in enriched_risks if r["status"] != "done"]
     elif filter == "closed":
@@ -756,9 +930,11 @@ def risks_page(request: Request, sort: str = "status", filter: str = "all"):
         visible_risks = list(enriched_risks)
     visible_risks = _sort_risks(visible_risks, sort)
 
-    return templates.TemplateResponse("risks.html", {
+    ctx = {
         "request": request,
         "active": "risks",
+        "active_page": "risks",
+        "project": project,
         "risks": visible_risks,
         "all_features": all_features,
         "summary": {
@@ -774,16 +950,18 @@ def risks_page(request: Request, sort: str = "status", filter: str = "all"):
         "default_rate": default_role_rate,
         "sort_key": sort,
         "filter_key": filter,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("risks.html", ctx)
 
 
 def _clamp_pct(value: float) -> float:
-    """Constrain a percentage value to [0, 100]."""
     return max(0.0, min(100.0, value))
 
 
-@app.post("/risks/add")
+@app.post("/p/{project_id}/risks/add")
 def add_risk(
+    project_id: int,
     name: str = Form(...),
     description: str = Form(""),
     status: str = Form("todo"),
@@ -795,12 +973,14 @@ def add_risk(
     resultant_work: str = Form(""),
 ):
     db = get_db()
-    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM risks").fetchone()[0]
-    # If the PM doesn't supply a raise-date, default to today so the age
-    # indicator starts counting from creation rather than showing blank.
+    max_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM risks WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
     if not date_identified:
         date_identified = _date.today().isoformat()
     db["risks"].insert({
+        "project_id": project_id,
         "name": name,
         "description": description,
         "status": status,
@@ -812,11 +992,12 @@ def add_risk(
         "realised_percentage": _clamp_pct(realised_percentage),
         "resultant_work": resultant_work,
     })
-    return RedirectResponse("/risks", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/risks", status_code=303)
 
 
-@app.post("/risks/{risk_id}/update")
+@app.post("/p/{project_id}/risks/{risk_id}/update")
 def update_risk(
+    project_id: int,
     risk_id: int,
     name: str = Form(...),
     description: str = Form(""),
@@ -840,22 +1021,19 @@ def update_risk(
         "realised_percentage": _clamp_pct(realised_percentage),
         "resultant_work": resultant_work,
     })
-    return RedirectResponse("/risks", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/risks", status_code=303)
 
 
-@app.post("/risks/{risk_id}/delete")
-def delete_risk(risk_id: int):
+@app.post("/p/{project_id}/risks/{risk_id}/delete")
+def delete_risk(project_id: int, risk_id: int):
     db = get_db()
     db.execute("DELETE FROM risk_features WHERE risk_id = ?", [risk_id])
     db["risks"].delete(risk_id)
-    return RedirectResponse("/risks", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/risks", status_code=303)
 
 
-@app.post("/api/risks/{risk_id}/status")
-def update_risk_status(risk_id: int, status: str = Form("todo")):
-    """Inline status change from a risk card. Realised % is handled
-    independently via /api/risks/{id}/realised — no modal flow needed.
-    """
+@app.post("/api/p/{project_id}/risks/{risk_id}/status")
+def update_risk_status(project_id: int, risk_id: int, status: str = Form("todo")):
     if status not in ("todo", "doing", "done"):
         return JSONResponse({"ok": False, "error": "invalid status"})
     db = get_db()
@@ -863,16 +1041,15 @@ def update_risk_status(risk_id: int, status: str = Form("todo")):
     return JSONResponse({"ok": True, "status": status})
 
 
-@app.post("/api/risks/{risk_id}/realised")
-def update_risk_realised(risk_id: int, realised_percentage: float = Form(0.0)):
-    """Inline edit of realised % from a risk card."""
+@app.post("/api/p/{project_id}/risks/{risk_id}/realised")
+def update_risk_realised(project_id: int, risk_id: int, realised_percentage: float = Form(0.0)):
     db = get_db()
     db["risks"].update(risk_id, {"realised_percentage": _clamp_pct(realised_percentage)})
     return JSONResponse({"ok": True, "realised_percentage": _clamp_pct(realised_percentage)})
 
 
-@app.post("/risks/{risk_id}/link-feature")
-def link_feature_to_risk(risk_id: int, feature_id: int = Form(...)):
+@app.post("/p/{project_id}/risks/{risk_id}/link-feature")
+def link_feature_to_risk(project_id: int, risk_id: int, feature_id: int = Form(...)):
     db = get_db()
     existing = db.execute(
         "SELECT COUNT(*) FROM risk_features WHERE risk_id = ? AND feature_id = ?",
@@ -880,30 +1057,30 @@ def link_feature_to_risk(risk_id: int, feature_id: int = Form(...)):
     ).fetchone()[0]
     if not existing:
         db["risk_features"].insert({"risk_id": risk_id, "feature_id": feature_id})
-    return RedirectResponse("/risks", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/risks", status_code=303)
 
 
-@app.post("/risks/{risk_id}/unlink-feature/{feature_id}")
-def unlink_feature_from_risk(risk_id: int, feature_id: int):
+@app.post("/p/{project_id}/risks/{risk_id}/unlink-feature/{feature_id}")
+def unlink_feature_from_risk(project_id: int, risk_id: int, feature_id: int):
     db = get_db()
     db.execute(
         "DELETE FROM risk_features WHERE risk_id = ? AND feature_id = ?",
         [risk_id, feature_id]
     )
-    return RedirectResponse("/risks", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/risks", status_code=303)
 
 
 # ── PM Notes ──
 
-@app.get("/pm-notes")
-def pm_notes_page(request: Request, filter: str = "all"):
+@app.get("/p/{project_id}/pm-notes")
+def pm_notes_page(request: Request, project_id: int, filter: str = "all"):
     db = get_db()
-    project = get_project()
+    project = get_project(project_id)
     notes = list(db.execute(
         "SELECT id, name, description, status, due_date, sort_order "
-        "FROM pm_notes ORDER BY "
+        "FROM pm_notes WHERE project_id = ? ORDER BY "
         "CASE status WHEN 'sticky' THEN 0 WHEN 'todo' THEN 1 WHEN 'doing' THEN 2 ELSE 3 END, "
-        "due_date ASC, sort_order, id"
+        "due_date ASC, sort_order, id", [project_id]
     ).fetchall())
     enriched = [
         {"id": r[0], "name": r[1], "description": r[2], "status": r[3], "due_date": r[4], "sort_order": r[5]}
@@ -918,37 +1095,46 @@ def pm_notes_page(request: Request, filter: str = "all"):
     visible = enriched if filter not in ("sticky", "todo", "doing", "done") else [
         n for n in enriched if n["status"] == filter
     ]
-    return templates.TemplateResponse("pm_notes.html", {
+    ctx = {
         "request": request,
         "active": "pm_notes",
+        "active_page": "pm_notes",
         "project": project,
         "notes": visible,
         "counts": counts,
         "filter_key": filter,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("pm_notes.html", ctx)
 
 
-@app.post("/pm-notes/add")
+@app.post("/p/{project_id}/pm-notes/add")
 def add_note(
+    project_id: int,
     name: str = Form(...),
     description: str = Form(""),
     status: str = Form("todo"),
     due_date: str = Form(""),
 ):
     db = get_db()
-    max_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM pm_notes").fetchone()[0]
+    max_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM pm_notes WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
     db["pm_notes"].insert({
+        "project_id": project_id,
         "name": name,
         "description": description,
         "status": status,
         "due_date": due_date if status != "sticky" else "",
         "sort_order": max_order + 1,
     })
-    return RedirectResponse("/pm-notes", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/pm-notes", status_code=303)
 
 
-@app.post("/pm-notes/{note_id}/update")
+@app.post("/p/{project_id}/pm-notes/{note_id}/update")
 def update_note(
+    project_id: int,
     note_id: int,
     name: str = Form(...),
     description: str = Form(""),
@@ -962,23 +1148,23 @@ def update_note(
         "status": status,
         "due_date": due_date if status != "sticky" else "",
     })
-    return RedirectResponse("/pm-notes", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/pm-notes", status_code=303)
 
 
-@app.post("/pm-notes/{note_id}/delete")
-def delete_note(note_id: int):
+@app.post("/p/{project_id}/pm-notes/{note_id}/delete")
+def delete_note(project_id: int, note_id: int):
     db = get_db()
     db["pm_notes"].delete(note_id)
-    return RedirectResponse("/pm-notes", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/pm-notes", status_code=303)
 
 
 # ── Capacity Planning ──
 
-@app.get("/capacity")
-def capacity_page(request: Request):
+@app.get("/p/{project_id}/capacity")
+def capacity_page(request: Request, project_id: int):
     db = get_db()
-    project = get_project()
-    roles = get_roles()
+    project = get_project(project_id)
+    roles = _roles_as_dicts(project_id)
     default_rate = get_role_rate(project["default_role_id"], roles, 0)
 
     rows = list(db.execute(
@@ -987,11 +1173,11 @@ def capacity_page(request: Request):
         "COALESCE(r.day_rate, ?) as day_rate "
         "FROM capacity_periods cp "
         "LEFT JOIN roles r ON cp.role_id = r.id "
+        "WHERE cp.project_id = ? "
         "ORDER BY cp.week_start_date, cp.id",
-        [default_rate]
+        [default_rate, project_id]
     ).fetchall())
 
-    # Group periods by week for display (regular dict preserves insertion order in Python 3.7+)
     weeks: dict = {}
     for row in rows:
         wdate = row[1]
@@ -1006,82 +1192,134 @@ def capacity_page(request: Request):
             "day_rate": row[5],
         })
 
-    return templates.TemplateResponse("capacity.html", {
+    ctx = {
         "request": request,
         "active": "capacity",
+        "active_page": "capacity",
         "project": project,
         "roles": roles,
         "weeks": weeks,
-    })
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse("capacity.html", ctx)
 
 
-@app.post("/capacity/add")
+@app.post("/p/{project_id}/capacity/add")
 def add_capacity_period(
+    project_id: int,
     week_start_date: str = Form(...),
     role_id: Optional[int] = Form(None),
     team_size: int = Form(1),
 ):
     db = get_db()
-    # Normalise to Monday of the given week
     try:
         d = _date.fromisoformat(week_start_date)
         monday = d - timedelta(days=d.weekday())
     except ValueError:
-        return RedirectResponse("/capacity", status_code=303)
+        return RedirectResponse(f"/p/{project_id}/capacity", status_code=303)
     db["capacity_periods"].insert({
+        "project_id": project_id,
         "week_start_date": monday.isoformat(),
         "role_id": role_id,
         "team_size": max(0, team_size),
     })
-    return RedirectResponse("/capacity", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/capacity", status_code=303)
 
 
-@app.post("/capacity/{period_id}/delete")
-def delete_capacity_period(period_id: int):
+@app.post("/p/{project_id}/capacity/{period_id}/delete")
+def delete_capacity_period(project_id: int, period_id: int):
     db = get_db()
     db["capacity_periods"].delete(period_id)
-    return RedirectResponse("/capacity", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/capacity", status_code=303)
 
 
-@app.post("/capacity/defaults")
+@app.post("/p/{project_id}/capacity/defaults")
 def update_capacity_defaults(
+    project_id: int,
     team_size: int = Form(1),
     default_role_id: int = Form(1),
 ):
-    """Update the project-level default team size and role used for weeks
-    without an explicit capacity entry."""
     db = get_db()
-    db["project"].update(1, {
+    db["projects"].update(project_id, {
         "team_size": max(1, team_size),
         "default_role_id": default_role_id,
     })
-    return RedirectResponse("/capacity", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/capacity", status_code=303)
 
 
-# ── Export / Import ──
+# ── Export / Import (scoped to active project) ──
 
-EXPORT_TABLES = ["project", "roles", "budget_adjustments", "features", "requirements", "deliverables", "risks", "risk_features", "overheads"]
+EXPORT_TABLES = [
+    "projects", "roles", "budget_adjustments", "features", "requirements",
+    "deliverables", "risks", "risk_features", "overheads", "pm_notes",
+    "capacity_periods",
+]
 
 
-@app.get("/export")
-def export_csv():
+def _scoped_rows(db, table: str, project_id: int, feature_ids: list, risk_ids: list):
+    """Rows of a table belonging to the given project."""
+    if table == "projects":
+        return list(db.execute("SELECT * FROM projects WHERE id = ?", [project_id]).fetchall())
+    if table == "requirements":
+        if not feature_ids:
+            return []
+        placeholders = ",".join("?" * len(feature_ids))
+        return list(db.execute(
+            f"SELECT * FROM requirements WHERE feature_id IN ({placeholders})",
+            feature_ids,
+        ).fetchall())
+    if table == "deliverables":
+        if not feature_ids:
+            return []
+        placeholders = ",".join("?" * len(feature_ids))
+        return list(db.execute(
+            f"SELECT * FROM deliverables WHERE requirement_id IN "
+            f"(SELECT id FROM requirements WHERE feature_id IN ({placeholders}))",
+            feature_ids,
+        ).fetchall())
+    if table == "risk_features":
+        if not risk_ids:
+            return []
+        placeholders = ",".join("?" * len(risk_ids))
+        return list(db.execute(
+            f"SELECT * FROM risk_features WHERE risk_id IN ({placeholders})",
+            risk_ids,
+        ).fetchall())
+    # default: project-scoped table
+    return list(db.execute(
+        f"SELECT * FROM {table} WHERE project_id = ?", [project_id]
+    ).fetchall())
+
+
+@app.get("/p/{project_id}/export")
+def export_csv(project_id: int):
     db = get_db()
+    project = get_project(project_id)
     buf = io.BytesIO()
-    project = get_project()
     project_name = project["name"].replace(" ", "_").replace("/", "-")
     filename = f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+
+    feat_ids = [r[0] for r in db.execute(
+        "SELECT id FROM features WHERE project_id = ?", [project_id]
+    ).fetchall()]
+    risk_ids = [r[0] for r in db.execute(
+        "SELECT id FROM risks WHERE project_id = ?", [project_id]
+    ).fetchall()]
 
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for table_name in EXPORT_TABLES:
             if table_name not in db.table_names():
                 continue
-            rows = list(db[table_name].rows)
+            rows = _scoped_rows(db, table_name, project_id, feat_ids, risk_ids)
             if not rows:
                 continue
+            # Get column names
+            col_names = [c.name for c in db[table_name].columns]
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=rows[0].keys())
+            writer = csv.DictWriter(output, fieldnames=col_names)
             writer.writeheader()
-            writer.writerows(rows)
+            for row in rows:
+                writer.writerow({col_names[i]: row[i] for i in range(len(col_names))})
             zf.writestr(f"{table_name}.csv", output.getvalue())
 
     buf.seek(0)
@@ -1092,41 +1330,152 @@ def export_csv():
     )
 
 
-@app.post("/import")
-async def import_csv(file: UploadFile = File(...)):
+@app.post("/p/{project_id}/import")
+async def import_csv(project_id: int, file: UploadFile = File(...)):
+    """Import a zip into the active project. Overwrites the project's existing
+    rows; other projects' data is untouched. Primary keys in the import are
+    remapped so IDs don't collide with existing rows in other projects.
+    """
     db = get_db()
     content = await file.read()
     buf = io.BytesIO(content)
 
-    with zipfile.ZipFile(buf, "r") as zf:
-        # Clear existing data in reverse FK order
-        for table_name in reversed(EXPORT_TABLES):
-            if table_name in db.table_names():
-                db[table_name].delete_where()
+    # Wipe just this project's existing rows (mirror the logic in delete_project)
+    feat_ids = [r[0] for r in db.execute(
+        "SELECT id FROM features WHERE project_id = ?", [project_id]
+    ).fetchall()]
+    if feat_ids:
+        placeholders = ",".join("?" * len(feat_ids))
+        req_ids = [r[0] for r in db.execute(
+            f"SELECT id FROM requirements WHERE feature_id IN ({placeholders})", feat_ids
+        ).fetchall()]
+        if req_ids:
+            rp = ",".join("?" * len(req_ids))
+            db.execute(f"DELETE FROM deliverables WHERE requirement_id IN ({rp})", req_ids)
+            db.execute(f"DELETE FROM requirements WHERE id IN ({rp})", req_ids)
+    risk_ids = [r[0] for r in db.execute(
+        "SELECT id FROM risks WHERE project_id = ?", [project_id]
+    ).fetchall()]
+    if risk_ids:
+        rip = ",".join("?" * len(risk_ids))
+        db.execute(f"DELETE FROM risk_features WHERE risk_id IN ({rip})", risk_ids)
+    for tbl in PROJECT_SCOPED_TABLES:
+        db.execute(f"DELETE FROM {tbl} WHERE project_id = ?", [project_id])
 
+    # Parse zip.
+    with zipfile.ZipFile(buf, "r") as zf:
+        csv_data = {}
         for table_name in EXPORT_TABLES:
             csv_filename = f"{table_name}.csv"
             if csv_filename not in zf.namelist():
                 continue
-            csv_content = zf.read(csv_filename).decode("utf-8")
-            reader = csv.DictReader(io.StringIO(csv_content))
-            for row in reader:
-                # Convert numeric fields
-                cleaned = {}
-                for k, v in row.items():
-                    if v == "" or v is None:
-                        cleaned[k] = None
-                    else:
-                        try:
-                            if "." in v:
-                                cleaned[k] = float(v)
-                            else:
-                                cleaned[k] = int(v)
-                        except (ValueError, TypeError):
-                            cleaned[k] = v
-                db[table_name].insert(cleaned)
+            csv_data[table_name] = list(csv.DictReader(
+                io.StringIO(zf.read(csv_filename).decode("utf-8"))
+            ))
 
-    # Re-run init to ensure any missing columns/defaults exist
+        def _coerce(v):
+            if v == "" or v is None:
+                return None
+            try:
+                return float(v) if "." in v else int(v)
+            except (ValueError, TypeError):
+                return v
+
+        # ID remapping tables: old_id → new_id
+        role_map = {}
+        feature_map = {}
+        req_map = {}
+
+        # Re-import roles (assign new ids, track map)
+        for row in csv_data.get("roles", []):
+            old_id = row.get("id")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            new_id = db["roles"].insert(cleaned).last_pk
+            if old_id:
+                role_map[str(old_id)] = new_id
+
+        # budget_adjustments, overheads, pm_notes, capacity_periods — simple scoped inserts
+        for row in csv_data.get("budget_adjustments", []):
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            db["budget_adjustments"].insert(cleaned)
+
+        for row in csv_data.get("overheads", []):
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            db["overheads"].insert(cleaned)
+
+        for row in csv_data.get("pm_notes", []):
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            db["pm_notes"].insert(cleaned)
+
+        # features (remap id)
+        for row in csv_data.get("features", []):
+            old_id = row.get("id")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            new_id = db["features"].insert(cleaned).last_pk
+            if old_id:
+                feature_map[str(old_id)] = new_id
+
+        # requirements (remap feature_id + id)
+        for row in csv_data.get("requirements", []):
+            old_id = row.get("id")
+            old_fid = str(row.get("feature_id") or "")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k not in ("id", "feature_id")}
+            cleaned["feature_id"] = feature_map.get(old_fid)
+            if cleaned["feature_id"] is None:
+                continue
+            new_id = db["requirements"].insert(cleaned).last_pk
+            if old_id:
+                req_map[str(old_id)] = new_id
+
+        # deliverables (remap requirement_id, role_id)
+        for row in csv_data.get("deliverables", []):
+            old_req = str(row.get("requirement_id") or "")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k not in ("id", "requirement_id", "role_id")}
+            cleaned["requirement_id"] = req_map.get(old_req)
+            if cleaned["requirement_id"] is None:
+                continue
+            old_role = row.get("role_id")
+            cleaned["role_id"] = role_map.get(str(old_role)) if old_role else None
+            db["deliverables"].insert(cleaned)
+
+        # risks (remap id + track)
+        risk_map = {}
+        for row in csv_data.get("risks", []):
+            old_id = row.get("id")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            new_id = db["risks"].insert(cleaned).last_pk
+            if old_id:
+                risk_map[str(old_id)] = new_id
+
+        # risk_features (remap both)
+        for row in csv_data.get("risk_features", []):
+            rid = risk_map.get(str(row.get("risk_id")))
+            fid = feature_map.get(str(row.get("feature_id")))
+            if rid and fid:
+                db["risk_features"].insert({"risk_id": rid, "feature_id": fid})
+
+        # capacity_periods (remap role_id)
+        for row in csv_data.get("capacity_periods", []):
+            cleaned = {k: _coerce(v) for k, v in row.items() if k not in ("id", "role_id")}
+            cleaned["project_id"] = project_id
+            old_role = row.get("role_id")
+            cleaned["role_id"] = role_map.get(str(old_role)) if old_role else None
+            db["capacity_periods"].insert(cleaned)
+
+        # Update project settings (but keep id + project_id consistent)
+        for row in csv_data.get("projects", []):
+            cleaned = {k: _coerce(v) for k, v in row.items() if k not in ("id",)}
+            # Remap default_role_id
+            old_drole = cleaned.pop("default_role_id", None)
+            if old_drole:
+                cleaned["default_role_id"] = role_map.get(str(old_drole), old_drole)
+            db["projects"].update(project_id, cleaned)
+
     init_db()
-
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(f"/p/{project_id}/settings", status_code=303)

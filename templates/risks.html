@@ -1,232 +1,189 @@
 {% extends "base.html" %}
-{% block title %}Risks - Project Health Check{% endblock %}
+{% block title %}Risks · {{ project.name }}{% endblock %}
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-title-row">
-    <h2 style="margin:0">Risks</h2>
-    <button type="button" id="toggle-add-risk" class="btn-small outline no-print" aria-expanded="false" aria-controls="add-risk-panel">+ Add Risk</button>
+{% set pid = project.id %}
+
+<div class="page-head">
+    <div>
+        <div class="page-title">Risks</div>
+        <div class="page-sub">Financial and timeline exposure across open and closed risks.</div>
+    </div>
+    <div class="page-actions">
+        <button type="button" class="btn btn-primary" id="toggle-add-risk" aria-expanded="false" aria-controls="add-risk-panel">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add risk
+        </button>
+    </div>
 </div>
 
-{# ── Summary cards ── #}
-<dl class="summary-grid risk-summary-grid" style="grid-template-columns: repeat(7, 1fr); margin-bottom: 2rem;">
-    <div class="summary-card">
-        <dt class="label">To Do</dt>
-        <dd class="value">{{ summary.todo }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Doing</dt>
-        <dd class="value health-amber">{{ summary.doing }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Done</dt>
-        <dd class="value health-green">{{ summary.done }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Unrealised Exposure (days)</dt>
-        <dd class="value">{{ summary.open_impact_days | days }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Unrealised Exposure ($)</dt>
-        <dd class="value">{{ summary.open_impact_dollars | currency }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Realised Impact (days)</dt>
-        <dd class="value">{{ summary.effective_impact_days | days }}</dd>
-        <dd class="text-muted" style="font-size:0.75rem;">all risks</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Realised Impact ($)</dt>
-        <dd class="value">{{ summary.effective_impact_dollars | currency }}</dd>
-        <dd class="text-muted" style="font-size:0.75rem;">all risks</dd>
-    </div>
-</dl>
+<div class="stat-grid" style="grid-template-columns: repeat(7, 1fr); margin-bottom: 20px;">
+    <div class="stat"><div class="label">To Do</div><div class="value" style="color:var(--bad)">{{ summary.todo }}</div></div>
+    <div class="stat"><div class="label">Doing</div><div class="value" style="color:var(--warn)">{{ summary.doing }}</div></div>
+    <div class="stat"><div class="label">Done</div><div class="value" style="color:var(--good)">{{ summary.done }}</div></div>
+    <div class="stat"><div class="label">Open (days)</div><div class="value">{{ summary.open_impact_days | days }}</div></div>
+    <div class="stat"><div class="label">Open ($)</div><div class="value">{{ summary.open_impact_dollars | currency }}</div></div>
+    <div class="stat"><div class="label">Realised (days)</div><div class="value">{{ summary.effective_impact_days | days }}</div><div class="meta">all risks</div></div>
+    <div class="stat"><div class="label">Realised ($)</div><div class="value">{{ summary.effective_impact_dollars | currency }}</div><div class="meta">all risks</div></div>
+</div>
 
-{# ── Add risk panel (hidden by default, toggled via button) ── #}
-<div id="add-risk-panel" class="add-requirement-section" style="display:none; margin-bottom:1.25rem;">
-    <form method="post" action="/risks/add">
-        <label>
-            Name <span class="text-muted">(short, at-a-glance)</span>
-            <input type="text" name="name" placeholder="e.g., Third-party API dependency" required>
-        </label>
-        <label>
-            Description <span class="text-muted">(optional detail)</span>
-            <input type="hidden" name="description" id="add-desc-hidden">
-            <div id="add-desc-editor"></div>
-        </label>
-        <label>
-            Resultant Work <span class="text-muted">(work that came out of realised impact)</span>
-            <input type="hidden" name="resultant_work" id="add-resultant-hidden">
-            <div id="add-resultant-editor" class="rich-editor-compact"></div>
-        </label>
-        <div class="grid">
-            <label>
-                Status
+<div id="add-risk-panel" class="card" style="display:none; margin-bottom:16px;">
+    <form method="post" action="/p/{{ pid }}/risks/add">
+        <div class="card-head"><h3>New risk</h3></div>
+        <div class="field-grid" style="grid-template-columns: 1fr;">
+            <label class="field">Name <span class="muted tiny">(short, at-a-glance)</span>
+                <input type="text" name="name" placeholder="e.g., Third-party API dependency" required>
+            </label>
+        </div>
+        <div class="field-grid" style="grid-template-columns: 2fr 1fr; margin-top:14px;">
+            <label class="field">Description <span class="muted tiny">(optional detail)</span>
+                <input type="hidden" name="description" id="add-desc-hidden">
+                <div id="add-desc-editor"></div>
+            </label>
+            <label class="field">Resultant Work <span class="muted tiny">(work that flowed from realised impact)</span>
+                <input type="hidden" name="resultant_work" id="add-resultant-hidden">
+                <div id="add-resultant-editor"></div>
+            </label>
+        </div>
+        <div class="field-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:14px;">
+            <label class="field">Status
                 <select name="status">
                     <option value="todo" selected>To Do</option>
                     <option value="doing">Doing</option>
                     <option value="done">Done</option>
                 </select>
             </label>
-            <label>
-                Identified <span class="text-muted">(defaults to today)</span>
+            <label class="field">Identified <span class="muted tiny">(defaults to today)</span>
                 <input type="date" name="date_identified">
             </label>
-            <label>
-                Due Date
+            <label class="field">Due Date
                 <input type="date" name="due_date">
             </label>
         </div>
-        <div class="grid">
-            <label>
-                Budget Impact (d)
+        <div class="field-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:14px;">
+            <label class="field">Budget Impact (d)
                 <input type="number" name="impact_days" value="0" step="0.5" min="0">
             </label>
-            <label>
-                Timeline Impact (d)
+            <label class="field">Timeline Impact (d)
                 <input type="number" name="timeline_impact_days" value="0" step="0.5" min="0">
             </label>
-            <label>
-                % Realised <span class="text-muted">(usually 0)</span>
+            <label class="field">% Realised <span class="muted tiny">(usually 0)</span>
                 <input type="number" name="realised_percentage" value="0" step="1" min="0" max="100">
             </label>
         </div>
-        <div style="display:flex; gap:0.75rem; align-items:center;">
-            <button type="submit" class="btn-add">+ Add Risk</button>
-            <button type="button" id="cancel-add-risk" class="btn-small outline secondary">Cancel</button>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+            <button type="submit" class="btn btn-primary">+ Add risk</button>
+            <button type="button" class="btn" id="cancel-add-risk">Cancel</button>
         </div>
     </form>
 </div>
 
-{# ── Sort & filter controls ── #}
 {% if risks or filter_key != 'all' %}
-<form method="get" action="/risks" class="risk-controls" id="risk-controls">
-    <label class="risk-controls-field">
-        <span class="text-muted">Sort:</span>
-        <select name="sort" onchange="document.getElementById('risk-controls').submit()">
-            <option value="status" {% if sort_key == 'status' %}selected{% endif %}>Status (todo → done)</option>
-            <option value="impact" {% if sort_key == 'impact' %}selected{% endif %}>Impact (high to low)</option>
-            <option value="age" {% if sort_key == 'age' %}selected{% endif %}>Age (oldest first)</option>
-            <option value="name" {% if sort_key == 'name' %}selected{% endif %}>Name (A–Z)</option>
-        </select>
-    </label>
-    <label class="risk-controls-field">
-        <span class="text-muted">Show:</span>
-        <select name="filter" onchange="document.getElementById('risk-controls').submit()">
-            <option value="all" {% if filter_key == 'all' %}selected{% endif %}>All risks</option>
-            <option value="open" {% if filter_key == 'open' %}selected{% endif %}>Open only</option>
-            <option value="closed" {% if filter_key == 'closed' %}selected{% endif %}>Closed only</option>
-        </select>
-    </label>
-</form>
+<div class="filters">
+    <form method="get" action="/p/{{ pid }}/risks" id="risk-controls" style="display:contents;">
+        <div class="pill-tabs">
+            <button type="submit" name="filter" value="all" class="{% if filter_key == 'all' %}active{% endif %}">All</button>
+            <button type="submit" name="filter" value="open" class="{% if filter_key == 'open' %}active{% endif %}">Open only</button>
+            <button type="submit" name="filter" value="closed" class="{% if filter_key == 'closed' %}active{% endif %}">Closed only</button>
+        </div>
+        <div class="group">
+            <span>Sort</span>
+            <select name="sort" onchange="document.getElementById('risk-controls').submit()">
+                <option value="status" {% if sort_key == 'status' %}selected{% endif %}>Status (todo → done)</option>
+                <option value="impact" {% if sort_key == 'impact' %}selected{% endif %}>Impact (high to low)</option>
+                <option value="age" {% if sort_key == 'age' %}selected{% endif %}>Age (oldest first)</option>
+                <option value="name" {% if sort_key == 'name' %}selected{% endif %}>Name (A–Z)</option>
+            </select>
+        </div>
+    </form>
+</div>
 {% endif %}
 
-{# ── Risk card grid ── #}
 {% if risks %}
-<div class="risk-card-grid">
+<div class="card-grid">
     {% for risk in risks %}
-    <article class="risk-card risk-card-severity-{{ risk.severity_band }}" data-risk-id="{{ risk.id }}">
-        <header class="risk-card-header">
-            <div class="risk-card-badges">
-                <span class="health-badge {% if risk.status == 'done' %}badge-green{% elif risk.status == 'doing' %}badge-amber{% else %}badge-grey{% endif %}">
-                    <span aria-hidden="true">{% if risk.status == 'done' %}&#10003;{% elif risk.status == 'doing' %}&#9888;{% else %}&#9675;{% endif %}</span> {{ risk.status | upper }}
-                </span>
-                {% if risk.resolution_label %}
-                <span class="health-badge {% if risk.resolution_label == 'Avoided' %}badge-green{% elif risk.resolution_label == 'Mitigated' %}badge-amber{% else %}badge-red{% endif %}">
-                    {{ risk.resolution_label }}
-                </span>
-                {% endif %}
+    {% set sev = 'done' if risk.status == 'done' else risk.severity_band %}
+    {% set sev_class = {'high':'high', 'med':'med', 'low':'low', 'none':'low', 'done':'done'}[sev] %}
+    <article class="risk-card sev-{{ sev_class }}" data-risk-id="{{ risk.id }}">
+        <div class="head">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <span class="chip chip-{{ {'todo':'bad','doing':'warn','done':'good'}[risk.status] }}">{{ risk.status | upper }}</span>
+                {% if risk.resolution_label == 'Avoided' %}<span class="chip chip-good">Avoided</span>{% endif %}
+                {% if risk.resolution_label == 'Realised' %}<span class="chip chip-bad">Realised</span>{% endif %}
+                {% if risk.resolution_label == 'Mitigated' %}<span class="chip chip-warn">Mitigated</span>{% endif %}
                 {% if risk.realised_percentage > 0 and risk.realised_percentage < 100 %}
-                <span class="realised-chip" title="Realised portion">{{ risk.realised_percentage | round(0) | int }}%</span>
+                <span class="chip chip-soft">{{ risk.realised_percentage | round(0) | int }}% realised</span>
                 {% endif %}
             </div>
-            <h3 class="risk-card-title">
-                <button type="button" class="risk-card-title-btn" data-action="open-modal" data-risk-id="{{ risk.id }}">{{ risk.name }}</button>
-            </h3>
-        </header>
+        </div>
+        <div class="title">
+            <button type="button" data-action="open-modal" data-risk-id="{{ risk.id }}" style="background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer;">{{ risk.name }}</button>
+        </div>
+        {% if risk.description %}<div class="desc rich-content">{{ risk.description | render_rich | safe }}</div>{% endif %}
+        {% if risk.resultant_work %}<div class="desc rich-content"><span class="muted">Resultant:</span> {{ risk.resultant_work | render_rich | safe }}</div>{% endif %}
 
-        {% if risk.description %}
-        <div class="risk-card-description">{{ risk.description | render_rich | safe }}</div>
-        {% endif %}
-
-        {% if risk.resultant_work %}
-        <div class="risk-card-resultant"><span class="text-muted">Resultant:</span> {{ risk.resultant_work | render_rich | safe }}</div>
-        {% endif %}
-
-        <ul class="risk-card-meta">
+        <ul class="meta" style="list-style:none; padding:0; margin:0;">
             {% if risk.impact_days > 0 %}
-            <li><strong>{{ risk.impact_days | days }}d</strong> budget
-                {% if risk.realised_percentage > 0 and risk.realised_percentage < 100 %}
-                <span class="text-muted">({{ risk.effective_impact_days | days }}d realised)</span>
-                {% endif %}
+            <li><strong>{{ risk.impact_days | days }}d</strong> budget · <strong>{{ risk.impact_dollars | currency }}</strong>
+                {% if risk.realised_percentage > 0 and risk.realised_percentage < 100 %}<span class="muted">({{ risk.effective_impact_days | days }}d realised)</span>{% endif %}
             </li>
             {% endif %}
-            {% if risk.timeline_impact_days > 0 %}
-            <li><strong>{{ risk.timeline_impact_days | days }}d</strong> timeline</li>
-            {% endif %}
+            {% if risk.timeline_impact_days > 0 %}<li><strong>{{ risk.timeline_impact_days | days }}d</strong> timeline</li>{% endif %}
             {% if risk.status != 'done' and risk.date_identified %}
             {% set age = risk.date_identified | age_days %}
-            {% if age is not none %}
-            <li class="{% if age >= 30 %}health-amber{% endif %}" title="Identified {{ risk.date_identified }}">Open for {{ age }}d</li>
+            {% if age is not none %}<li style="{% if age >= 30 %}color:var(--warn);{% endif %}" title="Identified {{ risk.date_identified }}">Open for {{ age }}d</li>{% endif %}
             {% endif %}
-            {% endif %}
-            {% if risk.due_date %}
-            <li class="text-muted">Due {{ risk.due_date }}</li>
-            {% endif %}
+            {% if risk.due_date %}<li class="muted">Due {{ risk.due_date }}</li>{% endif %}
         </ul>
 
         {% if risk.impact_days > 0 %}
-        {# Progress bar: red = realised (unrecoverable), amber = still at risk, grey = avoided #}
-        {% set realised_pct = risk.realised_percentage | int %}
+        {% set realised_pct = risk.realised_percentage | round(0) | int %}
         {% set remaining_pct = 100 - realised_pct %}
-        <div class="risk-budget-bar"
-             title="{{ realised_pct }}% realised · {{ remaining_pct }}% {% if risk.status == 'done' %}avoided{% else %}at risk{% endif %}">
-            {% if realised_pct > 0 %}
-            <div class="risk-budget-bar-realised" style="width:{{ realised_pct }}%"></div>
-            {% endif %}
+        <div class="progress" title="{{ realised_pct }}% realised · {{ remaining_pct }}% {% if risk.status == 'done' %}avoided{% else %}at risk{% endif %}">
+            {% if realised_pct > 0 %}<div style="position:absolute; inset:0; width:{{ realised_pct }}%; background:var(--bad);"></div>{% endif %}
             {% if remaining_pct > 0 %}
-            <div class="{% if risk.status == 'done' %}risk-budget-bar-avoided{% else %}risk-budget-bar-atrisk{% endif %}"
-                 style="width:{{ remaining_pct }}%"></div>
+            <div style="position:absolute; inset:0; left:{{ realised_pct }}%; width:{{ remaining_pct }}%; background: {% if risk.status == 'done' %}var(--n-200){% else %}oklch(from var(--warn) l c h / 0.55){% endif %};"></div>
             {% endif %}
         </div>
         {% endif %}
 
         {% if risk.linked_features %}
-        <div class="risk-card-linked">
+        <div class="linked">
+            <span class="lbl muted">Linked:</span>
             {% for f in risk.linked_features %}
-            <span class="linked-feature-badge">
-                <a href="/features/{{ f.id }}">{{ f.name }}</a>
-                <form method="post" action="/risks/{{ risk.id }}/unlink-feature/{{ f.id }}" style="margin:0; display:inline;">
-                    <button type="submit" class="unlink-btn" aria-label="Unlink {{ f.name }} from {{ risk.name }}">&times;</button>
+            <span class="chip chip-info" style="text-transform:none;">
+                <a href="/p/{{ pid }}/features/{{ f.id }}" style="color:inherit;">{{ f.name }}</a>
+                <form method="post" action="/p/{{ pid }}/risks/{{ risk.id }}/unlink-feature/{{ f.id }}" style="margin:0; display:inline;">
+                    <button type="submit" style="background:none; border:0; padding:0 2px; color:inherit; cursor:pointer; font-size:12px;" aria-label="Unlink {{ f.name }}">×</button>
                 </form>
             </span>
             {% endfor %}
         </div>
         {% endif %}
 
-        {# Inline quick controls — status + realised % #}
-        <div class="risk-card-inline-controls">
-            <label class="inline-control">
-                <span class="text-muted">Status</span>
-                <select data-action="inline-status" data-risk-id="{{ risk.id }}">
+        <div class="footer">
+            <label class="field" style="flex-direction:row; align-items:center; gap:6px; font-size:12px;">
+                Status
+                <select data-action="inline-status" data-risk-id="{{ risk.id }}" style="padding:3px 20px 3px 6px; font-size:12px;">
                     <option value="todo" {% if risk.status == 'todo' %}selected{% endif %}>To Do</option>
                     <option value="doing" {% if risk.status == 'doing' %}selected{% endif %}>Doing</option>
                     <option value="done" {% if risk.status == 'done' %}selected{% endif %}>Done</option>
                 </select>
             </label>
-            <label class="inline-control">
-                <span class="text-muted">% Realised</span>
-                <input type="number" min="0" max="100" step="1"
-                       value="{{ risk.realised_percentage | round(0) | int }}"
-                       data-action="inline-realised" data-risk-id="{{ risk.id }}">
+            <label class="field" style="flex-direction:row; align-items:center; gap:6px; font-size:12px;">
+                % Realised
+                <input type="number" min="0" max="100" step="1" value="{{ risk.realised_percentage | round(0) | int }}"
+                       data-action="inline-realised" data-risk-id="{{ risk.id }}"
+                       style="width:56px; padding:3px 6px; font-size:12px;">
             </label>
-            <button type="button" class="btn-small outline" data-action="open-modal" data-risk-id="{{ risk.id }}">Edit</button>
+            <div style="flex:1;"></div>
+            <button type="button" class="btn btn-sm" data-action="open-modal" data-risk-id="{{ risk.id }}">Edit</button>
         </div>
 
-        {# Hidden payload consumed by openModal() for pre-filling form fields. #}
         <script type="application/json" class="risk-payload" data-risk-id="{{ risk.id }}">
         {
           "id": {{ risk.id }},
@@ -245,131 +202,100 @@
     {% endfor %}
 </div>
 {% else %}
-<p class="text-muted">{% if filter_key != 'all' %}No risks match the current filter.{% else %}No risks tracked yet. Add one below.{% endif %}</p>
+<p class="muted">{% if filter_key != 'all' %}No risks match the current filter.{% else %}No risks tracked yet. Click <em>Add risk</em>.{% endif %}</p>
 {% endif %}
 
-{# ── Edit modal ── #}
-<dialog id="risk-edit-modal" class="risk-modal">
-    <article>
-        <header class="risk-modal-header">
-            <strong>Edit Risk</strong>
-            <button type="button" class="risk-modal-close" aria-label="Close" onclick="closeRiskModal()">&times;</button>
-        </header>
+<dialog id="risk-edit-modal" style="width:75vw; max-width:1200px;">
+    <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:14px; color:var(--text-strong);">Edit Risk</strong>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="closeRiskModal()">✕</button>
+        </div>
         <form id="risk-edit-form" method="post">
-            <label>
-                Name
+            <label class="field">Name
                 <input type="text" name="name" required>
             </label>
-            <div class="risk-modal-fields-row">
-                <label>
-                    Description
+            <div class="field-grid" style="grid-template-columns: 2fr 1fr; margin-top:14px;">
+                <label class="field">Description
                     <input type="hidden" name="description" id="modal-desc-hidden">
                     <div id="modal-desc-editor"></div>
                 </label>
-                <label>
-                    Resultant Work
+                <label class="field">Resultant Work
                     <input type="hidden" name="resultant_work" id="modal-resultant-hidden">
-                    <div id="modal-resultant-editor" class="rich-editor-compact"></div>
+                    <div id="modal-resultant-editor"></div>
                 </label>
             </div>
-            <div class="grid">
-                <label>
-                    Status
+            <div class="field-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:14px;">
+                <label class="field">Status
                     <select name="status">
                         <option value="todo">To Do</option>
                         <option value="doing">Doing</option>
                         <option value="done">Done</option>
                     </select>
                 </label>
-                <label>
-                    Identified
+                <label class="field">Identified
                     <input type="date" name="date_identified">
                 </label>
-                <label>
-                    Due Date
+                <label class="field">Due Date
                     <input type="date" name="due_date">
                 </label>
             </div>
-            <div class="grid">
-                <label>
-                    Budget Impact (d)
+            <div class="field-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:14px;">
+                <label class="field">Budget Impact (d)
                     <input type="number" name="impact_days" step="0.5" min="0">
                 </label>
-                <label>
-                    Timeline Impact (d)
+                <label class="field">Timeline Impact (d)
                     <input type="number" name="timeline_impact_days" step="0.5" min="0">
                 </label>
-                <label>
-                    % Realised
+                <label class="field">% Realised
                     <input type="number" name="realised_percentage" step="1" min="0" max="100">
                 </label>
             </div>
-            <div class="risk-modal-actions">
-                <button type="button" class="btn-small outline secondary" onclick="closeRiskModal()">Cancel</button>
-                <button type="submit" class="btn-small">Save</button>
-                <button type="button" class="btn-small outline secondary risk-modal-delete"
-                        id="risk-modal-delete-btn">Delete Risk</button>
+            <div style="display:flex; gap:8px; margin-top:18px;">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn" onclick="closeRiskModal()">Cancel</button>
+                <div style="flex:1;"></div>
+                <button type="button" class="btn btn-danger-ghost" id="risk-modal-delete-btn">Delete risk</button>
             </div>
         </form>
 
         {% if all_features %}
-        <form id="risk-link-form" method="post" class="risk-modal-link-form">
-            <label>
-                Link a Feature
+        <form id="risk-link-form" method="post" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:end;">
+            <label class="field" style="flex:1;">Link a Feature
                 <select name="feature_id">
-                    {% for f in all_features %}
-                    <option value="{{ f.id }}">{{ f.name }}</option>
-                    {% endfor %}
+                    {% for f in all_features %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
                 </select>
             </label>
-            <button type="submit" class="btn-small outline">+ Link Feature</button>
+            <button type="submit" class="btn btn-sm">+ Link feature</button>
         </form>
         {% endif %}
-    </article>
+    </div>
 </dialog>
-
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.js"></script>
 <script>
 (function() {
-    // ── Quill helpers ──
-    const TOOLBAR = [
-        ['bold', 'italic'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        [{ header: [2, 3, false] }],
-        ['clean'],
-    ];
+    const PID = {{ project.id }};
+    const TOOLBAR = [['bold', 'italic'], [{list: 'ordered'}, {list: 'bullet'}], [{header: [2, 3, false]}], ['clean']];
 
     function makeQuill(selector, placeholder) {
-        return new Quill(selector, {
-            theme: 'snow',
-            placeholder: placeholder || '',
-            modules: { toolbar: TOOLBAR },
-        });
+        return new Quill(selector, { theme: 'snow', placeholder: placeholder || '', modules: { toolbar: TOOLBAR } });
     }
-
-    function quillSet(quill, value) {
-        if (!value || !value.trim()) {
-            quill.setContents([]);
-        } else if (value.trim().startsWith('<')) {
-            quill.clipboard.dangerouslyPasteHTML(0, value);
-        } else {
-            quill.setText(value);
-        }
+    function quillSet(q, v) {
+        if (!v || !v.trim()) q.setContents([]);
+        else if (v.trim().startsWith('<')) q.clipboard.dangerouslyPasteHTML(0, v);
+        else q.setText(v);
     }
-
-    function quillGet(quill) {
-        const h = quill.root.innerHTML;
+    function quillGet(q) {
+        const h = q.root.innerHTML;
         return (h === '<p><br></p>' || h === '') ? '' : h;
     }
 
-    // ── Add-form Quill editors (initialized at page load) ──
     const addDescQuill = makeQuill('#add-desc-editor',
         'Original expectation:\nWhat changed / was revealed:\nNotable timeline and sequencing impacts:');
-    const addResultantQuill = makeQuill('#add-resultant-editor',
-        'e.g., 3 days went into rebuilding the sync layer');
+    const addResultantQuill = makeQuill('#add-resultant-editor', 'e.g., 3 days went into rebuilding the sync layer');
 
     const addForm = document.querySelector('#add-risk-panel form');
     if (addForm) {
@@ -379,7 +305,6 @@
         });
     }
 
-    // ── Toggle Add Risk panel ──
     const toggleBtn = document.getElementById('toggle-add-risk');
     const addPanel = document.getElementById('add-risk-panel');
     const cancelBtn = document.getElementById('cancel-add-risk');
@@ -387,7 +312,6 @@
         toggleBtn.addEventListener('click', () => {
             const isOpen = addPanel.style.display !== 'none';
             addPanel.style.display = isOpen ? 'none' : 'block';
-            toggleBtn.textContent = isOpen ? '+ Add Risk' : '✕ Cancel';
             toggleBtn.setAttribute('aria-expanded', String(!isOpen));
             if (!isOpen) addPanel.querySelector('input[name="name"]').focus();
         });
@@ -395,12 +319,10 @@
     if (cancelBtn && addPanel) {
         cancelBtn.addEventListener('click', () => {
             addPanel.style.display = 'none';
-            toggleBtn.textContent = '+ Add Risk';
             toggleBtn.setAttribute('aria-expanded', 'false');
         });
     }
 
-    // ── Gather risk payloads ──
     const payloads = {};
     document.querySelectorAll('.risk-payload').forEach(el => {
         try { payloads[el.dataset.riskId] = JSON.parse(el.textContent); } catch (e) {}
@@ -411,14 +333,11 @@
     const linkForm = document.getElementById('risk-link-form');
     const deleteBtn = document.getElementById('risk-modal-delete-btn');
 
-    // ── Modal Quill editors — lazily initialized on first open ──
     let modalDescQuill = null, modalResultantQuill = null;
-
     function ensureModalQuills() {
         if (modalDescQuill) return;
         modalDescQuill = makeQuill('#modal-desc-editor', '');
-        modalResultantQuill = makeQuill('#modal-resultant-editor',
-            'e.g., 3 days went into rebuilding the sync layer');
+        modalResultantQuill = makeQuill('#modal-resultant-editor', '');
     }
 
     form.addEventListener('submit', () => {
@@ -431,8 +350,8 @@
     function openModal(riskId) {
         const r = payloads[riskId];
         if (!r) return;
-        form.action = '/risks/' + r.id + '/update';
-        if (linkForm) linkForm.action = '/risks/' + r.id + '/link-feature';
+        form.action = `/p/${PID}/risks/${r.id}/update`;
+        if (linkForm) linkForm.action = `/p/${PID}/risks/${r.id}/link-feature`;
         form.elements['name'].value = r.name;
         form.elements['status'].value = r.status;
         form.elements['date_identified'].value = r.date_identified || '';
@@ -443,61 +362,43 @@
         deleteBtn.onclick = () => {
             if (confirm('Delete risk "' + r.name + '"?')) {
                 const f = document.createElement('form');
-                f.method = 'post';
-                f.action = '/risks/' + r.id + '/delete';
-                document.body.appendChild(f);
-                f.submit();
+                f.method = 'post'; f.action = `/p/${PID}/risks/${r.id}/delete`;
+                document.body.appendChild(f); f.submit();
             }
         };
-        // Show modal before initializing Quill so the container is visible.
-        if (modal.showModal) modal.showModal();
-        else modal.setAttribute('open', '');
+        if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
         ensureModalQuills();
         quillSet(modalDescQuill, r.description || '');
         quillSet(modalResultantQuill, r.resultant_work || '');
     }
 
     window.closeRiskModal = function() {
-        if (modal.close) modal.close();
-        else modal.removeAttribute('open');
+        if (modal.close) modal.close(); else modal.removeAttribute('open');
     };
 
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-modal"]');
-        if (trigger) {
-            e.preventDefault();
-            openModal(trigger.dataset.riskId);
-            return;
-        }
-        // Clicking anywhere on a card (outside interactive controls) opens modal
-        const card = e.target.closest('.risk-card[data-risk-id]');
-        if (card && !e.target.closest('button, input, select, a, form')) {
-            openModal(card.dataset.riskId);
-        }
+        if (trigger) { e.preventDefault(); openModal(trigger.dataset.riskId); return; }
     });
 
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeRiskModal();
-    });
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeRiskModal(); });
 
     document.addEventListener('change', (e) => {
         const sel = e.target.closest('[data-action="inline-status"]');
         if (sel) {
-            const body = new URLSearchParams({status: sel.value});
-            fetch('/api/risks/' + sel.dataset.riskId + '/status', {
+            fetch(`/api/p/${PID}/risks/${sel.dataset.riskId}/status`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: body.toString(),
+                body: new URLSearchParams({status: sel.value}).toString(),
             }).then(() => location.reload());
             return;
         }
         const pct = e.target.closest('[data-action="inline-realised"]');
         if (pct) {
-            const body = new URLSearchParams({realised_percentage: pct.value || '0'});
-            fetch('/api/risks/' + pct.dataset.riskId + '/realised', {
+            fetch(`/api/p/${PID}/risks/${pct.dataset.riskId}/realised`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: body.toString(),
+                body: new URLSearchParams({realised_percentage: pct.value || '0'}).toString(),
             }).then(() => location.reload());
         }
     });

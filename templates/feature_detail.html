@@ -1,102 +1,85 @@
 {% extends "base.html" %}
-{% block title %}{{ feature.name }} - Project Health Check{% endblock %}
+{% block title %}{{ feature.name }} · {{ project.name }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb">
-    <ul>
-        <li><a href="/features">Features</a></li>
-        <li>{{ feature.name }}</li>
-    </ul>
-</nav>
+{% set pid = project.id %}
+<div class="page-head">
+    <div>
+        <div class="breadcrumbs" style="margin-bottom:6px;">
+            <a class="link" href="/p/{{ pid }}/features">Features</a>
+            <span class="sep">/</span>
+            <span>{{ feature.name }}</span>
+        </div>
+        <div class="page-title inline-editable" data-action="/p/{{ pid }}/features/{{ feature.id }}/update" title="Double-click to rename" tabindex="0" role="button">
+            {{ feature.name }} <span class="edit-pencil muted" aria-hidden="true" style="font-size:16px; cursor:pointer;">✎</span>
+        </div>
+    </div>
+    <div class="page-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('add-req-dialog').showModal()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add requirement
+        </button>
+    </div>
+</div>
 
-<h2 class="inline-editable" data-action="/features/{{ feature.id }}/update" title="Double-click to rename" tabindex="0" role="button">
-    {{ feature.name }} <span class="edit-pencil" aria-hidden="true">✎</span>
-</h2>
-
-<dl class="summary-grid">
-    <div class="summary-card">
-        <dt class="label">Allocated Budget (days)</dt>
-        <dd class="value">{{ feature.total_days | days }}</dd>
+<div class="card" style="margin-bottom:16px;">
+    <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr);">
+        <div class="stat"><div class="label">Allocated (days)</div><div class="value val-lg">{{ feature.total_days | days }}</div></div>
+        <div class="stat"><div class="label">Allocated ($)</div><div class="value val-lg">{{ feature.total_dollars | currency }}</div></div>
+        <div class="stat"><div class="label">Completion</div><div class="value val-lg">{{ feature.weighted_completion | pct }}</div></div>
+        <div class="stat"><div class="label">Remaining (days)</div><div class="value val-lg">{{ feature.remaining_days | days }}</div></div>
+        <div class="stat"><div class="label">Remaining ($)</div><div class="value val-lg">{{ feature.remaining_dollars | currency }}</div></div>
     </div>
-    <div class="summary-card">
-        <dt class="label">Allocated Budget ($)</dt>
-        <dd class="value">{{ feature.total_dollars | currency }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Completion</dt>
-        <dd class="value">{{ feature.weighted_completion | pct }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Remaining (days)</dt>
-        <dd class="value">{{ feature.remaining_days | days }}</dd>
-    </div>
-    <div class="summary-card">
-        <dt class="label">Remaining ($)</dt>
-        <dd class="value">{{ feature.remaining_dollars | currency }}</dd>
-    </div>
-</dl>
+</div>
 
 {% for req in feature.requirements %}
-<article class="requirement-section">
-    <div class="requirement-section-header" style="align-items:center;">
-        <div style="display:flex; align-items:center; gap:0.5rem;">
-            <button class="collapse-btn" data-req-id="{{ req.id }}" aria-expanded="true"
-                    style="background:none; border:none; cursor:pointer; padding:0; line-height:1;"
-                    aria-label="Toggle requirement {{ req.name }}">
-                <span class="collapse-arrow">&#9660;</span>
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-head" style="align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button class="collapse-btn btn btn-ghost btn-icon btn-sm" data-req-id="{{ req.id }}" aria-expanded="true" aria-label="Toggle requirement {{ req.name }}">
+                <span class="collapse-arrow">▾</span>
             </button>
-            <h3 class="inline-editable" data-action="/requirements/{{ req.id }}/update" style="margin:0;" title="Double-click to rename" tabindex="0" role="button">
-                {{ req.name }} <span class="edit-pencil" aria-hidden="true">✎</span>
+            <h3 class="inline-editable" data-action="/p/{{ pid }}/requirements/{{ req.id }}/update" style="margin:0;" title="Double-click to rename" tabindex="0" role="button">
+                {{ req.name }} <span class="edit-pencil muted" aria-hidden="true" style="font-size:13px; cursor:pointer;">✎</span>
             </h3>
         </div>
-        <span class="text-muted">
-            {{ req.total_days | days }} days / {{ req.total_dollars | currency }}
-            &bull; {{ req.weighted_completion | pct }} complete
-        </span>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span class="muted tiny">
+                {{ req.total_days | days }}d / {{ req.total_dollars | currency }}
+                · {{ req.weighted_completion | pct }} complete
+            </span>
+            <form method="post" action="/p/{{ pid }}/requirements/{{ req.id }}/delete" style="margin:0;">
+                <button type="submit" class="btn btn-danger-ghost btn-sm"
+                        onclick="event.preventDefault(); showConfirm('Delete requirement &quot;{{ req.name }}&quot; and all its deliverables?', this.closest('form'))"
+                        aria-label="Delete requirement {{ req.name }}">Delete</button>
+            </form>
+        </div>
     </div>
 
     <div class="req-body" data-req-id="{{ req.id }}">
-    <div class="req-header-actions">
-        <form method="post" action="/requirements/{{ req.id }}/delete" style="margin:0;">
-            <button type="submit" class="btn-small outline secondary"
-                    aria-label="Delete requirement {{ req.name }}"
-                    onclick="event.preventDefault(); showConfirm('Delete requirement &quot;{{ req.name }}&quot; and all its deliverables?', this.closest('form'))">Delete Req</button>
-        </form>
-    </div>
-
     {% if req.deliverables %}
     <div class="table-scroll">
-    <table>
-        <colgroup>
-            <col class="col-name">
-            <col class="col-priority">
-            <col class="col-role">
-            <col class="col-num">
-            <col class="col-num">
-            <col class="col-num">
-            <col class="col-num">
-            <col class="col-actions">
-        </colgroup>
+    <table class="data-table">
         <thead>
             <tr>
-                <th scope="col">Deliverable</th>
-                <th scope="col">Priority</th>
-                <th scope="col">Role</th>
-                <th scope="col" class="text-right">Budget (days)</th>
-                <th scope="col" class="text-right">% Done</th>
-                <th scope="col" class="text-right">Remaining days</th>
-                <th scope="col" class="text-right">Remaining $</th>
-                <th scope="col">Actions</th>
+                <th>Deliverable</th>
+                <th>Priority</th>
+                <th>Role</th>
+                <th class="right">Budget (days)</th>
+                <th class="right">% Done</th>
+                <th class="right">Remaining days</th>
+                <th class="right">Remaining $</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
             {% for d in req.deliverables %}
             <tr data-del-id="{{ d.id }}">
-                <form method="post" action="/deliverables/{{ d.id }}/update">
+                <form method="post" action="/p/{{ pid }}/deliverables/{{ d.id }}/update">
                     <td><input type="text" name="name" value="{{ d.name }}" aria-label="Deliverable name"></td>
                     <td>
                         <select name="priority" aria-label="Priority for {{ d.name }}"
-                                class="priority-select {% if d.priority == 'Must Have' %}priority-select-must{% elif d.priority == 'Should Have' %}priority-select-should{% else %}priority-select-could{% endif %}">
+                                class="priority-select {% if d.priority == 'Must Have' %}priority-must{% elif d.priority == 'Should Have' %}priority-should{% else %}priority-could{% endif %}">
                             <option value="Must Have" {% if d.priority == "Must Have" %}selected{% endif %}>Must</option>
                             <option value="Should Have" {% if d.priority == "Should Have" %}selected{% endif %}>Should</option>
                             <option value="Could Have" {% if d.priority == "Could Have" %}selected{% endif %}>Could</option>
@@ -110,26 +93,20 @@
                             {% endfor %}
                         </select>
                     </td>
-                    <td class="text-right"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0" aria-label="Budget days for {{ d.name }}"></td>
-                    <td class="text-right">
-                        <div class="percent-cell">
-                            <input type="number" name="percent_complete" value="{{ d.percent_complete }}"
-                                   min="0" max="100"
-                                   class="inline-percent" data-id="{{ d.id }}"
-                                   aria-label="Percent complete for {{ d.name }}">
-                            <div class="percent-mini-bar">
-                                <div class="percent-mini-fill {% if d.percent_complete == 100 %}fill-done{% endif %}"
-                                     style="width: {{ d.percent_complete }}%"></div>
-                            </div>
+                    <td class="cell-num"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0" aria-label="Budget days for {{ d.name }}" style="width:70px;"></td>
+                    <td class="cell-num">
+                        <div class="pct-cell">
+                            <div class="mini-bar"><div class="mini-fill {% if d.percent_complete == 100 %}fill-done{% endif %}" style="width: {{ d.percent_complete }}%"></div></div>
+                            <input type="number" name="percent_complete" value="{{ d.percent_complete }}" min="0" max="100" class="inline-percent" data-id="{{ d.id }}" aria-label="Percent complete for {{ d.name }}">
                         </div>
                     </td>
-                    <td class="text-right cell-readonly">{{ d.remaining_days | days }}</td>
-                    <td class="text-right cell-readonly">{{ d.remaining_dollars | currency }}</td>
-                    <td class="actions">
-                        <button type="submit" class="btn-icon outline" aria-label="Save deliverable {{ d.name }}" title="Save">&#10003;</button>
-                        <button type="submit" formaction="/deliverables/{{ d.id }}/delete" class="btn-icon outline secondary"
+                    <td class="cell-num">{{ d.remaining_days | days }}</td>
+                    <td class="cell-num">{{ d.remaining_dollars | currency }}</td>
+                    <td class="cell-actions">
+                        <button type="submit" class="btn btn-sm btn-icon" aria-label="Save deliverable {{ d.name }}" title="Save">✓</button>
+                        <button type="submit" formaction="/p/{{ pid }}/deliverables/{{ d.id }}/delete" class="btn btn-danger-ghost btn-sm btn-icon"
                                 aria-label="Delete deliverable {{ d.name }}" title="Delete"
-                                onclick="event.preventDefault(); showConfirm('Delete deliverable &quot;{{ d.name }}&quot;?', this.closest('form'), '/deliverables/{{ d.id }}/delete')">&#10007;</button>
+                                onclick="event.preventDefault(); showConfirm('Delete deliverable &quot;{{ d.name }}&quot;?', this.closest('form'), '/p/{{ pid }}/deliverables/{{ d.id }}/delete')">✕</button>
                     </td>
                 </form>
             </tr>
@@ -137,76 +114,69 @@
         </tbody>
         <tfoot>
             <tr>
-                <th colspan="3">Subtotal</th>
-                <th class="text-right">{{ req.total_days | days }}</th>
-                <th class="text-right">{{ req.weighted_completion | pct }}</th>
-                <th class="text-right">{{ req.remaining_days | days }}</th>
-                <th class="text-right">{{ req.remaining_dollars | currency }}</th>
-                <th></th>
+                <td colspan="3">Subtotal</td>
+                <td class="cell-num">{{ req.total_days | days }}</td>
+                <td class="cell-num">{{ req.weighted_completion | pct }}</td>
+                <td class="cell-num">{{ req.remaining_days | days }}</td>
+                <td class="cell-num">{{ req.remaining_dollars | currency }}</td>
+                <td></td>
             </tr>
         </tfoot>
     </table>
     </div>
     {% else %}
-    <p class="text-muted">No deliverables yet. Add one below.</p>
+    <p class="muted small">No deliverables yet.</p>
     {% endif %}
 
-    <details class="add-deliverable-section">
-        <summary class="btn-add">+ New Deliverable</summary>
-        <form method="post" action="/requirements/{{ req.id }}/deliverables/add" style="margin-top:0.75rem">
-            <div class="grid">
-                <label>
-                    Deliverable Name
-                    <input type="text" name="name" required>
-                </label>
-                <label>
-                    Budget (days)
-                    <input type="number" name="budget_days" value="0" step="0.5" min="0">
-                </label>
-            </div>
-            <div class="grid">
-                <label>
-                    Priority
-                    <select name="priority">
-                        <option value="Must Have">Must Have</option>
-                        <option value="Should Have">Should Have</option>
-                        <option value="Could Have">Could Have</option>
-                    </select>
-                </label>
-                <label>
-                    Role
-                    <select name="role_id">
-                        <option value="">Default</option>
-                        {% for r in roles %}
-                        <option value="{{ r.id }}">{{ r.name }} ({{ r.day_rate | currency }}/day)</option>
-                        {% endfor %}
-                    </select>
-                </label>
-            </div>
-            <button type="submit" class="btn-add">+ Add Deliverable</button>
+    <details style="margin-top:12px;">
+        <summary class="btn btn-sm" style="display:inline-block;">+ New deliverable</summary>
+        <form method="post" action="/p/{{ pid }}/requirements/{{ req.id }}/deliverables/add" style="margin-top:12px; display:grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">
+            <label class="field">Deliverable Name
+                <input type="text" name="name" required>
+            </label>
+            <label class="field">Budget (days)
+                <input type="number" name="budget_days" value="0" step="0.5" min="0">
+            </label>
+            <label class="field">Priority
+                <select name="priority">
+                    <option value="Must Have">Must Have</option>
+                    <option value="Should Have">Should Have</option>
+                    <option value="Could Have">Could Have</option>
+                </select>
+            </label>
+            <label class="field">Role
+                <select name="role_id">
+                    <option value="">Default</option>
+                    {% for r in roles %}
+                    <option value="{{ r.id }}">{{ r.name }} ({{ r.day_rate | currency }}/day)</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-primary">+ Add</button>
         </form>
     </details>
     </div>
-</article>
+</div>
 {% endfor %}
 
-<div class="add-requirement-section">
-    <form method="post" action="/features/{{ feature.id }}/requirements/add">
-        <div class="grid">
-            <label>
-                Requirement Name
-                <input type="text" name="name" placeholder="e.g., Internal Calculations" required>
-            </label>
+<dialog id="add-req-dialog">
+    <form method="post" action="/p/{{ pid }}/features/{{ feature.id }}/requirements/add" style="display:flex; flex-direction:column; gap:12px; min-width:380px;">
+        <strong style="font-size:14px; color: var(--text-strong);">Add requirement</strong>
+        <label class="field">Requirement Name
+            <input type="text" name="name" required autofocus placeholder="e.g., Internal Calculations">
+        </label>
+        <div class="dialog-actions">
+            <button type="button" class="btn" onclick="document.getElementById('add-req-dialog').close()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add requirement</button>
         </div>
-        <button type="submit" class="btn-add">+ Add Requirement</button>
     </form>
-</div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ── Persist requirement collapse state ──
-const STORAGE_KEY = 'req-open-{{ feature.id }}';
+const PID = {{ project.id }};
+const STORAGE_KEY = 'req-open-' + {{ feature.id }};
 
 function loadReqStates() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -252,135 +222,73 @@ document.querySelectorAll('.collapse-btn').forEach(btn => {
     });
 });
 
-// ── Inline name editing ──
+// Inline name editing
 document.querySelectorAll('.inline-editable').forEach(el => {
     function activateEdit(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        if (el.querySelector('.inline-edit-input')) return; // already editing
-
+        e.stopPropagation(); e.preventDefault();
+        if (el.querySelector('.inline-edit-input')) return;
         const action = el.dataset.action;
         const currentText = el.childNodes[0].textContent.trim();
-
         const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentText;
+        input.type = 'text'; input.value = currentText;
         input.className = 'inline-edit-input';
-
+        input.style.fontSize = 'inherit';
         el.style.visibility = 'hidden';
         el.insertAdjacentElement('afterend', input);
-        input.focus();
-        input.select();
-
+        input.focus(); input.select();
         function submit() {
             const newName = input.value.trim();
             input.removeEventListener('blur', submit);
-            input.remove();
-            el.style.visibility = '';
+            input.remove(); el.style.visibility = '';
             if (newName && newName !== currentText) {
-                if (typeof saveReqStates === 'function') saveReqStates();
                 const f = document.createElement('form');
-                f.method = 'post';
-                f.action = action;
+                f.method = 'post'; f.action = action;
                 const n = document.createElement('input');
-                n.type = 'hidden';
-                n.name = 'name';
-                n.value = newName;
-                f.appendChild(n);
-                document.body.appendChild(f);
-                f.submit();
+                n.type = 'hidden'; n.name = 'name'; n.value = newName;
+                f.appendChild(n); document.body.appendChild(f); f.submit();
             }
         }
-
-        function cancel() {
-            input.removeEventListener('blur', submit);
-            input.remove();
-            el.style.visibility = '';
-        }
-
+        function cancel() { input.removeEventListener('blur', submit); input.remove(); el.style.visibility = ''; }
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); submit(); }
             if (e.key === 'Escape') cancel();
         });
         input.addEventListener('blur', submit);
     }
-
-    // Single click on pencil icon activates edit
     const pencil = el.querySelector('.edit-pencil');
     if (pencil) pencil.addEventListener('click', activateEdit);
-
-    // Double-click anywhere on the element also activates edit
     el.addEventListener('dblclick', activateEdit);
-
-
 });
 
-// ── Priority select colour update ──
-const PRIORITY_CLASSES = { 'Must Have': 'priority-select-must', 'Should Have': 'priority-select-should', 'Could Have': 'priority-select-could' };
-document.querySelectorAll('.priority-select').forEach(sel => {
-    sel.addEventListener('change', () => {
-        sel.classList.remove('priority-select-must', 'priority-select-should', 'priority-select-could');
-        sel.classList.add(PRIORITY_CLASSES[sel.value] || '');
-    });
-});
-
-// ── Autosave deliverables on blur/change — no page refresh ──
-// Uses <tr data-del-id> as the anchor (always in correct DOM position;
-// the <form> inside <tr> is invalid HTML and may be repositioned by
-// browsers via foster-parenting, so we avoid relying on it for queries).
+// Autosave deliverables
 function autoSave(tr) {
     const delId = tr.dataset.delId;
     if (!delId) return;
-
-    // Clamp percent within 0–100 and update the mini-bar immediately
     const pctInput = tr.querySelector('[name="percent_complete"]');
     if (pctInput) {
         const clamped = Math.max(0, Math.min(100, parseInt(pctInput.value) || 0));
         pctInput.value = clamped;
-        const fill = tr.querySelector('.percent-mini-fill');
+        const fill = tr.querySelector('.mini-fill');
         if (fill) {
             fill.style.width = clamped + '%';
             fill.classList.toggle('fill-done', clamped === 100);
         }
     }
-
-    // Collect named field values directly from the row's DOM
     const params = new URLSearchParams();
     ['name', 'budget_days', 'percent_complete', 'priority', 'role_id'].forEach(fname => {
         const el = tr.querySelector(`[name="${fname}"]`);
         if (el) params.set(fname, el.value);
     });
-
-    fetch(`/api/deliverables/${delId}/update`, {
+    fetch(`/api/p/${PID}/deliverables/${delId}/update`, {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: params.toString(),
-    }).then(r => r.json()).then(res => {
-        if (res.ok) {
-            tr.classList.remove('row-saved');
-            void tr.offsetWidth; // restart animation if already playing
-            tr.classList.add('row-saved');
-        }
-    }).catch(() => { /* network error — silent, user can still try save button */ });
+    }).catch(() => {});
 }
 
 document.querySelectorAll('tr[data-del-id]').forEach(tr => {
-    // Intercept the Save (✓) button click so it doesn't cause a page reload
-    const saveBtn = tr.querySelector('button.btn-icon.outline:not(.secondary)');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', e => {
-            e.preventDefault();
-            autoSave(tr);
-        });
-    }
-    // Autosave when the user leaves any text / number input
-    tr.querySelectorAll('input').forEach(inp => {
-        inp.addEventListener('blur', () => autoSave(tr));
-    });
-    // Autosave immediately when a select changes
-    tr.querySelectorAll('select').forEach(sel => {
-        sel.addEventListener('change', () => autoSave(tr));
-    });
+    tr.querySelectorAll('input').forEach(inp => { inp.addEventListener('blur', () => autoSave(tr)); });
+    tr.querySelectorAll('select').forEach(sel => { sel.addEventListener('change', () => autoSave(tr)); });
 });
 </script>
 {% endblock %}
