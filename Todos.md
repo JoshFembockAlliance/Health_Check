@@ -4,20 +4,14 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ## Enhancements to Existing Pages
 
-### Dashboard 
-* [x] Export to PDF is never going to be printed so it does not need to use a blank background, make sure it looks similar to the dashboard itself and provides a representative export of the page. 
-
 ### Features & Deliverables
 
 ### Risks & Notes UI changes
-* [x] The pop-up modal should be larger, particularly horizontally for risks and just in general for notes. The intent of having this kind of modal is to let the user see more details, after all. 
-* [x] The rich text-editor should be given the space to display a lot of rich text, several paragraphs even. 
-* [x] Clicking anywhere on a card that isn't a button should open the details modal, right now it's just the title.
-* [x] Cards taking up slightly more vertical space so that a bit more of descriptions can be shown before it becomes necessary to cut them off would be good.
-* [x] The Risks modal field labels could be shortened to use (d) instead of (days) and not wrap to take up two lines, it looks messy. 
+* [ ] The pop-up modal should be larger, particularly horizontally for risks and just in general for notes. The intent of having this kind of modal is to let the user see more details, after all. Id the text entry areas were very full then this would not be enough to displa them. Consider using 75% of the horizontal space available and 90% of the vertical. 
+* [ ] Laptop screens are usually quite wide. For Risks, placing the description area beside the resultant work would allow both to be quite tall and show a lot of useful information at once. Of the two, 2/3 of the horizontal space should go to the description which will be larger and contain more text than the resultant work field. 
 
 ### Risks grid changes
-* [x] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
+* [ ] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
 
 
 ## New Feature Items
