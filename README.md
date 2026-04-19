@@ -50,7 +50,7 @@ Record your team's size and composition week by week. The Dashboard uses your de
 
 ![The Risks tab showing open and realised risks with financial impact](./readme_screenshots/Risks.png)
 
-Log every risk with its potential impact in days and dollars. Risks flow to the Dashboard in two ways: **open** risks appear as a warning overlay on the budget cards (your worst-case exposure), while **realised** risks (closed and confirmed) have their impact permanently deducted from your accessible budget. The kanban-style To Do / Doing / Done columns let you track mitigation progress at a glance.
+Log every risk with its potential impact in days and dollars. Risks flow to the Dashboard in two ways: **open** risks appear as a warning overlay on the budget cards (your worst-case exposure), while **realised** risks (closed and confirmed) have their impact permanently deducted from your accessible budget. Risks are displayed as cards — click any card to open a full edit modal with rich-text description and resultant-work fields. Each card shows a progress bar that splits the budget impact into realised (red) and still-at-risk (amber) portions, so you can see at a glance how much of each risk has been absorbed. Status and realised percentage can also be updated inline without opening the modal.
 
 ---
 
@@ -58,7 +58,7 @@ Log every risk with its potential impact in days and dollars. Risks flow to the 
 
 ![The PM Notes tab with sticky reminders and to-do items](./readme_screenshots/PM_Notes.png)
 
-Capture reminders, action items, and anything you need to stay on top of. Notes can be flagged **Sticky** or given a due date — either condition causes them to surface automatically on the Dashboard. If more than three notes are due in the next two weeks, the Dashboard shows a count badge so nothing gets buried in a long list.
+Capture reminders, action items, and anything you need to stay on top of. Notes are displayed as cards in a filterable grid — filter by status (To Do / Doing / Done) or by sticky flag. Click any card to open a full edit modal with a rich-text editor for detailed notes. Notes can be flagged **Sticky** or given a due date — either condition causes them to surface automatically on the Dashboard. If more than three notes are due in the next two weeks, the Dashboard shows a count badge so nothing gets buried in a long list.
 
 ---
 
