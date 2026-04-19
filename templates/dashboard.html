@@ -259,7 +259,7 @@
             </div>
             <div class="bar">
                 {% if h.status != 'not_budgeted' %}
-                    <div class="progress">
+                    <div class="progress" role="progressbar" aria-valuenow="{{ f.weighted_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ f.name }} completion">
                         <div class="fill fill-{{ h.status }}" style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
                         {% if h.target_pct > 0 and h.target_pct <= 100 %}
                         <div class="target" style="left: {{ h.target_pct }}%"></div>

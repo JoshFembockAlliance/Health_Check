@@ -32,7 +32,7 @@
             {% set color = 'var(--good)' if p.status == 'done' else ('var(--warn)' if p.status == 'doing' else 'var(--n-300)') %}
             <tr>
                 <td>
-                    <span class="dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:{{ color }}; margin-right:8px; vertical-align:middle;"></span>
+                    <span class="dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:{{ color }}; margin-right:8px; vertical-align:middle;" aria-hidden="true"></span>
                     <a href="/p/{{ p.id }}/" style="color:var(--text-strong); font-weight:500;">{{ p.name }}</a>
                 </td>
                 <td class="muted">{{ p.description or '—' }}</td>

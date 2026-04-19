@@ -143,7 +143,7 @@
         {% if risk.impact_days > 0 %}
         {% set realised_pct = risk.realised_percentage | round(0) | int %}
         {% set remaining_pct = 100 - realised_pct %}
-        <div class="progress" title="{{ realised_pct }}% realised · {{ remaining_pct }}% {% if risk.status == 'done' %}avoided{% else %}at risk{% endif %}">
+        <div class="progress" role="progressbar" aria-valuenow="{{ realised_pct }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ realised_pct }}% realised, {{ remaining_pct }}% {% if risk.status == 'done' %}avoided{% else %}at risk{% endif %}" title="{{ realised_pct }}% realised · {{ remaining_pct }}% {% if risk.status == 'done' %}avoided{% else %}at risk{% endif %}">
             {% if realised_pct > 0 %}<div style="position:absolute; inset:0; width:{{ realised_pct }}%; background:var(--bad);"></div>{% endif %}
             {% if remaining_pct > 0 %}
             <div style="position:absolute; inset:0; left:{{ realised_pct }}%; width:{{ remaining_pct }}%; background: {% if risk.status == 'done' %}var(--n-200){% else %}oklch(from var(--warn) l c h / 0.55){% endif %};"></div>

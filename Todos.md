@@ -4,8 +4,8 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ## Enhancements to Existing 
 * [ ] Using dummy data, update the Readme screenshots based on the new UI. 
-* [ ] Allow the user to set visual tweaks that are already accounted for in the style.css like the data accent or light/dark mode in project settings on a per-project basis. 
-* [ ] The regular page has had a visual overhaul but the PDF export is not very nice by comparison. Make the PDF export prettier.
+* [x] Allow the user to set visual tweaks that are already accounted for in the style.css like the data accent or light/dark mode in project settings on a per-project basis. 
+* [x] The regular page has had a visual overhaul but the PDF export is not very nice by comparison. Make the PDF export prettier.
 
 ### Features & Deliverables
 
@@ -44,7 +44,7 @@ Last Addressed: 19/04/2026
 
 ### UI / UX Clarity and Accessibility Review
 Review all user interface elements across the different pages. Ensure that each element's purpose is clear and visually legible. Consider accessibility metrics like those that would be used by the Lighthouse chrome plugin. 
-Last Addressed: 14/04/2026
+Last Addressed: 19/04/2026
 
 ### Readme Review
 Check that the readme is up to date. Ensure any recent changes that require revisions to the document have been adjusted for. If there have been significant changes, synchronise the readme with the true current state. If the Readme is getting crowded, consider ading one or more purpose-specific multiple documents and linking them to essentially maintain a multi-page readme in a way that is friendly with GitHub. If you update screenshots, ensure mock data is in use instead of actual data as it could contain sensitive customer information. 
