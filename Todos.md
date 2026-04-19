@@ -13,8 +13,8 @@ Export to PDF is never going to be printed so it does not need to use a blank ba
 * [x] The pop-up modal should be larger, particularly horizontally for risks and just in general for notes. The intent of having this kind of modal is to let the user see more details, after all. 
 * [x] The rich text-editor should be given the space to display a lot of rich text, several paragraphs even. 
 * [x] Clicking anywhere on a card that isn't a button should open the details modal, right now it's just the title.
-* [ ] Cards taking up slightly more vertical space so that a bit more of descriptions can be shown before it becomes necessary to cut them off would be good.
-* [ ] The Risks modal field labels could be shortened to use (d) instead of (days) and not wrap to take up two lines, it looks messy. 
+* [x] Cards taking up slightly more vertical space so that a bit more of descriptions can be shown before it becomes necessary to cut them off would be good.
+* [x] The Risks modal field labels could be shortened to use (d) instead of (days) and not wrap to take up two lines, it looks messy. 
 
 ### Risks grid changes
 * [ ] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
