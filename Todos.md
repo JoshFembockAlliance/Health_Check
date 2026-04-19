@@ -15,8 +15,8 @@ Export to PDF is never going to be printed so it does not need to use a blank ba
 * [x] A rich text editor for the larger text area field like the notes description that allows for dot points and headings etc, especially when the modal is open
 
 ## Notes
-* [ ] Bring the design language into line with Risks. Filters, multiple items per line with modals, etc.
-* [ ] If Risks have a rich text editor copying that would be good.
+* [x] Bring the design language into line with Risks. Filters, multiple items per line with modals, etc.
+* [x] If Risks have a rich text editor copying that would be good.
 
 
 

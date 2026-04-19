@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 {% block title %}PM Notes - {{ project.name }}{% endblock %}
 
-{% block content %}
-<h2>PM Notes</h2>
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+{% endblock %}
 
-{# ── Summary counts ── #}
+{% block content %}
+<div class="dashboard-title-row">
+    <h2 style="margin:0">PM Notes</h2>
+    <button type="button" id="toggle-add-note" class="btn-small outline no-print" aria-expanded="false" aria-controls="add-note-panel">+ Add Note</button>
+</div>
+
+{# ── Summary cards ── #}
 <dl class="summary-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:1.5rem;">
     <div class="summary-card">
         <dt class="label">Sticky</dt>
@@ -24,81 +31,8 @@
     </div>
 </dl>
 
-{# ── Notes list ── #}
-{% if notes %}
-{% for note in notes %}
-<article class="dashboard-section note-card note-status-{{ note.status }}">
-    <div class="section-title-row" style="margin-bottom:0.5rem">
-        <div style="display:flex; align-items:center; gap:0.75rem">
-            <span class="health-badge note-badge-{{ note.status }}">
-                {% if note.status == "sticky" %}&#x1F4CC; Sticky
-                {% elif note.status == "todo" %}To Do
-                {% elif note.status == "doing" %}Doing
-                {% else %}Done{% endif %}
-            </span>
-            <strong>{{ note.name }}</strong>
-            {% if note.due_date and note.status != "sticky" %}
-            <span class="text-muted">due {{ note.due_date }}</span>
-            {% endif %}
-        </div>
-        <div style="display:flex;gap:0.5rem">
-            <button class="btn-small outline" onclick="toggleNoteEdit({{ note.id }})">Edit</button>
-            <form method="post" action="/pm-notes/{{ note.id }}/delete" style="display:inline">
-                <button type="button" class="btn-small btn-icon outline secondary"
-                        onclick="showConfirm('Delete this note?', this.form)"
-                        aria-label="Delete note">&#x2715;</button>
-            </form>
-        </div>
-    </div>
-
-    {% if note.description %}
-    <p class="risk-description" id="note-desc-{{ note.id }}">{{ note.description }}</p>
-    {% endif %}
-
-    {# Inline edit form (hidden by default) #}
-    <form id="note-edit-{{ note.id }}" method="post" action="/pm-notes/{{ note.id }}/update"
-          style="display:none; margin-top:0.75rem">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.5rem">
-            <label>
-                Name
-                <input type="text" name="name" value="{{ note.name }}" required>
-            </label>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem">
-                <label>
-                    Status
-                    <select name="status" onchange="toggleDueDate(this, 'edit-due-{{ note.id }}')">
-                        <option value="todo" {% if note.status=='todo' %}selected{% endif %}>To Do</option>
-                        <option value="doing" {% if note.status=='doing' %}selected{% endif %}>Doing</option>
-                        <option value="done" {% if note.status=='done' %}selected{% endif %}>Done</option>
-                        <option value="sticky" {% if note.status=='sticky' %}selected{% endif %}>Sticky</option>
-                    </select>
-                </label>
-                <label id="edit-due-{{ note.id }}" {% if note.status=='sticky' %}style="display:none"{% endif %}>
-                    Due Date
-                    <input type="date" name="due_date" value="{{ note.due_date or '' }}">
-                </label>
-            </div>
-        </div>
-        <label>
-            Description
-            <textarea name="description" rows="3">{{ note.description or '' }}</textarea>
-        </label>
-        <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
-            <button type="submit" class="btn-small">Save</button>
-            <button type="button" class="btn-small outline secondary" onclick="toggleNoteEdit({{ note.id }})">Cancel</button>
-        </div>
-    </form>
-</article>
-{% endfor %}
-{% else %}
-<article class="dashboard-section">
-    <p class="text-muted">No notes yet. Add one below.</p>
-</article>
-{% endif %}
-
-{# ── Add note form ── #}
-<article class="dashboard-section">
-    <h3>Add Note</h3>
+{# ── Add note panel (hidden by default) ── #}
+<div id="add-note-panel" class="add-requirement-section" style="display:none; margin-bottom:1.25rem;">
     <form method="post" action="/pm-notes/add">
         <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:1rem; margin-bottom:0.75rem">
             <label>
@@ -121,22 +55,262 @@
         </div>
         <label>
             Description
-            <textarea name="description" rows="3" placeholder="Optional details…"></textarea>
+            <input type="hidden" name="description" id="add-note-desc-hidden">
+            <div id="add-note-desc-editor" class="rich-editor-compact"></div>
         </label>
-        <button type="submit" class="btn-add" style="margin-top:0.5rem">+ Add Note</button>
+        <div style="display:flex; gap:0.75rem; align-items:center; margin-top:0.5rem">
+            <button type="submit" class="btn-add">+ Add Note</button>
+            <button type="button" id="cancel-add-note" class="btn-small outline secondary">Cancel</button>
+        </div>
     </form>
-</article>
+</div>
+
+{# ── Filter bar ── #}
+<form method="get" action="/pm-notes" class="risk-controls" id="note-controls">
+    <label class="risk-controls-field">
+        <span class="text-muted">Show:</span>
+        <select name="filter" onchange="document.getElementById('note-controls').submit()">
+            <option value="all" {% if filter_key == 'all' %}selected{% endif %}>All notes</option>
+            <option value="sticky" {% if filter_key == 'sticky' %}selected{% endif %}>Sticky only</option>
+            <option value="todo" {% if filter_key == 'todo' %}selected{% endif %}>To Do only</option>
+            <option value="doing" {% if filter_key == 'doing' %}selected{% endif %}>Doing only</option>
+            <option value="done" {% if filter_key == 'done' %}selected{% endif %}>Done only</option>
+        </select>
+    </label>
+</form>
+
+{# ── Note card grid ── #}
+{% if notes %}
+<div class="risk-card-grid">
+    {% for note in notes %}
+    <article class="risk-card note-card note-status-{{ note.status }}" data-note-id="{{ note.id }}">
+        <header class="risk-card-header">
+            <div class="risk-card-badges">
+                <span class="health-badge note-badge-{{ note.status }}">
+                    {% if note.status == "sticky" %}&#x1F4CC; Sticky
+                    {% elif note.status == "todo" %}To Do
+                    {% elif note.status == "doing" %}Doing
+                    {% else %}Done{% endif %}
+                </span>
+                {% if note.due_date and note.status != "sticky" %}
+                <span class="text-muted" style="font-size:0.75rem;">due {{ note.due_date }}</span>
+                {% endif %}
+            </div>
+            <h3 class="risk-card-title">
+                <button type="button" class="risk-card-title-btn" data-action="open-note-modal" data-note-id="{{ note.id }}">{{ note.name }}</button>
+            </h3>
+        </header>
+
+        {% if note.description %}
+        <div class="risk-card-description">{{ note.description | render_rich | safe }}</div>
+        {% endif %}
+
+        <div class="risk-card-inline-controls" style="justify-content:flex-end;">
+            <button type="button" class="btn-small outline" data-action="open-note-modal" data-note-id="{{ note.id }}">Edit</button>
+            <form method="post" action="/pm-notes/{{ note.id }}/delete" style="margin:0; display:inline;">
+                <button type="button" class="btn-small outline secondary"
+                        onclick="showConfirm('Delete this note?', this.form)"
+                        aria-label="Delete note">Delete</button>
+            </form>
+        </div>
+
+        {# Hidden payload for modal pre-fill #}
+        <script type="application/json" class="note-payload" data-note-id="{{ note.id }}">
+        {
+          "id": {{ note.id }},
+          "name": {{ note.name | tojson }},
+          "description": {{ (note.description or '') | tojson }},
+          "status": {{ note.status | tojson }},
+          "due_date": {{ (note.due_date or '') | tojson }}
+        }
+        </script>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">{% if filter_key != 'all' %}No notes match the current filter.{% else %}No notes yet. Add one above.{% endif %}</p>
+{% endif %}
+
+{# ── Edit modal ── #}
+<dialog id="note-edit-modal" class="risk-modal">
+    <article>
+        <header class="risk-modal-header">
+            <strong>Edit Note</strong>
+            <button type="button" class="risk-modal-close" aria-label="Close" onclick="closeNoteModal()">&times;</button>
+        </header>
+        <form id="note-edit-form" method="post">
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:0.75rem; margin-bottom:0.5rem">
+                <label>
+                    Name
+                    <input type="text" name="name" required>
+                </label>
+                <label>
+                    Status
+                    <select name="status" onchange="toggleDueDate(this, 'modal-due-label')">
+                        <option value="todo">To Do</option>
+                        <option value="doing">Doing</option>
+                        <option value="done">Done</option>
+                        <option value="sticky">Sticky</option>
+                    </select>
+                </label>
+                <label id="modal-due-label">
+                    Due Date
+                    <input type="date" name="due_date">
+                </label>
+            </div>
+            <label>
+                Description
+                <input type="hidden" name="description" id="modal-note-desc-hidden">
+                <div id="modal-note-desc-editor"></div>
+            </label>
+            <div class="risk-modal-actions">
+                <button type="button" id="note-modal-delete-btn" class="btn-small outline secondary risk-modal-delete">Delete Note</button>
+                <button type="button" class="btn-small outline secondary" onclick="closeNoteModal()">Cancel</button>
+                <button type="submit" class="btn-small">Save</button>
+            </div>
+        </form>
+    </article>
+</dialog>
+
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.js"></script>
 <script>
-function toggleNoteEdit(id) {
-    const form = document.getElementById('note-edit-' + id);
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-}
-function toggleDueDate(select, labelId) {
-    const label = document.getElementById(labelId);
-    if (label) label.style.display = select.value === 'sticky' ? 'none' : '';
-}
+(function() {
+    function toggleDueDate(select, labelId) {
+        const label = document.getElementById(labelId);
+        if (label) label.style.display = select.value === 'sticky' ? 'none' : '';
+    }
+    window.toggleDueDate = toggleDueDate;
+
+    // ── Quill helpers ──
+    const TOOLBAR = [
+        ['bold', 'italic'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ header: [2, 3, false] }],
+        ['clean'],
+    ];
+
+    function makeQuill(selector, placeholder) {
+        return new Quill(selector, {
+            theme: 'snow',
+            placeholder: placeholder || '',
+            modules: { toolbar: TOOLBAR },
+        });
+    }
+
+    function quillSet(quill, value) {
+        if (!value || !value.trim()) {
+            quill.setContents([]);
+        } else if (value.trim().startsWith('<')) {
+            quill.clipboard.dangerouslyPasteHTML(0, value);
+        } else {
+            quill.setText(value);
+        }
+    }
+
+    function quillGet(quill) {
+        const h = quill.root.innerHTML;
+        return (h === '<p><br></p>' || h === '') ? '' : h;
+    }
+
+    // ── Add-form Quill editor ──
+    const addNoteDescQuill = makeQuill('#add-note-desc-editor', 'Optional details…');
+    const addForm = document.querySelector('#add-note-panel form');
+    if (addForm) {
+        addForm.addEventListener('submit', () => {
+            document.getElementById('add-note-desc-hidden').value = quillGet(addNoteDescQuill);
+        });
+    }
+
+    // ── Toggle Add Note panel ──
+    const toggleBtn = document.getElementById('toggle-add-note');
+    const addPanel = document.getElementById('add-note-panel');
+    const cancelBtn = document.getElementById('cancel-add-note');
+    if (toggleBtn && addPanel) {
+        toggleBtn.addEventListener('click', () => {
+            const isOpen = addPanel.style.display !== 'none';
+            addPanel.style.display = isOpen ? 'none' : 'block';
+            toggleBtn.textContent = isOpen ? '+ Add Note' : '✕ Cancel';
+            toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+            if (!isOpen) addPanel.querySelector('input[name="name"]').focus();
+        });
+    }
+    if (cancelBtn && addPanel) {
+        cancelBtn.addEventListener('click', () => {
+            addPanel.style.display = 'none';
+            toggleBtn.textContent = '+ Add Note';
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    // ── Gather note payloads ──
+    const payloads = {};
+    document.querySelectorAll('.note-payload').forEach(el => {
+        try { payloads[el.dataset.noteId] = JSON.parse(el.textContent); } catch (e) {}
+    });
+
+    const modal = document.getElementById('note-edit-modal');
+    const form = document.getElementById('note-edit-form');
+    const deleteBtn = document.getElementById('note-modal-delete-btn');
+
+    // ── Modal Quill editor — lazily initialized on first open ──
+    let modalNoteDescQuill = null;
+
+    function ensureModalQuill() {
+        if (modalNoteDescQuill) return;
+        modalNoteDescQuill = makeQuill('#modal-note-desc-editor', 'Optional details…');
+    }
+
+    form.addEventListener('submit', () => {
+        if (modalNoteDescQuill) {
+            document.getElementById('modal-note-desc-hidden').value = quillGet(modalNoteDescQuill);
+        }
+    });
+
+    function openNoteModal(noteId) {
+        const n = payloads[noteId];
+        if (!n) return;
+        form.action = '/pm-notes/' + n.id + '/update';
+        form.elements['name'].value = n.name;
+        form.elements['status'].value = n.status;
+        form.elements['due_date'].value = n.due_date || '';
+        // Show/hide due date label based on status
+        const dueLabel = document.getElementById('modal-due-label');
+        if (dueLabel) dueLabel.style.display = n.status === 'sticky' ? 'none' : '';
+        deleteBtn.onclick = () => {
+            if (confirm('Delete note "' + n.name + '"?')) {
+                const f = document.createElement('form');
+                f.method = 'post';
+                f.action = '/pm-notes/' + n.id + '/delete';
+                document.body.appendChild(f);
+                f.submit();
+            }
+        };
+        // Show modal first so Quill can measure the container
+        if (modal.showModal) modal.showModal();
+        else modal.setAttribute('open', '');
+        ensureModalQuill();
+        quillSet(modalNoteDescQuill, n.description || '');
+    }
+
+    window.closeNoteModal = function() {
+        if (modal.close) modal.close();
+        else modal.removeAttribute('open');
+    };
+
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-action="open-note-modal"]');
+        if (trigger) {
+            e.preventDefault();
+            openNoteModal(trigger.dataset.noteId);
+        }
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeNoteModal();
+    });
+})();
 </script>
 {% endblock %}

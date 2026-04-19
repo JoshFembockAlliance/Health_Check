@@ -242,6 +242,9 @@ def test_add_and_delete_note(page: Page):
     """Can add a PM note and then delete it."""
     page.goto(f"{BASE}/pm-notes")
 
+    # Open the Add Note panel (hidden behind toggle by default)
+    page.locator("#toggle-add-note").click()
+
     page.locator("form[action='/pm-notes/add'] input[name='name']").fill("E2E Test Note")
     page.locator("form[action='/pm-notes/add'] button[type='submit']").click()
 
