@@ -965,19 +965,35 @@ dialog.confirm-dialog .dialog-actions {
     cursor: pointer;
 }
 
-/* Severity bands — left-border accent, subtle card tint */
+/* Severity bands — left-border accent only, neutral card background */
 .risk-card-severity-none { border-left-color: var(--pico-muted-border-color); }
-.risk-card-severity-low {
-    border-left-color: #c9a227;
-    background: rgba(201, 162, 39, 0.04);
+.risk-card-severity-low  { border-left-color: #c9a227; }
+.risk-card-severity-med  { border-left-color: #e65100; }
+.risk-card-severity-high { border-left-color: #b71c1c; }
+
+/* Budget impact bar: shows realised (red) vs at-risk (amber) portions */
+.risk-budget-bar {
+    height: 5px;
+    border-radius: 3px;
+    background: #e0e0e0;
+    overflow: hidden;
+    display: flex;
+    margin-top: 0.25rem;
 }
-.risk-card-severity-med {
-    border-left-color: #e65100;
-    background: rgba(230, 81, 0, 0.06);
+.risk-budget-bar-realised {
+    height: 100%;
+    background: #b71c1c;
+    min-width: 0;
 }
-.risk-card-severity-high {
-    border-left-color: #b71c1c;
-    background: rgba(183, 28, 28, 0.07);
+.risk-budget-bar-atrisk {
+    height: 100%;
+    background: #e65100;
+    min-width: 0;
+}
+.risk-budget-bar-avoided {
+    height: 100%;
+    background: #adb5bd;
+    min-width: 0;
 }
 
 .risk-card-header {
@@ -1201,6 +1217,13 @@ button.print-btn:hover {
 
 /* ── Print / PDF export styles ── */
 @media print {
+    /* Force browsers to render background colours and images so the PDF
+       looks like the live dashboard rather than a stripped-out white page. */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
     .no-print,
     nav,
     .skip-link,

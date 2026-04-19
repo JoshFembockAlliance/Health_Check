@@ -5,7 +5,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing Pages
 
 ### Dashboard 
-Export to PDF is never going to be printed so it does not need to use a blank background, make sure it looks similar to the dashboard itself and provides a representative export of the page. 
+* [x] Export to PDF is never going to be printed so it does not need to use a blank background, make sure it looks similar to the dashboard itself and provides a representative export of the page. 
 
 ### Features & Deliverables
 
