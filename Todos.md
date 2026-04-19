@@ -2,25 +2,23 @@
 
 This is a list of ToDos. Read through it, plan to address items, and tick items off as they are addressed. It's fine to plan all the items holistically or to draw reasonnable conceptual lines around related blocks of work before working through the blocks one at a time. For each block of items being picked up together, the plan can be implemented holistically without individual approval but create one code commit per item. If there are many items in the list that are unaddressed, then feel free to enhance the descriptions of these based on the planning in case there is only capacity for partial completion. That would allow future sessions to build on the thinking done initially. 
 
-## Enhancements to Existing Pages
+## Enhancements to Existing 
+* [ ] Using dummy data, update the Readme screenshots based on the new UI. 
+* [ ] Allow the user to set visual tweaks that are already accounted for in the style.css like the data accent or light/dark mode in project settings on a per-project basis. 
+* [ ] The regular page has had a visual overhaul but the PDF export is not very nice by comparison. Make the PDF export prettier.
 
 ### Features & Deliverables
 
 ### Risks & Notes UI changes
-* [x] The pop-up modal should be larger, particularly horizontally for risks and just in general for notes. The intent of having this kind of modal is to let the user see more details, after all. Id the text entry areas were very full then this would not be enough to displa them. Consider using 75% of the horizontal space available and 90% of the vertical. 
-* [x] Laptop screens are usually quite wide. For Risks, placing the description area beside the resultant work would allow both to be quite tall and show a lot of useful information at once. Of the two, 2/3 of the horizontal space should go to the description which will be larger and contain more text than the resultant work field. 
+
 
 ### Risks grid changes
-* [x] The risks have background colours that don't seem to add value. If the intent is to indicate the urgency of a given risk then perhaps having a more neutral background but instead adding a sort of progress indicator bar showing how much budget is at risk vs how much has become unrecoverable would work better.
 
 
 ## New Feature Items
 
 ### Rework to be based on Alliance Platform 2 - Very Low Priority, will consume lots of tokens 
 Alliance Platform 2 (https://github.com/AllianceSoftware/alliance-platform-py) provides a lot of tools and a uniform visual design. A redesign onto AP2 might provide more structure than our current flask-based setup.
-
-### Multiple Projects - Low Priority
-* [x] This application is currently set up to help a Project Manager track the health of one and only one project at a time. The ability to create more than one project and to swap between them would allow a PM to keep track of multiple projects at once. Each project would need a name and description and its financials and settings etc should be entirely separate from other projects. I expect this would break imports and exports as they currently exist, so those may need to be removed. **[Done 19/04/2026]** — Multi-project shipped alongside the visual overhaul. Every project-scoped page lives under `/p/{id}/…`; `/` is the cross-project dashboard stub. Data model gained `project_id` on roles, features, risks, pm_notes, budget_adjustments, capacity_periods, overheads (requirements/deliverables/risk_features inherit scope). Roles are fully per-project. Export/import now scoped to the active project with ID remapping.
 
 ### Mac App - Very, very Low Priority
 * [ ] Currently this is a web app, a desktop mac application dmg would be slightly more useful. Pyinstall may be able to achieve this with a wrapper. This one is high risk and low priority and probably shouldn't be picked up unless requested or there's an obvious benefit. Particularly if it would cause issues for the test suites. 

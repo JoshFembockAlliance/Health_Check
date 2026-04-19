@@ -2,7 +2,7 @@
    Renders the design from healthcheck-ui/HealthCheck UI.html using server-rendered
    Jinja markup (no React). Sidebar collapse state persists in localStorage. #}
 <!DOCTYPE html>
-<html lang="en" data-theme="light" data-density="balanced" data-accent="navy">
+<html lang="en" data-theme="light" data-density="balanced" data-accent="cyan">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,8 +15,6 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-<a href="#main" class="skip-link">Skip to main content</a>
-
 <div class="app" id="app-shell" data-sidebar="open">
 
     {# ── Sidebar ── #}
