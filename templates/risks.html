@@ -288,8 +288,9 @@
         return new Quill(selector, { theme: 'snow', placeholder: placeholder || '', modules: { toolbar: TOOLBAR } });
     }
     function quillSet(q, v) {
-        if (!v || !v.trim()) q.setContents([]);
-        else if (v.trim().startsWith('<')) q.clipboard.dangerouslyPasteHTML(0, v);
+        q.setContents([]);
+        if (!v || !v.trim()) return;
+        if (v.trim().startsWith('<')) q.clipboard.dangerouslyPasteHTML(v);
         else q.setText(v);
     }
     function quillGet(q) {
