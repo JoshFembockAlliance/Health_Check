@@ -13,7 +13,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ### Misc
 * [ ] Using dummy data, update the Readme screenshots based on the new UI. 
-* [ ] Update the application browser tab icon to pair with the shield and tick icon we're currently using at the top of the project sidenav bar.
+* [x] Update the application browser tab icon to pair with the shield and tick icon we're currently using at the top of the project sidenav bar.
 
 
 ## New Feature Items
