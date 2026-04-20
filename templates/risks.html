@@ -3,6 +3,10 @@
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<style>
+/* Ensure the add-risk description editor is tall enough to show its multi-line placeholder */
+#add-desc-editor .ql-editor { min-height: 120px; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -336,8 +340,8 @@
     let modalDescQuill = null, modalResultantQuill = null;
     function ensureModalQuills() {
         if (modalDescQuill) return;
-        modalDescQuill = makeQuill('#modal-desc-editor', '');
-        modalResultantQuill = makeQuill('#modal-resultant-editor', '');
+        modalDescQuill = makeQuill('#modal-desc-editor', 'Description, context, and impact notes…');
+        modalResultantQuill = makeQuill('#modal-resultant-editor', 'Work that flowed from this risk being realised…');
     }
 
     form.addEventListener('submit', () => {

@@ -9,7 +9,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Risks & Notes
 * [x] Clicking anywhere that isn't a field on a risk or note preview card should open its modal like clicking the title does
 * [ ] In the rich text editor, it seems like highlighting a section and clicking it bolds the text, which is annoying. Clicking the highlighted section again reverts it but using the actual bold button does not. Italics can be applied but they also seem like they are not toggling off as expected when the italics button is pressed a second time. The whole thing feels a little clunky. It needs a bit of investigation and some tests. 
-* [ ] In the create modal the default height of the text area for the description is too small to fit the placeholder text. In the edit modal the placeholder text does not appear even if the area is empty.
+* [x] In the create modal the default height of the text area for the description is too small to fit the placeholder text. In the edit modal the placeholder text does not appear even if the area is empty.
 
 ### Misc
 * [ ] Using dummy data, update the Readme screenshots based on the new UI. 
