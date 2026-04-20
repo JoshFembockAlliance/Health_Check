@@ -3,7 +3,6 @@
 This is a list of ToDos. Read through it, plan to address items, and tick items off as they are addressed. It's fine to plan all the items holistically or to draw reasonnable conceptual lines around related blocks of work before working through the blocks one at a time. For each block of items being picked up together, the plan can be implemented holistically without individual approval but create one code commit per item. If there are many items in the list that are unaddressed, then feel free to enhance the descriptions of these based on the planning in case there is only capacity for partial completion. That would allow future sessions to build on the thinking done initially. 
 
 ## Enhancements to Existing 
-* [ ] Using dummy data, update the Readme screenshots based on the new UI. 
 
 ### Features, Requirements & Deliverables
 
@@ -11,6 +10,9 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 * [ ] Clicking anywhere that isn't a field on a risk or note preview card should open its modal like clicking the title does
 * [ ] In the rich text editor, it seems like highlighting a section and clicking it bolds the text, which is annoying. Clicking the highlighted section again reverts it but using the actual bold button does not. Italics can be applied but they also seem like they are not toggling off as expected when the italics button is pressed a second time. The whole thing feels a little clunky. It needs a bit of investigation and some tests. 
 
+### Misc
+* [ ] Using dummy data, update the Readme screenshots based on the new UI. 
+* [ ] Update the application browser tab icon to pair with the shield and tick icon we're currently using at the top of the project sidenav bar.
 
 
 ## New Feature Items
