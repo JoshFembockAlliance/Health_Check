@@ -250,7 +250,7 @@ def shell_context(project_id: Optional[int]) -> dict:
 def cross_project_dashboard(request: Request):
     ctx = {"request": request, "active": "all", "active_page": "all_projects"}
     ctx.update(shell_context(None))
-    return templates.TemplateResponse("cross_project.html", ctx)
+    return templates.TemplateResponse(request, "cross_project.html", ctx)
 
 
 # ── Project CRUD ──
@@ -484,7 +484,7 @@ def dashboard(request: Request, project_id: int):
         "notes_overflow": notes_overflow,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("dashboard.html", ctx)
+    return templates.TemplateResponse(request, "dashboard.html", ctx)
 
 
 # ── Settings ──
@@ -509,7 +509,7 @@ def settings_page(request: Request, project_id: int):
         "overheads": overheads,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("settings.html", ctx)
+    return templates.TemplateResponse(request, "settings.html", ctx)
 
 
 @app.post("/p/{project_id}/settings/project")
@@ -658,7 +658,7 @@ def features_list(request: Request, project_id: int):
         "project": project,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("features.html", ctx)
+    return templates.TemplateResponse(request, "features.html", ctx)
 
 
 @app.post("/p/{project_id}/features/{feature_id}/toggle-started")
@@ -728,7 +728,7 @@ def feature_detail(request: Request, project_id: int, feature_id: int):
         "roles": roles,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("feature_detail.html", ctx)
+    return templates.TemplateResponse(request, "feature_detail.html", ctx)
 
 
 # ── Requirements ──
@@ -968,7 +968,7 @@ def risks_page(request: Request, project_id: int, sort: str = "status", filter: 
         "filter_key": filter,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("risks.html", ctx)
+    return templates.TemplateResponse(request, "risks.html", ctx)
 
 
 def _clamp_pct(value: float) -> float:
@@ -1121,7 +1121,7 @@ def pm_notes_page(request: Request, project_id: int, filter: str = "all"):
         "filter_key": filter,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("pm_notes.html", ctx)
+    return templates.TemplateResponse(request, "pm_notes.html", ctx)
 
 
 @app.post("/p/{project_id}/pm-notes/add")
@@ -1217,7 +1217,7 @@ def capacity_page(request: Request, project_id: int):
         "weeks": weeks,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse("capacity.html", ctx)
+    return templates.TemplateResponse(request, "capacity.html", ctx)
 
 
 @app.post("/p/{project_id}/capacity/add")

@@ -173,6 +173,155 @@ def test_risk_modal_opens_with_prefilled_data(page: Page):
         }}""")
 
 
+def _delete_risk_by_name(page, name: str):
+    """Helper: delete all risk cards with the given name via direct form submit."""
+    while page.locator(".risk-card .title", has_text=name).count() > 0:
+        card = page.locator(".risk-card", has=page.locator(".title", has_text=name)).last
+        risk_id = card.get_attribute("data-risk-id")
+        with page.expect_navigation():
+            page.evaluate(f"""() => {{
+                const f = document.createElement('form');
+                f.method = 'post';
+                f.action = '/p/1/risks/{risk_id}/delete';
+                document.body.appendChild(f);
+                f.submit();
+            }}""")
+
+
+def _open_risk_modal(page, name: str):
+    """Helper: open the edit modal for the first card matching name."""
+    page.locator(".risk-card .title button", has_text=name).first.click()
+    modal = page.locator("#risk-edit-modal")
+    expect(modal).to_be_visible()
+    return modal
+
+
+def _quill_set_text(page, container_selector: str, text: str):
+    """Helper: set plain text in a Quill 2 editor and select all of it."""
+    page.evaluate(f"""() => {{
+        const el = document.querySelector('{container_selector}');
+        const q = Quill.find(el);
+        q.setContents([{{insert: '{text}'}}]);
+        q.setSelection(0, {len(text)});
+    }}""")
+
+
+def _quill_inner_html(page, container_selector: str) -> str:
+    return page.evaluate(f"""() => {{
+        const el = document.querySelector('{container_selector}');
+        return Quill.find(el).root.innerHTML;
+    }}""")
+
+
+def test_risk_editor_bold_toggle(page: Page):
+    """Bold toolbar button applies bold and then removes it on a second click."""
+    page.goto(f"{P1}/risks")
+    page.locator("#toggle-add-risk").click()
+    page.locator("form[action='/p/1/risks/add'] input[name='name']").fill("E2E Bold Toggle")
+    page.locator("form[action='/p/1/risks/add'] button[type='submit']").click()
+    expect(page.locator(".risk-card .title", has_text="E2E Bold Toggle").first).to_be_visible()
+
+    modal = _open_risk_modal(page, "E2E Bold Toggle")
+    _quill_set_text(page, "#modal-desc-editor", "hello world")
+
+    modal.locator(".ql-bold").click()
+    html_after_bold = _quill_inner_html(page, "#modal-desc-editor")
+    assert "<strong>" in html_after_bold, f"Expected bold after first click, got: {html_after_bold}"
+
+    # Re-select (clicking toolbar deselects in some browsers)
+    page.evaluate("""() => {
+        const q = Quill.find(document.querySelector('#modal-desc-editor'));
+        q.setSelection(0, q.getLength() - 1);
+    }""")
+    modal.locator(".ql-bold").click()
+    html_after_unbold = _quill_inner_html(page, "#modal-desc-editor")
+    assert "<strong>" not in html_after_unbold, f"Expected no bold after toggle off, got: {html_after_unbold}"
+
+    page.evaluate("document.getElementById('risk-edit-modal').close()")
+    _delete_risk_by_name(page, "E2E Bold Toggle")
+
+
+def test_risk_editor_italic_toggle(page: Page):
+    """Italic toolbar button applies italic and then removes it on a second click."""
+    page.goto(f"{P1}/risks")
+    page.locator("#toggle-add-risk").click()
+    page.locator("form[action='/p/1/risks/add'] input[name='name']").fill("E2E Italic Toggle")
+    page.locator("form[action='/p/1/risks/add'] button[type='submit']").click()
+    expect(page.locator(".risk-card .title", has_text="E2E Italic Toggle").first).to_be_visible()
+
+    modal = _open_risk_modal(page, "E2E Italic Toggle")
+    _quill_set_text(page, "#modal-desc-editor", "hello world")
+
+    modal.locator(".ql-italic").click()
+    html_after_italic = _quill_inner_html(page, "#modal-desc-editor")
+    assert "<em>" in html_after_italic, f"Expected italic after first click, got: {html_after_italic}"
+
+    page.evaluate("""() => {
+        const q = Quill.find(document.querySelector('#modal-desc-editor'));
+        q.setSelection(0, q.getLength() - 1);
+    }""")
+    modal.locator(".ql-italic").click()
+    html_after_unitalic = _quill_inner_html(page, "#modal-desc-editor")
+    assert "<em>" not in html_after_unitalic, f"Expected no italic after toggle off, got: {html_after_unitalic}"
+
+    page.evaluate("document.getElementById('risk-edit-modal').close()")
+    _delete_risk_by_name(page, "E2E Italic Toggle")
+
+
+def test_risk_editor_click_selection_does_not_format(page: Page):
+    """Clicking within a text selection in the editor does not apply any formatting."""
+    page.goto(f"{P1}/risks")
+    page.locator("#toggle-add-risk").click()
+    page.locator("form[action='/p/1/risks/add'] input[name='name']").fill("E2E Click Selection")
+    page.locator("form[action='/p/1/risks/add'] button[type='submit']").click()
+    expect(page.locator(".risk-card .title", has_text="E2E Click Selection").first).to_be_visible()
+
+    modal = _open_risk_modal(page, "E2E Click Selection")
+    _quill_set_text(page, "#modal-desc-editor", "hello world")
+
+    # Click in the middle of the editor (within the selection) — must not bold
+    modal.locator("#modal-desc-editor .ql-editor").click(position={"x": 30, "y": 10})
+    html = _quill_inner_html(page, "#modal-desc-editor")
+    assert "<strong>" not in html, f"Clicking selection should not bold text, got: {html}"
+    assert "<em>" not in html, f"Clicking selection should not italicise text, got: {html}"
+
+    page.evaluate("document.getElementById('risk-edit-modal').close()")
+    _delete_risk_by_name(page, "E2E Click Selection")
+
+
+def test_risk_editor_no_content_bleed_between_modals(page: Page):
+    """Opening a second risk's modal does not carry over the first risk's description."""
+    page.goto(f"{P1}/risks")
+    page.locator("#toggle-add-risk").click()
+    form = page.locator("form[action='/p/1/risks/add']")
+    form.locator("input[name='name']").fill("E2E Bleed Risk A")
+    form.locator("button[type='submit']").click()
+    expect(page.locator(".risk-card .title", has_text="E2E Bleed Risk A").first).to_be_visible()
+
+    page.locator("#toggle-add-risk").click()
+    form = page.locator("form[action='/p/1/risks/add']")
+    form.locator("input[name='name']").fill("E2E Bleed Risk B")
+    form.locator("button[type='submit']").click()
+    expect(page.locator(".risk-card .title", has_text="E2E Bleed Risk B").first).to_be_visible()
+
+    # Open A and set description text via Quill API
+    modal = _open_risk_modal(page, "E2E Bleed Risk A")
+    page.evaluate("""() => {
+        const q = Quill.find(document.querySelector('#modal-desc-editor'));
+        q.setContents([{insert: 'Risk A description'}]);
+    }""")
+    page.evaluate("document.getElementById('risk-edit-modal').close()")
+
+    # Open B — description must be empty, not contaminated with A's text
+    modal = _open_risk_modal(page, "E2E Bleed Risk B")
+    html = _quill_inner_html(page, "#modal-desc-editor")
+    assert "Risk A description" not in html, f"Content bled from Risk A into Risk B: {html}"
+
+    page.evaluate("document.getElementById('risk-edit-modal').close()")
+    _delete_risk_by_name(page, "E2E Bleed Risk A")
+    _delete_risk_by_name(page, "E2E Bleed Risk B")
+
+
 def test_risks_sort_by_impact(page: Page):
     """Sort=impact returns the card grid in high-to-low order."""
     page.goto(f"{P1}/risks?sort=impact")

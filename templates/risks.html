@@ -2,7 +2,7 @@
 {% block title %}Risks · {{ project.name }}{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 <style>
 /* Ensure the add-risk description editor is tall enough to show its multi-line placeholder */
 #add-desc-editor .ql-editor { min-height: 120px; }
@@ -44,14 +44,14 @@
             </label>
         </div>
         <div class="field-grid" style="grid-template-columns: 2fr 1fr; margin-top:14px;">
-            <label class="field">Description <span class="muted tiny">(optional detail)</span>
+            <div class="field">Description <span class="muted tiny">(optional detail)</span>
                 <input type="hidden" name="description" id="add-desc-hidden">
                 <div id="add-desc-editor"></div>
-            </label>
-            <label class="field">Resultant Work <span class="muted tiny">(work that flowed from realised impact)</span>
+            </div>
+            <div class="field">Resultant Work <span class="muted tiny">(work that flowed from realised impact)</span>
                 <input type="hidden" name="resultant_work" id="add-resultant-hidden">
                 <div id="add-resultant-editor"></div>
-            </label>
+            </div>
         </div>
         <div class="field-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:14px;">
             <label class="field">Status
@@ -220,14 +220,14 @@
                 <input type="text" name="name" required>
             </label>
             <div class="field-grid" style="grid-template-columns: 2fr 1fr; margin-top:14px;">
-                <label class="field">Description
+                <div class="field">Description
                     <input type="hidden" name="description" id="modal-desc-hidden">
                     <div id="modal-desc-editor"></div>
-                </label>
-                <label class="field">Resultant Work
+                </div>
+                <div class="field">Resultant Work
                     <input type="hidden" name="resultant_work" id="modal-resultant-hidden">
                     <div id="modal-resultant-editor"></div>
-                </label>
+                </div>
             </div>
             <div class="field-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:14px;">
                 <label class="field">Status
@@ -278,7 +278,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 <script>
 (function() {
     const PID = {{ project.id }};

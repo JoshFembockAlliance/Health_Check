@@ -2,7 +2,7 @@
 {% block title %}PM Notes · {{ project.name }}{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -47,10 +47,10 @@
                 <input type="date" name="due_date">
             </label>
         </div>
-        <label class="field" style="margin-top:14px;">Description
+        <div class="field" style="margin-top:14px;">Description
             <input type="hidden" name="description" id="add-note-desc-hidden">
             <div id="add-note-desc-editor"></div>
-        </label>
+        </div>
         <div style="display:flex; gap:8px; margin-top:14px;">
             <button type="submit" class="btn btn-primary">+ Add note</button>
             <button type="button" class="btn" id="cancel-add-note">Cancel</button>
@@ -128,10 +128,10 @@
                     <input type="date" name="due_date">
                 </label>
             </div>
-            <label class="field" style="margin-top:14px;">Description
+            <div class="field" style="margin-top:14px;">Description
                 <input type="hidden" name="description" id="modal-note-desc-hidden">
                 <div id="modal-note-desc-editor"></div>
-            </label>
+            </div>
             <div style="display:flex; gap:8px; margin-top:18px;">
                 <button type="submit" class="btn btn-primary">Save</button>
                 <button type="button" class="btn" onclick="closeNoteModal()">Cancel</button>
@@ -144,7 +144,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 <script>
 (function() {
     const PID = {{ project.id }};
@@ -157,8 +157,9 @@
     const TOOLBAR = [['bold','italic'], [{list:'ordered'},{list:'bullet'}], [{header:[2,3,false]}], ['clean']];
     function makeQuill(sel, ph) { return new Quill(sel, {theme:'snow', placeholder:ph||'', modules:{toolbar:TOOLBAR}}); }
     function quillSet(q, v) {
-        if (!v || !v.trim()) q.setContents([]);
-        else if (v.trim().startsWith('<')) q.clipboard.dangerouslyPasteHTML(0, v);
+        q.setContents([]);
+        if (!v || !v.trim()) return;
+        if (v.trim().startsWith('<')) q.clipboard.dangerouslyPasteHTML(v);
         else q.setText(v);
     }
     function quillGet(q) {
