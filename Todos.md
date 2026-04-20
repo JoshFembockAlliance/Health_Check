@@ -4,21 +4,38 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ## Enhancements to Existing 
 * [ ] Using dummy data, update the Readme screenshots based on the new UI. 
-* [x] Allow the user to set visual tweaks that are already accounted for in the style.css like the data accent or light/dark mode in project settings on a per-project basis. 
-* [x] The regular page has had a visual overhaul but the PDF export is not very nice by comparison. Make the PDF export prettier.
 
-### Features & Deliverables
+### Features, Requirements & Deliverables
 
-### Risks & Notes UI changes
+### Risks & Notes
+* [ ] Clicking anywhere that isn't a field on a risk or note preview card should open its modal like clicking the title does
+* [ ] In the rich text editor, it seems like highlighting a section and clicking it bolds the text, which is annoying. Clicking the highlighted section again reverts it but using the actual bold button does not. Italics can be applied but they also seem like they are not toggling off as expected when the italics button is pressed a second time. The whole thing feels a little clunky. It needs a bit of investigation and some tests. 
 
-
-### Risks grid changes
 
 
 ## New Feature Items
 
+### Inter-Dashboard A single card per project designed to show what matters at a glance - High Priority
+* [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. 
+
+
+### Distinct Project Types - Medium Priority
+* [ ] Every project has to strike a balance betwen Scope, Price, and Timeline. There are different types of project that a Project Manager might be working on to optimise for one or more of these, typically one must be left flexible or the project can't maneuver when issues arise. Plan and add one of the following that has not been implemented and then check it off. 
+Not all project types should to be added at once, in fact initially I'd like to add Fixed Price and see how this changes platform architecture.
+- Agile Feature Development: (Scope Very Slightly Flexible, Timeline Slightly Flexible, Budget Flexible) This is what we've been working on so far, primarily this a PM engaing with this kind of project wants to answer the question "Have I been getting a return roughly equal to my spend in an ongoing fashion. This kind of project tracks delivery against budget and risks.
+- Fixed Price with Milestones: (Budget inflexible, Scope inflexible, Timeline Flexible ) This kind of project has Milestones that unlock payments which increase the effective budget. Multiple features or even deliverables may contribute toward those milestones. Answers the question "Am I on track to have a return better than my investment overall and/o relative to each milestone."
+- Limited Scope SaaS Devekopment: (Budget Inflexible, Timeline slightly flexible, Scope Flexible) Budget infusions are assumed to be unlocked over time (eg every X weeks, increases by $Y), items chosen for development are typically those lower in size than current margin between spent and unlocked budget. Risks are not an issue for these, instead a manager needs to know which deliverables are financially viable at a given time and to be able to add them to a queue, removing their cost from the current accessible margin by basically adding it to what has been spent (and the opposite if removed)
+- [*] Agile Feature Development
+- [ ] Fixed Price with Milestones
+- [ ] Limited Scope SaaS Development
+
+
+
 ### Rework to be based on Alliance Platform 2 - Very Low Priority, will consume lots of tokens 
 Alliance Platform 2 (https://github.com/AllianceSoftware/alliance-platform-py) provides a lot of tools and a uniform visual design. A redesign onto AP2 might provide more structure than our current flask-based setup.
+
+### Single sign-on - Very Low priority, do not  pick up before lliance Platform 2 rework
+Support for integration with various SSO to allow for multiple users each with their own projects in a single organisation.
 
 ### Mac App - Very, very Low Priority
 * [ ] Currently this is a web app, a desktop mac application dmg would be slightly more useful. Pyinstall may be able to achieve this with a wrapper. This one is high risk and low priority and probably shouldn't be picked up unless requested or there's an obvious benefit. Particularly if it would cause issues for the test suites. 
