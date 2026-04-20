@@ -714,15 +714,16 @@ input:focus, select:focus, textarea:focus {
   padding: 12px 14px;
   display: flex; flex-direction: column; gap: 8px;
   box-shadow: var(--shadow-md);
+  cursor: pointer;
 }
 .risk-card .head { display: flex; justify-content: space-between; align-items: center; }
 .risk-card .title { font-weight: 600; color: var(--text-strong); font-size: 13.5px; line-height: 1.35; }
 .risk-card .desc { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .risk-card .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
 .risk-card .meta li strong { color: var(--text-strong); font-weight: 600; }
-.risk-card .linked { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 11px; }
+.risk-card .linked { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 11px; cursor: default; }
 .risk-card .linked .lbl { font-size: 10.5px; font-weight: 500; }
-.risk-card .footer { display: flex; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--border); margin-top: 4px; }
+.risk-card .footer { display: flex; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--border); margin-top: 4px; cursor: default; }
 .risk-card.sev-high { border-left-color: var(--bad); }
 .risk-card.sev-med  { border-left-color: var(--warn); }
 .risk-card.sev-low  { border-left-color: var(--info); }

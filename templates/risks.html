@@ -379,6 +379,10 @@
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-modal"]');
         if (trigger) { e.preventDefault(); openModal(trigger.dataset.riskId); return; }
+        const card = e.target.closest('.risk-card[data-risk-id]');
+        if (card && !e.target.closest('button, input, select, a, form')) {
+            openModal(card.dataset.riskId);
+        }
     });
 
     modal.addEventListener('click', (e) => { if (e.target === modal) closeRiskModal(); });

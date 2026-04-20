@@ -240,7 +240,11 @@
 
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-note-modal"]');
-        if (trigger) { e.preventDefault(); openNoteModal(trigger.dataset.noteId); }
+        if (trigger) { e.preventDefault(); openNoteModal(trigger.dataset.noteId); return; }
+        const card = e.target.closest('.note-card[data-note-id]');
+        if (card && !e.target.closest('button, input, select, a, form')) {
+            openNoteModal(card.dataset.noteId);
+        }
     });
 
     modal.addEventListener('click', (e) => { if (e.target === modal) closeNoteModal(); });
