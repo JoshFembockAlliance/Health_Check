@@ -4,19 +4,21 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ## Enhancements to Existing 
 
+### Settings
+* [ ] Add some more accent colour themes and let the user toggle dark theme on or off in the project settings. 
+
 ### Features, Requirements & Deliverables
 
 ### Risks & Notes
-* [x] Clicking anywhere that isn't a field on a risk or note preview card should open its modal like clicking the title does
-* [ ] In the rich text editor, it seems like highlighting a section and clicking it bolds the text, which is annoying. Clicking the highlighted section again reverts it but using the actual bold button does not. Italics can be applied but they also seem like they are not toggling off as expected when the italics button is pressed a second time. The whole thing feels a little clunky. It needs a bit of investigation and some tests. 
-* [x] In the create modal the default height of the text area for the description is too small to fit the placeholder text. In the edit modal the placeholder text does not appear even if the area is empty.
 
 ### Misc
 * [ ] Using dummy data, update the Readme screenshots based on the new UI. 
-* [x] Update the application browser tab icon to pair with the shield and tick icon we're currently using at the top of the project sidenav bar.
 
 
 ## New Feature Items
+
+### Decision Register - Medium Priority
+A bit like a Note but without a due date. Decisions are there to keep track of important pivots or new limitations that can be reviewed later. An example may be "MVP will not include SSO".
 
 ### Inter-Dashboard A single card per project designed to show what matters at a glance - High Priority
 * [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. 
