@@ -5,14 +5,12 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-* [x] Add some more accent colour themes and let the user toggle dark theme on or off in the project settings. 
 
 ### Features, Requirements & Deliverables
 
 ### Risks & Notes
 
 ### Misc
-* [x] Using dummy data, update the Readme screenshots based on the new UI. 
 
 
 ## New Feature Items
@@ -40,10 +38,15 @@ A bit like a Note but without a due date. Decisions are there to keep track of i
 **Open questions:**
 
 - **Card layout**: Should each project get a full `.hero-grid` trio (3 sub-cards side by side, same as the dashboard), or a single compact "summary card" that shows all three metrics in a condensed layout? The full grid looks great for 2–3 projects but becomes unwieldy at 6+. A compact card (one per project, key numbers in a mini stat row) scales better.
-- **What to show from card 3**: Budget Days Remaining depends on `team_size × default_day_rate`. If a project has no capacity periods set yet the "days remaining" figure is still meaningful; if it has no default role the number is zero/undefined. Decide whether to show a fallback label or hide that metric when no role is configured.
+  - Card Layout Answer: Each Project should get one larger card. There will be fewer projects so having a single larger item each will fit. 
+- **What to show from card 3**: Budget Days Remaining depends on `team_size × default_day_rate`. If a project has no capacity periods set yet the "days remaining" figure is still meaningful; if it has no default role the number is zero/undefined. Decide whether to show a fallback label or hide that metric when no role is configured. 
+  - For all items where a metric does not have enough information to be calculated, it makes sense to simply not show it. The alternative would be making it mandatory which I'd rather not do just yet as different kinds of projects may have a different unit of measure for burndown than a day rate (like maybe hours, or a burn-up for a future SaaS project type). 
 - **Health status colour**: The sidebar already shows a status dot (green/amber/grey) per project. Should the inter-dashboard card also reflect a health status (on-track / at-risk / behind) via a coloured border or badge, derived from `health_on_track_pct` / `health_at_risk_pct` thresholds? That would require computing the same logic as the per-project dashboard's feature health summary.
+  - No
 - **Performance guard**: For large project counts, consider whether to lazily skip the expensive `build_feature_data` call and show a "no data yet" state for projects with zero features, rather than paying the DB cost for empty projects.
+  - Yes
 - **Empty state for the route**: The current "All Projects" page doubles as the inter-dashboard. Should it keep the current table at all (useful for quick name/description scan), or fully replace it with the card grid?
+  - Replace it
 
 
 ### Distinct Project Types - Medium Priority
