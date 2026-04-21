@@ -285,7 +285,9 @@
     const TOOLBAR = [['bold', 'italic'], [{list: 'ordered'}, {list: 'bullet'}], [{header: [2, 3, false]}], ['clean']];
 
     function makeQuill(selector, placeholder) {
-        return new Quill(selector, { theme: 'snow', placeholder: placeholder || '', modules: { toolbar: TOOLBAR } });
+        const q = new Quill(selector, { theme: 'snow', placeholder: placeholder || '', modules: { toolbar: TOOLBAR } });
+        q.getModule('toolbar').container.addEventListener('mousedown', e => e.preventDefault());
+        return q;
     }
     function quillSet(q, v) {
         q.setContents([]);

@@ -155,7 +155,11 @@
     window.toggleDueDate = toggleDueDate;
 
     const TOOLBAR = [['bold','italic'], [{list:'ordered'},{list:'bullet'}], [{header:[2,3,false]}], ['clean']];
-    function makeQuill(sel, ph) { return new Quill(sel, {theme:'snow', placeholder:ph||'', modules:{toolbar:TOOLBAR}}); }
+    function makeQuill(sel, ph) {
+        const q = new Quill(sel, {theme:'snow', placeholder:ph||'', modules:{toolbar:TOOLBAR}});
+        q.getModule('toolbar').container.addEventListener('mousedown', e => e.preventDefault());
+        return q;
+    }
     function quillSet(q, v) {
         q.setContents([]);
         if (!v || !v.trim()) return;
