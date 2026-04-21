@@ -136,21 +136,20 @@ def build_feature_data(project_id: int, feature_id: Optional[int] = None):
     roles = _roles_as_dicts(project_id)
     default_role_rate = get_role_rate(project["default_role_id"], roles, 0)
 
+    sel = "SELECT id, name, sort_order, started FROM features"
     if feature_id:
         features_rows = list(db.execute(
-            "SELECT * FROM features WHERE id = ? AND project_id = ?",
+            f"{sel} WHERE id = ? AND project_id = ?",
             [feature_id, project_id],
         ).fetchall())
     else:
         features_rows = list(db.execute(
-            "SELECT * FROM features WHERE project_id = ? ORDER BY sort_order, id",
+            f"{sel} WHERE project_id = ? ORDER BY sort_order, id",
             [project_id],
         ).fetchall())
 
-    # features table columns after migration: id, name, sort_order, started, project_id
     enriched_features = []
     for f in features_rows:
-        # sqlite3 Row from raw SELECT * — positional access
         fdict = {"id": f[0], "name": f[1], "sort_order": f[2], "started": f[3] if len(f) > 3 else 0}
         reqs = list(db.execute(
             "SELECT * FROM requirements WHERE feature_id = ? ORDER BY sort_order, id", [fdict["id"]]
