@@ -103,6 +103,22 @@
   --primary: oklch(62% 0.17 30); --primary-hover: oklch(55% 0.19 30);
   --primary-soft: oklch(96% 0.04 30); --primary-border: oklch(84% 0.1 30);
 }
+[data-accent="teal"] {
+  --primary: oklch(48% 0.14 185); --primary-hover: oklch(42% 0.15 185);
+  --primary-soft: oklch(95% 0.04 185); --primary-border: oklch(80% 0.09 185);
+}
+[data-accent="lime"] {
+  --primary: oklch(50% 0.16 120); --primary-hover: oklch(44% 0.17 120);
+  --primary-soft: oklch(96% 0.05 120); --primary-border: oklch(82% 0.1 120);
+}
+[data-accent="ocean"] {
+  --primary: oklch(44% 0.17 250); --primary-hover: oklch(37% 0.18 250);
+  --primary-soft: oklch(95% 0.04 250); --primary-border: oklch(80% 0.1 250);
+}
+[data-accent="wine"] {
+  --primary: oklch(38% 0.16 350); --primary-hover: oklch(32% 0.17 350);
+  --primary-soft: oklch(95% 0.03 350); --primary-border: oklch(80% 0.09 350);
+}
 
 /* dark — more pronounced elevation steps */
 [data-theme="dark"] {
@@ -827,6 +843,13 @@ input:focus, select:focus, textarea:focus {
   cursor: pointer;
 }
 .tweaks-swatch.active { border-color: var(--text-strong); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
+
+/* theme segmented control */
+.theme-picker { display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; width: fit-content; }
+.theme-opt { cursor: pointer; padding: 6px 16px; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: background 0.15s, color 0.15s; background: var(--surface-alt); color: var(--text); }
+.theme-opt:not(:last-child) { border-right: 1.5px solid var(--border); }
+.theme-opt input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.theme-opt.active { background: var(--primary); color: #fff; }
 
 /* ===================== PRINT ===================== */
 

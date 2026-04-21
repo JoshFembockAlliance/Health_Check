@@ -5,7 +5,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-* [ ] Add some more accent colour themes and let the user toggle dark theme on or off in the project settings. 
+* [x] Add some more accent colour themes and let the user toggle dark theme on or off in the project settings. 
 
 ### Features, Requirements & Deliverables
 

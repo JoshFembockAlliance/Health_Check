@@ -538,7 +538,7 @@ def update_project(
     return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
-VALID_ACCENTS = {"cyan","indigo","emerald","mono","violet","rose","amber","forest","plum","slate","coral"}
+VALID_ACCENTS = {"cyan","indigo","emerald","mono","violet","rose","amber","forest","plum","slate","coral","teal","lime","ocean","wine"}
 VALID_THEMES = {"light", "dark"}
 
 @app.post("/p/{project_id}/settings/visual")

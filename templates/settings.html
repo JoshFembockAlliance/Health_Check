@@ -65,6 +65,10 @@
             ('slate',   'oklch(40% 0.04 240)'),
             ('coral',   'oklch(62% 0.17 30)'),
             ('mono',    'oklch(22% 0.01 260)'),
+            ('teal',    'oklch(48% 0.14 185)'),
+            ('lime',    'oklch(50% 0.16 120)'),
+            ('ocean',   'oklch(44% 0.17 250)'),
+            ('wine',    'oklch(38% 0.16 350)'),
         ] %}
         <div class="card" id="visual">
             <div class="card-head"><h3>Visual</h3></div>
@@ -79,7 +83,7 @@
                                 <input type="radio" name="accent" value="{{ name }}" {% if project.accent == name or (not project.accent and name == 'cyan') %}checked{% endif %} style="position:absolute; opacity:0; width:0; height:0;">
                                 <span class="tweaks-swatch {% if project.accent == name or (not project.accent and name == 'cyan') %}active{% endif %}"
                                       style="background:{{ color }}; width:28px; height:28px; border-radius:50%; display:block; border:2px solid transparent; transition:border-color 0.15s; cursor:pointer;"
-                                      onclick="this.previousElementSibling.checked=true; document.querySelectorAll('.accent-swatch').forEach(s=>s.classList.remove('active')); this.classList.add('active');"
+                                      onclick="this.previousElementSibling.checked=true; document.querySelectorAll('.tweaks-swatch').forEach(s=>s.classList.remove('active')); this.classList.add('active');"
                                       title="{{ name }}"></span>
                                 <span class="tiny muted" style="font-size:10px; text-transform:capitalize;">{{ name }}</span>
                             </label>
@@ -88,14 +92,14 @@
                     </div>
                     <div>
                         <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:8px;">Theme</div>
-                        <div style="display:flex; gap:8px;">
-                            <label class="field" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                        <div class="theme-picker" id="themePicker">
+                            <label class="theme-opt {% if not project.theme or project.theme == 'light' %}active{% endif %}" onclick="document.querySelectorAll('#themePicker .theme-opt').forEach(l=>l.classList.remove('active')); this.classList.add('active'); this.querySelector('input').checked=true;">
                                 <input type="radio" name="theme" value="light" {% if not project.theme or project.theme == 'light' %}checked{% endif %}>
-                                <span>Light</span>
+                                ☀ Light
                             </label>
-                            <label class="field" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                            <label class="theme-opt {% if project.theme == 'dark' %}active{% endif %}" onclick="document.querySelectorAll('#themePicker .theme-opt').forEach(l=>l.classList.remove('active')); this.classList.add('active'); this.querySelector('input').checked=true;">
                                 <input type="radio" name="theme" value="dark" {% if project.theme == 'dark' %}checked{% endif %}>
-                                <span>Dark</span>
+                                ☾ Dark
                             </label>
                         </div>
                     </div>
