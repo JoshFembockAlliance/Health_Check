@@ -23,6 +23,28 @@ A bit like a Note but without a due date. Decisions are there to keep track of i
 ### Inter-Dashboard A single card per project designed to show what matters at a glance - High Priority
 * [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. 
 
+#### Planning Activity
+
+**What we know:**
+
+- The cross-project landing page route is `cross_project_dashboard()` at `main.py:248`. It currently returns a placeholder template (`templates/cross_project.html`) that shows a simple table of projects with a "coming soon" note.
+- The three hero cards on the per-project dashboard (`templates/dashboard.html:41–96`) show: (1) **Net Accessible Budget** (`s.accessible_budget` = `current_budget − overhead_dollars − realised_risk_dollars`), (2) **Overall Completion** (`s.overall_completion` as a weighted % across features), and (3) **Full-Team Budget Days Remaining** (`s.budget_days_remaining` = accessible budget minus spend divided by daily burn).
+- All metrics for those cards come from `project_summary()` in `calculations.py:112–202`, which takes a project dict, enriched features list, adjustments list, and a default day rate. This function already exists and is stable — we just need to call it per-project in the cross-project route.
+- To feed `project_summary()` we need, for each project: the enriched feature list (call `build_feature_data(project_id)` in `main.py:133`), budget adjustments, overheads total, and a risk summary (sums of `effective_impact_days()` / `unrealised_exposure_days()` from `calculations.py:205–226`). The dashboard route at `main.py:313–486` already does all of this — the cross-project route just needs to loop it.
+- The CSS for hero cards already exists: `.hero-grid` (3-column grid, `style.css:446`) and `.hero-card` (card style, `style.css:456`). These classes can be reused directly.
+- `shell_context(None)` (called in the current route at `main.py:217`) already returns `projects_list` — a list of all projects with name, completion %, and status. This gives us the project IDs to iterate over.
+- The `_project_shell_meta()` function (`main.py:199`) shows the existing pattern for computing a compact per-project summary; the inter-dashboard card is a richer version of that.
+- Implementation steps that are clear: (1) in `cross_project_dashboard()`, loop over all projects, call `build_feature_data` + `project_summary` + risk sums for each, build a `projects_with_metrics` list of dicts; (2) pass it to the template; (3) in `cross_project.html`, replace the placeholder table with a card grid — one card per project showing the trio of metrics; (4) each card links to `/p/{id}/` for drill-down.
+- For a portfolio with many projects, `build_feature_data` per project on every page load could be slow. The dashboard route does this for one project with no caching — for N projects we'll be making O(N × features) DB calls. For typical use (single-user, handful of projects) this is fine.
+
+**Open questions:**
+
+- **Card layout**: Should each project get a full `.hero-grid` trio (3 sub-cards side by side, same as the dashboard), or a single compact "summary card" that shows all three metrics in a condensed layout? The full grid looks great for 2–3 projects but becomes unwieldy at 6+. A compact card (one per project, key numbers in a mini stat row) scales better.
+- **What to show from card 3**: Budget Days Remaining depends on `team_size × default_day_rate`. If a project has no capacity periods set yet the "days remaining" figure is still meaningful; if it has no default role the number is zero/undefined. Decide whether to show a fallback label or hide that metric when no role is configured.
+- **Health status colour**: The sidebar already shows a status dot (green/amber/grey) per project. Should the inter-dashboard card also reflect a health status (on-track / at-risk / behind) via a coloured border or badge, derived from `health_on_track_pct` / `health_at_risk_pct` thresholds? That would require computing the same logic as the per-project dashboard's feature health summary.
+- **Performance guard**: For large project counts, consider whether to lazily skip the expensive `build_feature_data` call and show a "no data yet" state for projects with zero features, rather than paying the DB cost for empty projects.
+- **Empty state for the route**: The current "All Projects" page doubles as the inter-dashboard. Should it keep the current table at all (useful for quick name/description scan), or fully replace it with the card grid?
+
 
 ### Distinct Project Types - Medium Priority
 * [ ] Every project has to strike a balance betwen Scope, Price, and Timeline. There are different types of project that a Project Manager might be working on to optimise for one or more of these, typically one must be left flexible or the project can't maneuver when issues arise. Plan and add one of the following that has not been implemented and then check it off. 
