@@ -12,7 +12,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ### Risks & Notes
 
 ### Misc
-* [ ] Using dummy data, update the Readme screenshots based on the new UI. 
+* [x] Using dummy data, update the Readme screenshots based on the new UI. 
 
 
 ## New Feature Items
