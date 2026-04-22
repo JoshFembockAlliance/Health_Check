@@ -204,7 +204,7 @@ class TestProjectSummary:
         }
 
     def test_basic_budget_days_remaining(self):
-        # Days remaining = (accessible_budget - actual_spend) / daily_burn
+        # Days remaining = accessible_budget / daily_burn
         # With $0 actual spend and $100k budget at $1k/day → 100 days
         proj = self._make_project(budget=100_000, team_size=1, spend=0)
         result = project_summary(proj, [], [], default_day_rate=1_000.0)
@@ -212,15 +212,31 @@ class TestProjectSummary:
 
     def test_budget_days_remaining_with_spend(self):
         # $10k spent from $100k budget at $1k/day → 90 days remaining
+        # (spend is subtracted once, via current_budget → accessible_budget)
         proj = self._make_project(budget=100_000, team_size=1, spend=10_000)
         result = project_summary(proj, [], [], default_day_rate=1_000.0)
         assert result["budget_days_remaining"] == pytest.approx(90.0)
 
-    def test_current_budget_includes_adjustments(self):
+    def test_total_budget_includes_adjustments(self):
         proj = self._make_project(budget=100_000)
         adjustments = [{"amount": 10_000}, {"amount": -5_000}]
         result = project_summary(proj, [], adjustments, default_day_rate=1_000.0)
-        assert result["current_budget"] == 105_000.0
+        assert result["total_budget"] == 105_000.0
+
+    def test_current_budget_subtracts_actual_spend(self):
+        # current_budget = total_budget − actual_spend.
+        # Spend that has been invoiced is no longer accessible.
+        proj = self._make_project(budget=100_000, spend=30_000)
+        result = project_summary(proj, [], [], default_day_rate=1_000.0)
+        assert result["total_budget"] == 100_000.0
+        assert result["current_budget"] == 70_000.0
+
+    def test_current_budget_combines_adjustments_and_spend(self):
+        proj = self._make_project(budget=100_000, spend=15_000)
+        adjustments = [{"amount": 10_000}]
+        result = project_summary(proj, [], adjustments, default_day_rate=1_000.0)
+        assert result["total_budget"] == 110_000.0
+        assert result["current_budget"] == 95_000.0
 
     def test_realised_risk_reduces_accessible_budget(self):
         proj = self._make_project(budget=100_000, team_size=1, spend=0)
@@ -265,9 +281,9 @@ class TestProjectSummary:
         ]
         result = project_summary(proj, features, [], default_day_rate=1_000.0, overhead_dollars=20_000.0)
         assert result["unallocated_budget"] == 50_000.0
-        # Identity: features + overheads + realised_risks + unallocated == current_budget
+        # Identity: features + overheads + realised_risks + unallocated == total_budget
         assert (result["allocated_dollars"] + result["overhead_dollars"]
-                + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["current_budget"])
+                + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["total_budget"])
 
     def test_open_risk_dollars_default_zero(self):
         # open_risk_dollars defaults to 0 when not supplied and the summary
@@ -304,7 +320,7 @@ class TestProjectSummary:
         )
         assert result["unallocated_budget"] == pytest.approx(40_000.0)
         assert (result["allocated_dollars"] + result["overhead_dollars"]
-                + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["current_budget"])
+                + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["total_budget"])
 
     def test_overhead_and_risk_both_reduce_accessible(self):
         # Both deductions stack: $100k - $5k risk - $10k overhead → $85k accessible

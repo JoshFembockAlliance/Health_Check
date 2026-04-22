@@ -386,9 +386,11 @@ def dashboard(request: Request, project_id: int):
     summary["total_feature_count"] = len([f for f in features if f["total_dollars"] > 0])
 
     avoided = sum(r[1] for r in closed_risks if (r[2] or 0.0) == 0)
-    current_budget = summary["current_budget"]
-    open_risk_pct = min(100.0, open_risk_dollars / current_budget * 100) if current_budget else 0.0
-    locked_risk_pct = min(100.0 - open_risk_pct, realised_risk_dollars / current_budget * 100) if current_budget else 0.0
+    # Risk-as-percent figures use total_budget as the denominator so the
+    # bar reads as "% of the full pot at risk", stable as spend lands.
+    total_budget = summary["total_budget"]
+    open_risk_pct = min(100.0, open_risk_dollars / total_budget * 100) if total_budget else 0.0
+    locked_risk_pct = min(100.0 - open_risk_pct, realised_risk_dollars / total_budget * 100) if total_budget else 0.0
     daily_burn = summary["daily_burn"]
     open_impact_budget_days = open_risk_dollars / daily_burn if daily_burn else 0.0
     risk_summary = {
@@ -400,7 +402,7 @@ def dashboard(request: Request, project_id: int):
         "effective_impact_days": realised_risk_days,
         "effective_impact_dollars": realised_risk_dollars,
         "avoided_days": avoided,
-        "effective_impact_pct": min(100.0, realised_risk_dollars / current_budget * 100) if current_budget else 0.0,
+        "effective_impact_pct": min(100.0, realised_risk_dollars / total_budget * 100) if total_budget else 0.0,
         "open_impact_pct": open_risk_pct,
         "open_risk_pct": round(open_risk_pct, 1),
         "locked_risk_pct": round(locked_risk_pct, 1),
@@ -437,9 +439,8 @@ def dashboard(request: Request, project_id: int):
         project.get("team_size", 1),
         summary["daily_burn"],
     )
-    remaining_budget = summary["accessible_budget"] - summary["actual_spend"]
     cap_budget = capacity_budget_summary(
-        remaining_budget,
+        summary["accessible_budget"],
         as_of or _date.today(),
         enriched_capacity,
         summary["daily_burn"],

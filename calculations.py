@@ -135,13 +135,34 @@ def project_summary(
     These are committed non-delivery costs that reduce the budget pool
     available for feature work — so they reduce both accessible_budget
     (flowing through to Budget Days Remaining and Capacity Remaining) and
-    unallocated_budget (so features/overheads/unallocated tile to current_budget).
+    unallocated_budget (so features/overheads/realised_risks/unallocated
+    tile to total_budget).
+
+    Budget vocabulary — three distinct values, each with a single purpose:
+      * total_budget       = initial_budget + adjustments. The full pot
+                             assigned to the project. Denominator for burn %.
+      * current_budget     = total_budget − actual_spend. What remains to be
+                             spent. "We can't spend what we've already spent."
+      * accessible_budget  = current_budget − realised_risk − overhead.
+                             What's still available for feature delivery.
     """
     total_adj = sum(a["amount"] for a in adjustments)
-    current_budget = project["initial_budget"] + total_adj
+    actual_spend = project["actual_spend"]
 
-    # Accessible budget excludes dollars already consumed by closed/realised risks
-    # and dollars committed to overheads (non-delivery costs).
+    # total_budget: the full pot assigned to the project — initial award plus
+    # any adjustments/infusions. This is the "ceiling" used as the denominator
+    # for burn % and as the base of the allocation identity.
+    total_budget = project["initial_budget"] + total_adj
+
+    # current_budget: what is still liquid. Dollars that have already been
+    # invoiced are gone — they can't be spent again — so we subtract them
+    # from the pot. Every downstream "what can we still do?" figure flows
+    # from here.
+    current_budget = total_budget - actual_spend
+
+    # accessible_budget: current_budget minus money already consumed by
+    # realised risks and money committed to overheads (non-delivery costs).
+    # This is what remains for feature delivery.
     accessible_budget = current_budget - realised_risk_dollars - overhead_dollars
 
     start = parse_date(project["start_date"])
@@ -150,13 +171,17 @@ def project_summary(
 
     daily_burn = project["team_size"] * default_day_rate
     expected_spend = daily_burn * elapsed_days
-    expected_burn_pct = (expected_spend / current_budget * 100) if current_budget else 0
-    # For feature completion comparisons, overhead budget is excluded — it never
-    # contributes to feature delivery, so including it would understate the target.
-    feature_budget = current_budget - overhead_dollars
+
+    # Burn percentages use total_budget as the denominator: they answer
+    # "what fraction of the full project pot has been / should have been
+    # spent by now?" — a stable reference that doesn't shift as spend lands.
+    expected_burn_pct = (expected_spend / total_budget * 100) if total_budget else 0
+    current_burn_pct = (actual_spend / total_budget * 100) if total_budget else 0
+    # Feature completion comparisons exclude overhead — it never contributes
+    # to feature delivery, so including it would understate the target.
+    feature_budget = total_budget - overhead_dollars
     feature_expected_burn_pct = (expected_spend / feature_budget * 100) if feature_budget > 0 else 0
-    current_burn_pct = (project["actual_spend"] / current_budget * 100) if current_budget else 0
-    burn_delta = project["actual_spend"] - expected_spend
+    burn_delta = actual_spend - expected_spend
 
     allocated_days = sum(f["total_days"] for f in features)
     allocated_dollars = sum(f["total_dollars"] for f in features)
@@ -170,13 +195,18 @@ def project_summary(
     else:
         overall_completion = 0
 
-    # Unallocated budget tiles cleanly with allocated_dollars, overhead_dollars, and realised risks:
-    # current_budget = allocated_to_features + allocated_to_overheads + realised_risks + unallocated
-    unallocated_budget = current_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
-    # Days remaining is based on accessible budget (after realised risk and overhead deductions)
-    budget_days_remaining = (accessible_budget - project["actual_spend"]) / daily_burn if daily_burn else 0
+    # Unallocated budget tiles cleanly with the other planning buckets:
+    # total_budget = features + overheads + realised_risks + unallocated.
+    # This is an allocation view (what is the pot earmarked for?), not a
+    # liquidity view, so it sits against total_budget, not current_budget.
+    unallocated_budget = total_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
+
+    # Days remaining flows straight from accessible_budget — actual_spend has
+    # already been subtracted upstream via current_budget, so no double-count.
+    budget_days_remaining = accessible_budget / daily_burn if daily_burn else 0
 
     return {
+        "total_budget": total_budget,
         "current_budget": current_budget,
         "accessible_budget": accessible_budget,
         "realised_risk_dollars": realised_risk_dollars,
@@ -189,7 +219,7 @@ def project_summary(
         "expected_spend": expected_spend,
         "expected_burn_pct": expected_burn_pct,
         "feature_expected_burn_pct": feature_expected_burn_pct,
-        "actual_spend": project["actual_spend"],
+        "actual_spend": actual_spend,
         "current_burn_pct": current_burn_pct,
         "burn_delta": burn_delta,
         "allocated_days": allocated_days,

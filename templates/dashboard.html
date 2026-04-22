@@ -27,7 +27,7 @@
     </div>
 </div>
 
-{% if not p.start_date or not p.as_of_date or s.current_budget == 0 %}
+{% if not p.start_date or not p.as_of_date or s.total_budget == 0 %}
 <div class="card" style="margin-bottom:16px;">
     <p style="margin:0;">Configure your project in <a href="/p/{{ pid }}/settings" class="link">Settings</a> to see the full dashboard (start date, as-of date, budget, and at least one role).</p>
 </div>
@@ -43,7 +43,11 @@
         <div class="label">Net Accessible Budget</div>
         <div class="value">{{ s.accessible_budget | currency }}</div>
         <div class="sub-row">
+            <div class="row"><span class="lbl">Total budget</span><span class="val">{{ s.total_budget | currency }}</span></div>
+            {% if s.actual_spend > 0 %}
+            <div class="row"><span class="lbl">Spent to date</span><span class="val">− {{ s.actual_spend | currency }}</span></div>
             <div class="row"><span class="lbl">Current budget</span><span class="val">{{ s.current_budget | currency }}</span></div>
+            {% endif %}
             {% if s.overhead_dollars > 0 %}
             <div class="row"><span class="lbl">Overheads</span><span class="val">− {{ s.overhead_dollars | currency }}</span></div>
             {% endif %}
@@ -102,7 +106,7 @@
         <div class="stat">
             <div class="label">Actual Spend to Date</div>
             <div class="value val-lg">{{ s.actual_spend | currency }}</div>
-            <div class="meta">{{ s.current_burn_pct | pct }} of current budget</div>
+            <div class="meta">{{ s.current_burn_pct | pct }} of total budget</div>
         </div>
         <div class="stat">
             <div class="label">Expected Spend to Date</div>
