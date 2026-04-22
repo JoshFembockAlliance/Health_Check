@@ -201,9 +201,16 @@ def project_summary(
     # liquidity view, so it sits against total_budget, not current_budget.
     unallocated_budget = total_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
 
-    # Days remaining flows straight from accessible_budget — actual_spend has
-    # already been subtracted upstream via current_budget, so no double-count.
+    # budget_days_remaining: accessible delivery days — the PM's risk-adjusted
+    # runway. Flows from accessible_budget (spend + overheads + realised risks
+    # already removed), so no double-count.
     budget_days_remaining = accessible_budget / daily_burn if daily_burn else 0
+
+    # total_budget_days_remaining: full days the current (post-spend) budget
+    # can fund at the team burn rate — before any risk or overhead deductions.
+    # Used as the headline on the "days remaining" hero card so the PM can
+    # see the whole story, then drill into the breakdowns below.
+    total_budget_days_remaining = current_budget / daily_burn if daily_burn else 0
 
     return {
         "total_budget": total_budget,
@@ -229,6 +236,7 @@ def project_summary(
         "overall_completion": overall_completion,
         "unallocated_budget": unallocated_budget,
         "budget_days_remaining": budget_days_remaining,
+        "total_budget_days_remaining": total_budget_days_remaining,
     }
 
 

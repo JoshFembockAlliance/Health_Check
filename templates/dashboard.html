@@ -36,7 +36,7 @@
 {# ── Hero trio ── #}
 {% set comp_fill = 'fill-good' if s.overall_completion >= s.feature_expected_burn_pct else ('fill-warn' if s.overall_completion >= s.feature_expected_burn_pct * 0.8 else 'fill-bad') %}
 {% set comp_color = 'var(--good)' if s.overall_completion >= s.feature_expected_burn_pct else ('var(--warn)' if s.overall_completion >= s.feature_expected_burn_pct * 0.8 else 'var(--bad)') %}
-{% set days_color = 'var(--bad)' if s.budget_days_remaining < 20 else ('var(--warn)' if s.budget_days_remaining < 60 else 'var(--good)') %}
+{% set days_color = 'var(--bad)' if s.total_budget_days_remaining < 20 else ('var(--warn)' if s.total_budget_days_remaining < 60 else 'var(--good)') %}
 
 <div class="hero-grid">
     <div class="hero-card primary">
@@ -85,16 +85,19 @@
 
     <div class="hero-card">
         <div class="label">Full-Team Budget Days Remaining</div>
-        <div class="value" style="color: {{ days_color }}">{{ s.budget_days_remaining | days }}</div>
+        <div class="value" style="color: {{ days_color }}">{{ s.total_budget_days_remaining | days }}</div>
         <div class="sub-row">
-            <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day</span></div>
-            <div class="row"><span class="lbl">Team size</span><span class="val">{{ p.team_size }} people</span></div>
-            {% if cap_budget %}
-            <div class="row"><span class="lbl">Person-days total</span><span class="val">{{ cap_budget.person_days | days }}</span></div>
+            <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ p.team_size }} people</span></div>
+            {% set realised_risk_days = (s.realised_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
+            {% set open_risk_days = (s.open_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
+            {% set not_at_risk_days = s.total_budget_days_remaining - realised_risk_days - open_risk_days %}
+            {% if realised_risk_days > 0 %}
+            <div class="row bad-row"><span class="lbl">Lost to realised risks</span><span class="val">− {{ realised_risk_days | days }}d</span></div>
             {% endif %}
-            {% if rs.open_impact_days > 0 %}
-            <div class="row warn-row"><span class="lbl">⚠ In open risks</span><span class="val">up to {{ rs.open_impact_days | days }}d</span></div>
+            {% if open_risk_days > 0 %}
+            <div class="row warn-row"><span class="lbl">Exposed to open risks</span><span class="val">− {{ open_risk_days | days }}d</span></div>
             {% endif %}
+            <div class="row" style="color: var(--good);"><span class="lbl">Not at risk</span><span class="val">{{ not_at_risk_days | days }}d</span></div>
         </div>
     </div>
 </div>
@@ -115,9 +118,24 @@
         </div>
         <div class="stat">
             <div class="label">Spend Delta</div>
-            {% set delta_color = 'var(--good)' if s.burn_delta < 0 else ('var(--bad)' if s.burn_delta > 0 else 'var(--text-strong)') %}
+            {% set completion_behind = s.overall_completion < s.feature_expected_burn_pct %}
+            {% if s.burn_delta > 0 %}
+                {% set delta_color = 'var(--bad)' %}
+            {% elif s.burn_delta < 0 and completion_behind %}
+                {% set delta_color = 'var(--warn)' %}
+            {% elif s.burn_delta < 0 %}
+                {% set delta_color = 'var(--good)' %}
+            {% else %}
+                {% set delta_color = 'var(--text-strong)' %}
+            {% endif %}
             <div class="value val-lg" style="color: {{ delta_color }}">{{ s.burn_delta | currency }}</div>
             <div class="meta">actual vs expected — {% if s.burn_delta < 0 %}under{% elif s.burn_delta > 0 %}over{% else %}on{% endif %} budget</div>
+            {% if s.burn_delta < 0 and completion_behind %}
+            {% set comp_gap = s.feature_expected_burn_pct - s.overall_completion %}
+            <div class="meta row" style="margin-top:4px;">
+                <span class="chip chip-warn" style="text-transform:none; font-weight:500; padding:1px 6px;">{{ comp_gap | pct }} behind delivery target</span>
+            </div>
+            {% endif %}
         </div>
         <div class="stat">
             <div class="label">Unallocated Budget</div>
