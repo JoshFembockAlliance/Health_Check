@@ -5,18 +5,18 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-- [ ] Project Icons. Add some more icons, I like the lightning bolt as that could be industry-specific. COuld you add more that indicate an industry? Maybe some that seem financial, related to construction, education, etc? Also in the sidebar, having the symbol's colour-coded square thing mathc the rest of the UI styling by using the rounded edges and maybe even subtlye gradient from the app icon would be good
+- [x] Project Icons. Add some more icons, I like the lightning bolt as that could be industry-specific. COuld you add more that indicate an industry? Maybe some that seem financial, related to construction, education, etc? Also in the sidebar, having the symbol's colour-coded square thing mathc the rest of the UI styling by using the rounded edges and maybe even subtlye gradient from the app icon would be good
 
-- [ ] Add a project end date field, similar to the as-of date except that it defines the expected project deadline. 
+- [x] Add a project end date field, similar to the as-of date except that it defines the expected project deadline. 
 
 ### Dashboard
-For spend delta, let it be coloured green if we're below delivery target but still leave the yellow badge that tells us why it's not entirely a good thing. 
+- [x] For spend delta, let it be coloured green if we're below delivery target but still leave the yellow badge that tells us why it's not entirely a good thing. 
 
 ### Features, Requirements & Deliverables
-- [ ] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making the symbol itself (not just the button) around 50% bigger to increase visual clarity.
+- [x] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making the symbol itself (not just the button) around 50% bigger to increase visual clarity.
 
 ### Decision Register
-- [ ] Add a new long text field "Expected Outcome" to the decision register to track what the decision hoped to achieve. For example "Reduced overall risk for MVP by 10%" 
+- [x] Add a new long text field "Expected Outcome" to the decision register to track what the decision hoped to achieve. For example "Reduced overall risk for MVP by 10%" 
 
 ### Capacity
 - [ ] The capacity planner seems to be only counting forward from the current date when calculating remaining capacity. I would like to be able to retroactively add an adjustment to capacity for example adding an item for a previoous week because I just found out someone was away and then have it count forward from the project start date. 
