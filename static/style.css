@@ -425,7 +425,7 @@ button { font-family: inherit; cursor: pointer; }
 .btn-icon { padding: 6px; width: 28px; height: 28px; justify-content: center; }
 .btn-sm { padding: 4px 8px; font-size: 11.5px; }
 .btn-icon.btn-sm { width: 24px; height: 24px; padding: 4px; }
-.collapse-arrow { font-size: 1.4em; line-height: 1; }
+.collapse-arrow { font-size: 2.1em; line-height: 1; }
 
 /* ===================== CARDS ===================== */
 .card {
