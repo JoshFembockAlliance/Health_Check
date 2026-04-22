@@ -32,6 +32,21 @@
     </div>
 </div>
 
+{% if linked_decisions %}
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><h3 style="margin:0;">Linked Decisions</h3></div>
+    <div class="linked" style="display:flex; flex-wrap:wrap; gap:8px;">
+        {% for d in linked_decisions %}
+        {% set tcls = 'chip-warn' if d.decision_type == 'Pivot' else ('chip-info' if d.decision_type == 'Acknowledged Limitation' else 'chip-soft') %}
+        <a href="/p/{{ pid }}/decisions" class="chip {{ tcls }}" style="text-transform:none; text-decoration:none;">
+            <strong>{{ d.name }}</strong>
+            <span class="muted" style="margin-left:6px;">· {{ d.decision_type }}{% if d.decision_date %} · {{ d.decision_date }}{% endif %}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% for req in feature.requirements %}
 <div class="card" style="margin-bottom:16px;">
     <div class="card-head" style="align-items:center;">

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}Decisions · {{ project.name }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+<style>
+#add-decision-desc-editor .ql-editor { min-height: 120px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set pid = project.id %}
+
+<div class="page-head">
+    <div>
+        <div class="page-title">Decision Register</div>
+        <div class="page-sub">Pivots, acknowledged limitations, and scope adjustments — the reasons things are done a particular way.</div>
+    </div>
+    <div class="page-actions">
+        <button type="button" class="btn btn-primary" id="toggle-add-decision" aria-expanded="false" aria-controls="add-decision-panel">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add decision
+        </button>
+    </div>
+</div>
+
+<div class="stat-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+    <div class="stat"><div class="label">Total</div><div class="value">{{ counts.total }}</div></div>
+    <div class="stat"><div class="label">Pivots</div><div class="value" style="color:var(--warn)">{{ counts.pivot }}</div></div>
+    <div class="stat"><div class="label">Limitations</div><div class="value" style="color:var(--primary)">{{ counts.limitation }}</div></div>
+    <div class="stat"><div class="label">Scope Adjustments</div><div class="value" style="color:var(--bad)">{{ counts.scope }}</div></div>
+</div>
+
+<div id="add-decision-panel" class="card" style="display:none; margin-bottom:16px;">
+    <form method="post" action="/p/{{ pid }}/decisions/add">
+        <div class="card-head"><h3>New decision</h3></div>
+        <div class="field-grid" style="grid-template-columns: 2fr 1fr 1fr;">
+            <label class="field">Title
+                <input type="text" name="name" placeholder="e.g., MVP will not include SSO" required>
+            </label>
+            <label class="field">Type
+                <select name="decision_type">
+                    {% for t in decision_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                </select>
+            </label>
+            <label class="field">Decision Date <span class="muted tiny">(defaults to today)</span>
+                <input type="date" name="decision_date">
+            </label>
+        </div>
+        <div class="field" style="margin-top:14px;">Description
+            <input type="hidden" name="description" id="add-decision-desc-hidden">
+            <div id="add-decision-desc-editor"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+            <button type="submit" class="btn btn-primary">+ Add decision</button>
+            <button type="button" class="btn" id="cancel-add-decision">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<div class="filters">
+    <form method="get" action="/p/{{ pid }}/decisions" id="decision-controls" style="display:contents;">
+        <div class="pill-tabs">
+            <button type="submit" name="filter" value="all" class="{% if filter_key == 'all' %}active{% endif %}">All</button>
+            <button type="submit" name="filter" value="pivot" class="{% if filter_key == 'pivot' %}active{% endif %}">Pivots</button>
+            <button type="submit" name="filter" value="limitation" class="{% if filter_key == 'limitation' %}active{% endif %}">Limitations</button>
+            <button type="submit" name="filter" value="scope" class="{% if filter_key == 'scope' %}active{% endif %}">Scope</button>
+        </div>
+    </form>
+    <div class="group" style="margin-left:auto;">
+        <span>Columns</span>
+        <div class="pill-tabs" id="cols-tabs">
+            <button type="button" data-cols="1">1</button>
+            <button type="button" data-cols="2">2</button>
+            <button type="button" data-cols="3">3</button>
+            <button type="button" data-cols="4">4</button>
+        </div>
+    </div>
+</div>
+
+{% if decisions %}
+<div class="card-grid">
+    {% for d in decisions %}
+    {% set tcls = 'med' if d.decision_type == 'Pivot' else ('low' if d.decision_type == 'Acknowledged Limitation' else 'high') %}
+    {% set chipcls = 'chip-warn' if d.decision_type == 'Pivot' else ('chip-info' if d.decision_type == 'Acknowledged Limitation' else 'chip-bad') %}
+    <article class="risk-card sev-{{ tcls }} decision-card" data-decision-id="{{ d.id }}">
+        <div class="head">
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <span class="chip {{ chipcls }}" style="text-transform:none;">{{ d.decision_type }}</span>
+                {% if d.decision_date %}<span class="tiny muted mono">{{ d.decision_date }}</span>{% endif %}
+            </div>
+        </div>
+        <div class="title">
+            <button type="button" data-action="open-decision-modal" data-decision-id="{{ d.id }}" style="background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer;">{{ d.name }}</button>
+        </div>
+        {% if d.description %}<div class="desc rich-content">{{ d.description | render_rich | safe }}</div>{% endif %}
+
+        {% if d.linked_features %}
+        <div class="linked">
+            <span class="lbl muted">Linked:</span>
+            {% for f in d.linked_features %}
+            <span class="chip chip-info" style="text-transform:none;">
+                <a href="/p/{{ pid }}/features/{{ f.id }}" style="color:inherit;">{{ f.name }}</a>
+                <form method="post" action="/p/{{ pid }}/decisions/{{ d.id }}/unlink-feature/{{ f.id }}" style="margin:0; display:inline;">
+                    <button type="submit" style="background:none; border:0; padding:0 2px; color:inherit; cursor:pointer; font-size:12px;" aria-label="Unlink {{ f.name }}">×</button>
+                </form>
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <div style="flex:1;"></div>
+            <button type="button" class="btn btn-sm" data-action="open-decision-modal" data-decision-id="{{ d.id }}">Edit</button>
+            <form method="post" action="/p/{{ pid }}/decisions/{{ d.id }}/delete" style="margin:0; display:inline;">
+                <button type="button" class="btn btn-sm btn-danger-ghost btn-icon"
+                        onclick="showConfirm('Delete this decision?', this.form)" aria-label="Delete decision">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </form>
+        </div>
+
+        <script type="application/json" class="decision-payload" data-decision-id="{{ d.id }}">
+        {
+          "id": {{ d.id }},
+          "name": {{ d.name | tojson }},
+          "description": {{ (d.description or '') | tojson }},
+          "decision_date": {{ (d.decision_date or '') | tojson }},
+          "decision_type": {{ d.decision_type | tojson }}
+        }
+        </script>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p class="muted">{% if filter_key != 'all' %}No decisions match the current filter.{% else %}No decisions logged yet. Click <em>Add decision</em> to record the first pivot, limitation, or scope adjustment.{% endif %}</p>
+{% endif %}
+
+<dialog id="decision-edit-modal" style="width:75vw; max-width:900px;">
+    <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:14px; color:var(--text-strong);">Edit Decision</strong>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="closeDecisionModal()">✕</button>
+        </div>
+        <form id="decision-edit-form" method="post">
+            <div class="field-grid" style="grid-template-columns: 2fr 1fr 1fr;">
+                <label class="field">Title
+                    <input type="text" name="name" required>
+                </label>
+                <label class="field">Type
+                    <select name="decision_type">
+                        {% for t in decision_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                    </select>
+                </label>
+                <label class="field">Decision Date
+                    <input type="date" name="decision_date">
+                </label>
+            </div>
+            <div class="field" style="margin-top:14px;">Description
+                <input type="hidden" name="description" id="modal-decision-desc-hidden">
+                <div id="modal-decision-desc-editor"></div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:18px;">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn" onclick="closeDecisionModal()">Cancel</button>
+                <div style="flex:1;"></div>
+                <button type="button" class="btn btn-danger-ghost" id="decision-modal-delete-btn">Delete decision</button>
+            </div>
+        </form>
+
+        {% if all_features %}
+        <form id="decision-link-form" method="post" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:end;">
+            <label class="field" style="flex:1;">Link a Feature
+                <select name="feature_id">
+                    {% for f in all_features %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-sm">+ Link feature</button>
+        </form>
+        {% endif %}
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<script>
+(function() {
+    const PID = {{ project.id }};
+    const TOOLBAR = [['bold','italic'], [{list:'ordered'},{list:'bullet'}], [{header:[2,3,false]}], ['clean']];
+    function makeQuill(sel, ph) {
+        const q = new Quill(sel, {theme:'snow', placeholder:ph||'', modules:{toolbar:TOOLBAR}});
+        q.getModule('toolbar').container.addEventListener('mousedown', e => e.preventDefault());
+        return q;
+    }
+    function quillSet(q, v) {
+        q.setContents([]);
+        if (!v || !v.trim()) return;
+        if (v.trim().startsWith('<')) q.clipboard.dangerouslyPasteHTML(v);
+        else q.setText(v);
+    }
+    function quillGet(q) {
+        const h = q.root.innerHTML;
+        return (h === '<p><br></p>' || h === '') ? '' : h;
+    }
+
+    const addDescQuill = makeQuill('#add-decision-desc-editor', 'Why was this decision made? What are the implications?');
+    const addForm = document.querySelector('#add-decision-panel form');
+    if (addForm) {
+        addForm.addEventListener('submit', () => {
+            document.getElementById('add-decision-desc-hidden').value = quillGet(addDescQuill);
+        });
+    }
+
+    const toggleBtn = document.getElementById('toggle-add-decision');
+    const addPanel = document.getElementById('add-decision-panel');
+    const cancelBtn = document.getElementById('cancel-add-decision');
+    if (toggleBtn && addPanel) {
+        toggleBtn.addEventListener('click', () => {
+            const isOpen = addPanel.style.display !== 'none';
+            addPanel.style.display = isOpen ? 'none' : 'block';
+            toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+            if (!isOpen) addPanel.querySelector('input[name="name"]').focus();
+        });
+    }
+    if (cancelBtn && addPanel) {
+        cancelBtn.addEventListener('click', () => {
+            addPanel.style.display = 'none';
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    const payloads = {};
+    document.querySelectorAll('.decision-payload').forEach(el => {
+        try { payloads[el.dataset.decisionId] = JSON.parse(el.textContent); } catch (e) {}
+    });
+
+    const modal = document.getElementById('decision-edit-modal');
+    const form = document.getElementById('decision-edit-form');
+    const linkForm = document.getElementById('decision-link-form');
+    const deleteBtn = document.getElementById('decision-modal-delete-btn');
+
+    let modalDescQuill = null;
+    function ensureModalQuill() {
+        if (modalDescQuill) return;
+        modalDescQuill = makeQuill('#modal-decision-desc-editor', 'Why was this decision made?');
+    }
+
+    form.addEventListener('submit', () => {
+        if (modalDescQuill) {
+            document.getElementById('modal-decision-desc-hidden').value = quillGet(modalDescQuill);
+        }
+    });
+
+    function openDecisionModal(id) {
+        const d = payloads[id];
+        if (!d) return;
+        form.action = `/p/${PID}/decisions/${d.id}/update`;
+        if (linkForm) linkForm.action = `/p/${PID}/decisions/${d.id}/link-feature`;
+        form.elements['name'].value = d.name;
+        form.elements['decision_type'].value = d.decision_type;
+        form.elements['decision_date'].value = d.decision_date || '';
+        deleteBtn.onclick = () => {
+            if (confirm('Delete decision "' + d.name + '"?')) {
+                const f = document.createElement('form');
+                f.method = 'post'; f.action = `/p/${PID}/decisions/${d.id}/delete`;
+                document.body.appendChild(f); f.submit();
+            }
+        };
+        if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
+        ensureModalQuill();
+        quillSet(modalDescQuill, d.description || '');
+    }
+
+    window.closeDecisionModal = function() {
+        if (modal.close) modal.close(); else modal.removeAttribute('open');
+    };
+
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-action="open-decision-modal"]');
+        if (trigger) { e.preventDefault(); openDecisionModal(trigger.dataset.decisionId); return; }
+        const card = e.target.closest('.decision-card[data-decision-id]');
+        if (card && !e.target.closest('button, input, select, a, form')) {
+            openDecisionModal(card.dataset.decisionId);
+        }
+    });
+
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeDecisionModal(); });
+
+    // Column picker
+    const COLS_KEY = 'decisions_cols_{{ pid }}';
+    const colsGrid = document.querySelector('.card-grid');
+    const colsTabs = document.getElementById('cols-tabs');
+    function applyColCount(n) {
+        if (colsGrid) colsGrid.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+        colsTabs && colsTabs.querySelectorAll('[data-cols]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.cols === String(n));
+        });
+    }
+    const savedCols = parseInt(localStorage.getItem(COLS_KEY), 10);
+    if (savedCols >= 1 && savedCols <= 4) applyColCount(savedCols);
+    colsTabs && colsTabs.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-cols]');
+        if (!btn) return;
+        const n = parseInt(btn.dataset.cols, 10);
+        localStorage.setItem(COLS_KEY, n);
+        applyColCount(n);
+    });
+})();
+</script>
+{% endblock %}

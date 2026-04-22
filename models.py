@@ -79,6 +79,21 @@ class RiskFeature(BaseModel):
     feature_id: int
 
 
+class Decision(BaseModel):
+    id: Optional[int] = None
+    project_id: int
+    name: str
+    description: str = ""
+    decision_date: str = ""
+    decision_type: str = "Pivot"
+    sort_order: int = 0
+
+
+class DecisionFeature(BaseModel):
+    decision_id: int
+    feature_id: int
+
+
 class Overhead(BaseModel):
     id: Optional[int] = None
     project_id: int

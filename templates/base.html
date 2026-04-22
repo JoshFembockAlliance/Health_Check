@@ -80,7 +80,7 @@
                     {% if active_project %}
                         <strong>{{ active_project.name }}</strong>
                         <span class="sep">/</span>
-                        <span style="color: var(--text)">{{ {'dashboard':'Dashboard','features':'Features','capacity':'Capacity','risks':'Risks','pm_notes':'PM Notes','settings':'Settings'}.get(active_page, '') }}</span>
+                        <span style="color: var(--text)">{{ {'dashboard':'Dashboard','features':'Features','risks':'Risks','pm_notes':'PM Notes','decisions':'Decisions','capacity':'Capacity','settings':'Settings'}.get(active_page, '') }}</span>
                     {% else %}
                         <strong>Workspace</strong>
                         <span class="sep">/</span>
@@ -100,9 +100,10 @@
                     {% set p = active_project_id %}
                     <a href="/p/{{ p }}/" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
                     <a href="/p/{{ p }}/features" class="{% if active_page == 'features' %}active{% endif %}">Features{% if nav_counts.features %}<span class="count">{{ nav_counts.features }}</span>{% endif %}</a>
-                    <a href="/p/{{ p }}/capacity" class="{% if active_page == 'capacity' %}active{% endif %}">Capacity</a>
                     <a href="/p/{{ p }}/risks" class="{% if active_page == 'risks' %}active{% endif %}">Risks{% if nav_counts.risks %}<span class="count">{{ nav_counts.risks }}</span>{% endif %}</a>
                     <a href="/p/{{ p }}/pm-notes" class="{% if active_page == 'pm_notes' %}active{% endif %}">PM Notes{% if nav_counts.notes %}<span class="count">{{ nav_counts.notes }}</span>{% endif %}</a>
+                    <a href="/p/{{ p }}/decisions" class="{% if active_page == 'decisions' %}active{% endif %}">Decisions{% if nav_counts.decisions %}<span class="count">{{ nav_counts.decisions }}</span>{% endif %}</a>
+                    <a href="/p/{{ p }}/capacity" class="{% if active_page == 'capacity' %}active{% endif %}">Capacity</a>
                     <a href="/p/{{ p }}/settings" class="{% if active_page == 'settings' %}active{% endif %}">Settings</a>
                 </nav>
             </div>

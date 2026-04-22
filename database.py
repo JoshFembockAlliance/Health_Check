@@ -22,6 +22,7 @@ PROJECT_SCOPED_TABLES = [
     "features",
     "risks",
     "pm_notes",
+    "decisions",
     "budget_adjustments",
     "capacity_periods",
     "overheads",
@@ -202,6 +203,24 @@ def init_db():
             "due_date": str,
             "sort_order": int,
         }, pk="id", foreign_keys=[("project_id", "projects")])
+
+    # Decisions — pivots, acknowledged limitations, scope adjustments
+    if "decisions" not in db.table_names():
+        db["decisions"].create({
+            "id": int,
+            "project_id": int,
+            "name": str,
+            "description": str,
+            "decision_date": str,
+            "decision_type": str,
+            "sort_order": int,
+        }, pk="id", foreign_keys=[("project_id", "projects")])
+
+    if "decision_features" not in db.table_names():
+        db["decision_features"].create({
+            "decision_id": int,
+            "feature_id": int,
+        }, foreign_keys=[("decision_id", "decisions"), ("feature_id", "features")])
 
     # overheads
     if "overheads" not in db.table_names():

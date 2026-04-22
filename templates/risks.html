@@ -104,6 +104,15 @@
             </select>
         </div>
     </form>
+    <div class="group" style="margin-left:auto;">
+        <span>Columns</span>
+        <div class="pill-tabs" id="cols-tabs">
+            <button type="button" data-cols="1">1</button>
+            <button type="button" data-cols="2">2</button>
+            <button type="button" data-cols="3">3</button>
+            <button type="button" data-cols="4">4</button>
+        </div>
+    </div>
 </div>
 {% endif %}
 
@@ -128,7 +137,12 @@
             <button type="button" data-action="open-modal" data-risk-id="{{ risk.id }}" style="background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer;">{{ risk.name }}</button>
         </div>
         {% if risk.description %}<div class="desc rich-content">{{ risk.description | render_rich | safe }}</div>{% endif %}
-        {% if risk.resultant_work %}<div class="desc rich-content"><span class="muted">Resultant:</span> {{ risk.resultant_work | render_rich | safe }}</div>{% endif %}
+        {% if risk.resultant_work %}
+        <div style="margin-top:8px;">
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">Resultant Work</div>
+            <div class="desc rich-content">{{ risk.resultant_work | render_rich | safe }}</div>
+        </div>
+        {% endif %}
 
         <ul class="meta" style="list-style:none; padding:0; margin:0;">
             {% if risk.impact_days > 0 %}
@@ -393,6 +407,26 @@
     });
 
     modal.addEventListener('click', (e) => { if (e.target === modal) closeRiskModal(); });
+
+    // Column picker
+    const COLS_KEY = 'risks_cols_{{ pid }}';
+    const colsGrid = document.querySelector('.card-grid');
+    const colsTabs = document.getElementById('cols-tabs');
+    function applyColCount(n) {
+        if (colsGrid) colsGrid.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+        colsTabs && colsTabs.querySelectorAll('[data-cols]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.cols === String(n));
+        });
+    }
+    const savedCols = parseInt(localStorage.getItem(COLS_KEY), 10);
+    if (savedCols >= 1 && savedCols <= 4) applyColCount(savedCols);
+    colsTabs && colsTabs.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-cols]');
+        if (!btn) return;
+        const n = parseInt(btn.dataset.cols, 10);
+        localStorage.setItem(COLS_KEY, n);
+        applyColCount(n);
+    });
 
     document.addEventListener('change', (e) => {
         const sel = e.target.closest('[data-action="inline-status"]');

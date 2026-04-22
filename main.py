@@ -193,7 +193,11 @@ def _dashboard_counts(project_id: int):
         "SELECT COUNT(*) FROM pm_notes WHERE project_id = ? AND status != 'done'",
         [project_id],
     ).fetchone()[0]
-    return {"features": feat_count, "risks": open_risks, "notes": open_notes}
+    decisions_count = db.execute(
+        "SELECT COUNT(*) FROM decisions WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
+    return {"features": feat_count, "risks": open_risks, "notes": open_notes, "decisions": decisions_count}
 
 
 def _project_shell_meta(project_id: int):
@@ -230,7 +234,7 @@ def shell_context(project_id: Optional[int]) -> dict:
         })
 
     active_project = None
-    counts = {"features": 0, "risks": 0, "notes": 0}
+    counts = {"features": 0, "risks": 0, "notes": 0, "decisions": 0}
     if project_id is not None:
         active_project = get_project(project_id)
         counts = _dashboard_counts(project_id)
@@ -718,6 +722,16 @@ def feature_detail(request: Request, project_id: int, feature_id: int):
     features, project, roles, default_rate = build_feature_data(project_id, feature_id)
     if not features:
         return RedirectResponse(f"/p/{project_id}/features", status_code=303)
+    db = get_db()
+    linked_decisions = [
+        {"id": r[0], "name": r[1], "decision_type": r[2] or "", "decision_date": r[3] or ""}
+        for r in db.execute(
+            "SELECT d.id, d.name, d.decision_type, d.decision_date "
+            "FROM decision_features df JOIN decisions d ON df.decision_id = d.id "
+            "WHERE df.feature_id = ? ORDER BY d.decision_date DESC, d.id DESC",
+            [feature_id],
+        ).fetchall()
+    ]
     ctx = {
         "request": request,
         "active": "features",
@@ -725,6 +739,7 @@ def feature_detail(request: Request, project_id: int, feature_id: int):
         "feature": features[0],
         "project": project,
         "roles": roles,
+        "linked_decisions": linked_decisions,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "feature_detail.html", ctx)
@@ -1171,6 +1186,153 @@ def delete_note(project_id: int, note_id: int):
     db = get_db()
     db["pm_notes"].delete(note_id)
     return RedirectResponse(f"/p/{project_id}/pm-notes", status_code=303)
+
+
+# ── Decisions ──
+
+DECISION_TYPES = ("Pivot", "Acknowledged Limitation", "Scope Adjustment")
+
+
+@app.get("/p/{project_id}/decisions")
+def decisions_page(request: Request, project_id: int, filter: str = "all"):
+    db = get_db()
+    project = get_project(project_id)
+    rows = list(db.execute(
+        "SELECT id, name, description, decision_date, decision_type, sort_order "
+        "FROM decisions WHERE project_id = ? "
+        "ORDER BY decision_date DESC, sort_order DESC, id DESC",
+        [project_id],
+    ).fetchall())
+    features_rows = list(db.execute(
+        "SELECT id, name FROM features WHERE project_id = ? ORDER BY sort_order, id",
+        [project_id],
+    ).fetchall())
+    all_features = [{"id": f[0], "name": f[1]} for f in features_rows]
+
+    decisions = []
+    for r in rows:
+        d = {
+            "id": r[0], "name": r[1], "description": r[2] or "",
+            "decision_date": r[3] or "", "decision_type": r[4] or "Pivot",
+            "sort_order": r[5],
+        }
+        links = list(db.execute(
+            "SELECT f.id, f.name FROM decision_features df "
+            "JOIN features f ON df.feature_id = f.id WHERE df.decision_id = ?",
+            [d["id"]],
+        ).fetchall())
+        d["linked_features"] = [{"id": l[0], "name": l[1]} for l in links]
+        decisions.append(d)
+
+    counts = {
+        "pivot": sum(1 for d in decisions if d["decision_type"] == "Pivot"),
+        "limitation": sum(1 for d in decisions if d["decision_type"] == "Acknowledged Limitation"),
+        "scope": sum(1 for d in decisions if d["decision_type"] == "Scope Adjustment"),
+        "total": len(decisions),
+    }
+
+    filter_map = {
+        "pivot": "Pivot",
+        "limitation": "Acknowledged Limitation",
+        "scope": "Scope Adjustment",
+    }
+    if filter in filter_map:
+        visible = [d for d in decisions if d["decision_type"] == filter_map[filter]]
+    else:
+        visible = decisions
+
+    ctx = {
+        "request": request,
+        "active": "decisions",
+        "active_page": "decisions",
+        "project": project,
+        "decisions": visible,
+        "all_features": all_features,
+        "counts": counts,
+        "filter_key": filter,
+        "decision_types": DECISION_TYPES,
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse(request, "decisions.html", ctx)
+
+
+@app.post("/p/{project_id}/decisions/add")
+def add_decision(
+    project_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    decision_date: str = Form(""),
+    decision_type: str = Form("Pivot"),
+):
+    if decision_type not in DECISION_TYPES:
+        decision_type = "Pivot"
+    if not decision_date:
+        decision_date = _date.today().isoformat()
+    db = get_db()
+    max_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM decisions WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
+    db["decisions"].insert({
+        "project_id": project_id,
+        "name": name,
+        "description": description,
+        "decision_date": decision_date,
+        "decision_type": decision_type,
+        "sort_order": max_order + 1,
+    })
+    return RedirectResponse(f"/p/{project_id}/decisions", status_code=303)
+
+
+@app.post("/p/{project_id}/decisions/{decision_id}/update")
+def update_decision(
+    project_id: int,
+    decision_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    decision_date: str = Form(""),
+    decision_type: str = Form("Pivot"),
+):
+    if decision_type not in DECISION_TYPES:
+        decision_type = "Pivot"
+    db = get_db()
+    db["decisions"].update(decision_id, {
+        "name": name,
+        "description": description,
+        "decision_date": decision_date,
+        "decision_type": decision_type,
+    })
+    return RedirectResponse(f"/p/{project_id}/decisions", status_code=303)
+
+
+@app.post("/p/{project_id}/decisions/{decision_id}/delete")
+def delete_decision(project_id: int, decision_id: int):
+    db = get_db()
+    db.execute("DELETE FROM decision_features WHERE decision_id = ?", [decision_id])
+    db["decisions"].delete(decision_id)
+    return RedirectResponse(f"/p/{project_id}/decisions", status_code=303)
+
+
+@app.post("/p/{project_id}/decisions/{decision_id}/link-feature")
+def link_feature_to_decision(project_id: int, decision_id: int, feature_id: int = Form(...)):
+    db = get_db()
+    existing = db.execute(
+        "SELECT COUNT(*) FROM decision_features WHERE decision_id = ? AND feature_id = ?",
+        [decision_id, feature_id],
+    ).fetchone()[0]
+    if not existing:
+        db["decision_features"].insert({"decision_id": decision_id, "feature_id": feature_id})
+    return RedirectResponse(f"/p/{project_id}/decisions", status_code=303)
+
+
+@app.post("/p/{project_id}/decisions/{decision_id}/unlink-feature/{feature_id}")
+def unlink_feature_from_decision(project_id: int, decision_id: int, feature_id: int):
+    db = get_db()
+    db.execute(
+        "DELETE FROM decision_features WHERE decision_id = ? AND feature_id = ?",
+        [decision_id, feature_id],
+    )
+    return RedirectResponse(f"/p/{project_id}/decisions", status_code=303)
 
 
 # ── Capacity Planning ──
