@@ -1104,7 +1104,7 @@ def unlink_feature_from_risk(project_id: int, risk_id: int, feature_id: int):
 # ── PM Notes ──
 
 @app.get("/p/{project_id}/pm-notes")
-def pm_notes_page(request: Request, project_id: int, filter: str = "all"):
+def pm_notes_page(request: Request, project_id: int, filter: str = "all", hide_done: str = "1"):
     db = get_db()
     project = get_project(project_id)
     notes = list(db.execute(
@@ -1126,6 +1126,8 @@ def pm_notes_page(request: Request, project_id: int, filter: str = "all"):
     visible = enriched if filter not in ("sticky", "todo", "doing", "done") else [
         n for n in enriched if n["status"] == filter
     ]
+    if filter == "all" and hide_done == "1":
+        visible = [n for n in visible if n["status"] != "done"]
     ctx = {
         "request": request,
         "active": "pm_notes",
@@ -1134,6 +1136,7 @@ def pm_notes_page(request: Request, project_id: int, filter: str = "all"):
         "notes": visible,
         "counts": counts,
         "filter_key": filter,
+        "hide_done": hide_done,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "pm_notes.html", ctx)

@@ -60,6 +60,7 @@
 
 <div class="filters">
     <form method="get" action="/p/{{ pid }}/pm-notes" id="note-controls" style="display:contents;">
+        <input type="hidden" name="hide_done" value="{{ hide_done }}">
         <div class="pill-tabs">
             <button type="submit" name="filter" value="all" class="{% if filter_key == 'all' %}active{% endif %}">All</button>
             <button type="submit" name="filter" value="sticky" class="{% if filter_key == 'sticky' %}active{% endif %}">Sticky</button>
@@ -68,6 +69,13 @@
             <button type="submit" name="filter" value="done" class="{% if filter_key == 'done' %}active{% endif %}">Done</button>
         </div>
     </form>
+    {% if filter_key == 'all' %}
+    <a href="/p/{{ pid }}/pm-notes?filter=all&hide_done={{ '0' if hide_done == '1' else '1' }}"
+       class="btn btn-sm {% if hide_done == '1' %}active{% endif %}"
+       title="{{ 'Done notes are hidden — click to show them' if hide_done == '1' else 'Click to hide Done notes' }}">
+        {{ 'Show Done (' + counts.done|string + ')' if hide_done == '1' else 'Hide Done' }}
+    </a>
+    {% endif %}
 </div>
 
 {% if notes %}

@@ -14,7 +14,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 
 ### Notes
-- [ ] Add an option to the filter for hiding notes that are 'Done' which is on by default. If they're closed then they are probably not relevant to the PM any more and are only kept around as a paper trail. 
+- [x] Add an option to the filter for hiding notes that are 'Done' which is on by default. If they're closed then they are probably not relevant to the PM any more and are only kept around as a paper trail. 
 
 ### Misc
 
