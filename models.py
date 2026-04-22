@@ -16,6 +16,7 @@ class Project(BaseModel):
     health_at_risk_pct: float = 80.0
     accent: str = "cyan"
     theme: str = "light"
+    icon: str = ""
 
 
 class Role(BaseModel):

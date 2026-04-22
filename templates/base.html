@@ -49,7 +49,11 @@
             {% set color = 'var(--good)' if p.status == 'done' else ('var(--warn)' if p.status == 'doing' else 'var(--n-300)') %}
             <li>
                 <a class="sidebar-item {% if active_project_id == p.id %}active{% endif %}" href="/p/{{ p.id }}/">
+                    {% if p.icon %}
+                    <span class="proj-icon" style="background: {{ color }}" aria-hidden="true">{{ p.icon }}</span>
+                    {% else %}
                     <span class="dot" style="background: {{ color }}" aria-hidden="true"></span>
+                    {% endif %}
                     <span class="proj-name">{{ p.name }}</span>
                     <span class="proj-meta">{{ p.completion }}%</span>
                 </a>

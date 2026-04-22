@@ -231,6 +231,7 @@ def shell_context(project_id: Optional[int]) -> dict:
             "description": pr.get("description", ""),
             "completion": meta["completion"],
             "status": meta["status"],
+            "icon": pr.get("icon", ""),
         })
 
     active_project = None
@@ -544,17 +545,20 @@ def update_project(
 
 VALID_ACCENTS = {"cyan","indigo","emerald","mono","violet","rose","amber","forest","plum","slate","coral","teal","lime","ocean","wine"}
 VALID_THEMES = {"light", "dark"}
+VALID_ICONS = {"", "◆", "★", "▲", "●", "✦", "⚡", "⚙", "✱", "♦", "❖"}
 
 @app.post("/p/{project_id}/settings/visual")
 def update_visual(
     project_id: int,
     accent: str = Form("cyan"),
     theme: str = Form("light"),
+    icon: str = Form(""),
 ):
     db = get_db()
     safe_accent = accent if accent in VALID_ACCENTS else "cyan"
     safe_theme = theme if theme in VALID_THEMES else "light"
-    db["projects"].update(project_id, {"accent": safe_accent, "theme": safe_theme})
+    safe_icon = icon if icon in VALID_ICONS else ""
+    db["projects"].update(project_id, {"accent": safe_accent, "theme": safe_theme, "icon": safe_icon})
     return RedirectResponse(f"/p/{project_id}/settings#visual", status_code=303)
 
 
