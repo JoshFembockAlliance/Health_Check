@@ -8,7 +8,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 - [ ] Project Icons. In the same way that a project can have an individual color accent, giving a project its own icon in the sidebar would be a fun way of distinguishing between them at a glance. Add a few icon symbols to settings in the same area as accents are chosen. In a perfect world, the status colour would be the icon's background colour in the navbar while the symbol colour remained consistent, a bit like how the HealthCheck logo has a gradient background with a white shield symbol right now. 
 
 ### Features, Requirements & Deliverables
-- [ ] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making them around 50% bigger would increase visual clarity.
+- [x] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making them around 50% bigger would increase visual clarity.
 
 ### Risks 
 
