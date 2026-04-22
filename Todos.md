@@ -5,7 +5,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-- [x] Project Icons. In the same way that a project can have an individual color accent, giving a project its own icon in the sidebar would be a fun way of distinguishing between them at a glance. Add a few icon symbols to settings in the same area as accents are chosen. In a perfect world, the status colour would be the icon's background colour in the navbar while the symbol colour remained consistent, a bit like how the HealthCheck logo has a gradient background with a white shield symbol right now. 
+- [ ] Project Icons. Add some more icons, I like the lightning bolt as that could be industry-specific. COuld you add more that indicate an industry? Maybe some that seem financial, related to construction, education, etc? Also in the sidebar, having the symbol's colour-coded square thing mathc the rest of the UI styling by using the rounded edges and maybe even subtlye gradient from the app icon would be good
 
 - [ ] Add a project end date field, similar to the as-of date except that it defines the expected project deadline. 
 
@@ -13,17 +13,16 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 For spend delta, let it be coloured green if we're below delivery target but still leave the yellow badge that tells us why it's not entirely a good thing. 
 
 ### Features, Requirements & Deliverables
-- [x] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making them around 50% bigger would increase visual clarity.
+- [ ] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making the symbol itself (not just the button) around 50% bigger to increase visual clarity.
 
 ### Decision Register
-- [ ] Add a new long text field "Expected Outcome" to track what the decision hoped to achieve. For example "Reduced overall risk for MVP by 10%" 
+- [ ] Add a new long text field "Expected Outcome" to the decision register to track what the decision hoped to achieve. For example "Reduced overall risk for MVP by 10%" 
 
 ### Capacity
 - [ ] The capacity planner seems to be only counting forward from the current date when calculating remaining capacity. I would like to be able to retroactively add an adjustment to capacity for example adding an item for a previoous week because I just found out someone was away and then have it count forward from the project start date. 
 
 
 ### Notes
-- [x] Add an option to the filter for hiding notes that are 'Done' which is on by default. If they're closed then they are probably not relevant to the PM any more and are only kept around as a paper trail. 
 
 ### Misc
 
