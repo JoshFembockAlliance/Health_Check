@@ -85,6 +85,7 @@ class Decision(BaseModel):
     project_id: int
     name: str
     description: str = ""
+    expected_outcome: str = ""
     decision_date: str = ""
     decision_type: str = "Pivot"
     sort_order: int = 0

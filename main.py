@@ -1269,6 +1269,7 @@ def add_decision(
     project_id: int,
     name: str = Form(...),
     description: str = Form(""),
+    expected_outcome: str = Form(""),
     decision_date: str = Form(""),
     decision_type: str = Form("Pivot"),
 ):
@@ -1285,6 +1286,7 @@ def add_decision(
         "project_id": project_id,
         "name": name,
         "description": description,
+        "expected_outcome": expected_outcome,
         "decision_date": decision_date,
         "decision_type": decision_type,
         "sort_order": max_order + 1,
@@ -1298,6 +1300,7 @@ def update_decision(
     decision_id: int,
     name: str = Form(...),
     description: str = Form(""),
+    expected_outcome: str = Form(""),
     decision_date: str = Form(""),
     decision_type: str = Form("Pivot"),
 ):
@@ -1307,6 +1310,7 @@ def update_decision(
     db["decisions"].update(decision_id, {
         "name": name,
         "description": description,
+        "expected_outcome": expected_outcome,
         "decision_date": decision_date,
         "decision_type": decision_type,
     })

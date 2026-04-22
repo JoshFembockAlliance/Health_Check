@@ -218,6 +218,10 @@ def init_db():
             "sort_order": int,
         }, pk="id", foreign_keys=[("project_id", "projects")])
 
+    existing_decision_cols = {col.name for col in db["decisions"].columns} if "decisions" in db.table_names() else set()
+    if "expected_outcome" not in existing_decision_cols and "decisions" in db.table_names():
+        db["decisions"].add_column("expected_outcome", str, not_null_default="")
+
     if "decision_features" not in db.table_names():
         db["decision_features"].create({
             "decision_id": int,
