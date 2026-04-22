@@ -8,6 +8,7 @@ class Project(BaseModel):
     description: str = ""
     start_date: str = ""
     as_of_date: str = ""
+    end_date: str = ""
     initial_budget: float = 0.0
     team_size: int = 1
     actual_spend: float = 0.0

@@ -82,6 +82,8 @@ def init_db():
         db["projects"].add_column("theme", str, not_null_default="light")
     if "icon" not in existing_cols:
         db["projects"].add_column("icon", str, not_null_default="")
+    if "end_date" not in existing_cols:
+        db["projects"].add_column("end_date", str, not_null_default="")
 
     # roles — named day-rate buckets. Now per-project so each engagement can
     # have its own rate card.

@@ -39,6 +39,9 @@
                     <label class="field">Start Date
                         <input type="date" name="start_date" value="{{ project.start_date }}">
                     </label>
+                    <label class="field">End Date <span class="muted tiny">(expected deadline)</span>
+                        <input type="date" name="end_date" value="{{ project.end_date }}">
+                    </label>
                     <label class="field">As-of Date
                         <input type="date" name="as_of_date" value="{{ project.as_of_date }}">
                     </label>
@@ -145,6 +148,7 @@
                 <input type="hidden" name="description" value="{{ project.description or '' }}">
                 <input type="hidden" name="start_date" value="{{ project.start_date }}">
                 <input type="hidden" name="as_of_date" value="{{ project.as_of_date }}">
+                <input type="hidden" name="end_date" value="{{ project.end_date }}">
                 <input type="hidden" name="health_on_track_pct" value="{{ project.health_on_track_pct|default(100) }}">
                 <input type="hidden" name="health_at_risk_pct" value="{{ project.health_at_risk_pct|default(80) }}">
                 <div class="field-grid">
