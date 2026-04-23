@@ -42,19 +42,17 @@
     <div class="hero-card primary">
         <div class="label">Net Accessible Budget</div>
         <div class="value">{{ s.accessible_budget | currency }}</div>
-        {% if s.allocated_dollars > 0 %}
-        {% set feature_shortfall = s.allocated_dollars - s.accessible_budget %}
-        {% if feature_shortfall > 0 %}
-        <div style="font-size:11px; font-weight:600; margin-top:-4px; margin-bottom:4px; opacity:0.9;">⚠ of {{ s.allocated_dollars | currency }} to features — {{ feature_shortfall | currency }} shortfall</div>
+        {% if s.remaining_dollars > 0 %}
+        {% set delivery_buffer = s.accessible_budget - s.remaining_dollars %}
+        {% if delivery_buffer < 0 %}
+        <div style="font-size:11px; font-weight:600; margin-top:-4px; margin-bottom:4px; opacity:0.9;">⚠ of {{ s.remaining_dollars | currency }} remaining — {{ (delivery_buffer * -1) | currency }} shortfall</div>
         {% else %}
-        <div style="font-size:11px; font-weight:500; margin-top:-4px; margin-bottom:4px; opacity:0.65;">of {{ s.allocated_dollars | currency }} allocated to features</div>
+        <div style="font-size:11px; font-weight:500; margin-top:-4px; margin-bottom:4px; opacity:0.65;">of {{ s.remaining_dollars | currency }} remaining to deliver · {{ delivery_buffer | currency }} buffer</div>
         {% endif %}
         {% endif %}
         <div class="sub-row">
-            <div class="row"><span class="lbl">Total budget</span><span class="val">{{ s.total_budget | currency }}</span></div>
             {% if s.actual_spend > 0 %}
             <div class="row"><span class="lbl">Spent to date</span><span class="val">− {{ s.actual_spend | currency }}</span></div>
-            <div class="row"><span class="lbl">Current budget</span><span class="val">{{ s.current_budget | currency }}</span></div>
             {% endif %}
             {% if s.overhead_dollars > 0 %}
             <div class="row"><span class="lbl">Overheads</span><span class="val">− {{ s.overhead_dollars | currency }}</span></div>
@@ -110,13 +108,13 @@
             <div class="row bad-row"><span class="lbl">Lost to realised risks</span><span class="val">− {{ realised_risk_days | days }}d</span></div>
             {% endif %}
             {% set total_risk_days = realised_risk_days + open_risk_days %}
-            {% set feature_team_days = (s.allocated_dollars / s.daily_burn) if s.daily_burn else 0 %}
-            {% if total_risk_days > 0 and feature_team_days > 0 %}
-            {% set decision_buffer = s.total_budget_days_remaining - feature_team_days %}
+            {% set remaining_team_days = (s.remaining_dollars / s.daily_burn) if s.daily_burn else 0 %}
+            {% if total_risk_days > 0 and remaining_team_days > 0 %}
+            {% set decision_buffer = s.total_budget_days_remaining - remaining_team_days %}
             <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;">
-                <div class="row"><span class="lbl">Days allocated to features</span><span class="val">{{ feature_team_days | days }}d</span></div>
+                <div class="row"><span class="lbl">Days needed for remaining work</span><span class="val">{{ remaining_team_days | days }}d</span></div>
                 {% if decision_buffer > 0 %}
-                <div class="row" style="color:var(--warn);"><span class="lbl">Days before scope/risk decision</span><span class="val">≈{{ decision_buffer | days }}d</span></div>
+                <div class="row" style="color:var(--good);"><span class="lbl">Buffer before scope/risk decision</span><span class="val">≈{{ decision_buffer | days }}d</span></div>
                 {% else %}
                 <div class="row bad-row"><span class="lbl">Scope or risk decision overdue</span><span class="val">{{ (decision_buffer * -1) | days }}d over</span></div>
                 {% endif %}
@@ -162,14 +160,14 @@
             {% endif %}
         </div>
         <div class="stat">
-            <div class="label">Unallocated Budget</div>
-            <div class="value val-lg">{{ s.unallocated_budget | currency }}</div>
-            {% if s.open_risk_dollars > 0 %}
-            <div class="meta row">
-                <span class="chip chip-warn" style="text-transform:none; font-weight:500; padding:1px 6px;">
-                    ⚠ {{ s.open_risk_dollars | currency }} at risk
-                </span>
-            </div>
+            <div class="label">Delivery Buffer</div>
+            {% if s.remaining_dollars > 0 %}
+            {% set buffer = s.accessible_budget - s.remaining_dollars %}
+            <div class="value val-lg" style="color: {% if buffer >= 0 %}var(--good){% else %}var(--bad){% endif %}">{{ buffer | currency }}</div>
+            <div class="meta">{% if buffer >= 0 %}can comfortably finish remaining work{% else %}cannot cover remaining work{% endif %}</div>
+            {% else %}
+            <div class="value val-lg muted">—</div>
+            <div class="meta">no remaining feature work</div>
             {% endif %}
         </div>
         <div class="stat">
@@ -182,6 +180,33 @@
             {% else %}
             <div class="value val-lg muted">—</div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── Project Context ── #}
+<div class="section-title"><h2>Project Context</h2></div>
+<div class="card">
+    <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr);">
+        <div class="stat">
+            <div class="label">Initial Budget</div>
+            <div class="value val-lg">{{ s.initial_budget | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Budget Adjustments</div>
+            <div class="value val-lg">{% if s.total_adjustments >= 0 %}+ {% endif %}{{ s.total_adjustments | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Total Budget</div>
+            <div class="value val-lg">{{ s.total_budget | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Spent to Date</div>
+            <div class="value val-lg">{{ s.actual_spend | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Current Budget</div>
+            <div class="value val-lg">{{ s.current_budget | currency }}</div>
         </div>
     </div>
     <hr class="hr">
@@ -199,8 +224,8 @@
             <div class="mono" style="font-size:15px; color: var(--bad);">{{ s.realised_risk_dollars | currency }}</div>
         </div>
         <div>
-            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Accessible Budget</div>
-            <div class="mono" style="font-size:15px; font-weight:600;">{{ s.accessible_budget | currency }}</div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Unallocated Budget</div>
+            <div class="mono" style="font-size:15px;">{{ s.unallocated_budget | currency }}</div>
         </div>
     </div>
 </div>
