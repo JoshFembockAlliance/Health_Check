@@ -1212,7 +1212,7 @@ def decisions_page(request: Request, project_id: int, filter: str = "all"):
     db = get_db()
     project = get_project(project_id)
     rows = list(db.execute(
-        "SELECT id, name, description, decision_date, decision_type, sort_order "
+        "SELECT id, name, description, expected_outcome, decision_date, decision_type, sort_order "
         "FROM decisions WHERE project_id = ? "
         "ORDER BY decision_date DESC, sort_order DESC, id DESC",
         [project_id],
@@ -1227,8 +1227,9 @@ def decisions_page(request: Request, project_id: int, filter: str = "all"):
     for r in rows:
         d = {
             "id": r[0], "name": r[1], "description": r[2] or "",
-            "decision_date": r[3] or "", "decision_type": r[4] or "Pivot",
-            "sort_order": r[5],
+            "expected_outcome": r[3] or "",
+            "decision_date": r[4] or "", "decision_type": r[5] or "Pivot",
+            "sort_order": r[6],
         }
         links = list(db.execute(
             "SELECT f.id, f.name FROM decision_features df "
