@@ -42,6 +42,14 @@
     <div class="hero-card primary">
         <div class="label">Net Accessible Budget</div>
         <div class="value">{{ s.accessible_budget | currency }}</div>
+        {% if s.allocated_dollars > 0 %}
+        {% set feature_shortfall = s.allocated_dollars - s.accessible_budget %}
+        {% if feature_shortfall > 0 %}
+        <div style="font-size:11px; font-weight:600; margin-top:-4px; margin-bottom:4px; opacity:0.9;">⚠ of {{ s.allocated_dollars | currency }} to features — {{ feature_shortfall | currency }} shortfall</div>
+        {% else %}
+        <div style="font-size:11px; font-weight:500; margin-top:-4px; margin-bottom:4px; opacity:0.65;">of {{ s.allocated_dollars | currency }} allocated to features</div>
+        {% endif %}
+        {% endif %}
         <div class="sub-row">
             <div class="row"><span class="lbl">Total budget</span><span class="val">{{ s.total_budget | currency }}</span></div>
             {% if s.actual_spend > 0 %}
