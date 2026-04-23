@@ -66,19 +66,29 @@
         </div>
     </div>
 
+    {% set bar_denom = s.total_budget - s.overhead_dollars %}
+    {% set feature_budget_pct = ([s.allocated_dollars / bar_denom * 100, 100] | min) if bar_denom > 0 else 0 %}
+    {% set comp_fill_pct = [s.overall_completion / 100 * feature_budget_pct, 100] | min %}
+    {% set target_pct = [s.feature_expected_burn_pct / 100 * feature_budget_pct, 100] | min %}
+    {% set bar_scale = (s.total_budget / bar_denom) if bar_denom > 0 else 1 %}
+    {% set bar_locked_risk_pct = [rs.locked_risk_pct * bar_scale, 100] | min %}
+    {% set bar_open_risk_pct = [rs.open_risk_pct * bar_scale, 100 - bar_locked_risk_pct] | min %}
     <div class="hero-card">
         <div class="label">Overall Completion</div>
         <div class="value" style="color: {{ comp_color }}">{{ s.overall_completion | pct }}</div>
         <div class="progress progress-lg" role="progressbar" aria-valuenow="{{ s.overall_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100" style="margin-top:2px;">
-            <div class="fill {{ comp_fill }}" style="width: {{ [s.overall_completion, 100] | min }}%"></div>
-            {% if s.feature_expected_burn_pct > 0 and s.feature_expected_burn_pct <= 100 %}
-            <div class="target" style="left: {{ s.feature_expected_burn_pct }}%"></div>
+            {% if feature_budget_pct > 0 %}
+            <div class="feature-budget-bar" style="width: {{ feature_budget_pct }}%"></div>
             {% endif %}
-            {% if rs.locked_risk_pct > 0 %}
-            <div class="risk-realised" style="width: {{ rs.locked_risk_pct }}%; right: 0; left: auto;"></div>
+            <div class="fill {{ comp_fill }}" style="width: {{ comp_fill_pct }}%"></div>
+            {% if target_pct > 0 %}
+            <div class="target" style="left: {{ target_pct }}%"></div>
             {% endif %}
-            {% if rs.open_risk_pct > 0 %}
-            <div class="risk-open" style="width: {{ rs.open_risk_pct }}%; right: {{ rs.locked_risk_pct }}%; left: auto;"></div>
+            {% if bar_locked_risk_pct > 0 %}
+            <div class="risk-realised" style="width: {{ bar_locked_risk_pct }}%; right: 0; left: auto;"></div>
+            {% endif %}
+            {% if bar_open_risk_pct > 0 %}
+            <div class="risk-open" style="width: {{ bar_open_risk_pct }}%; right: {{ bar_locked_risk_pct }}%; left: auto;"></div>
             {% endif %}
         </div>
         <div class="sub-row">

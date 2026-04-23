@@ -5,30 +5,30 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-- [x] In the sidebar, having the project symbol's colour-coded square thing match the rest of the UI styling by using the rounded edges and maybe even subtlye gradient similar to the HealthCheck app's icon would be good
-
+- [ ] Move the visual settings lower below overheads as those are not frequently adjusted and remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. 
 ### Dashboard
-- [x] Reverse the order of the budget days remaining hero card sub-items. Start with the not at risk days at the top and end at the lost to risk days at the bottom.  
-- [x] Add the number of working days left until the project end date to the full-team-budget-days-remaining top level metric (e.g 59.9 becomes something like 59.9 available of 40 to end date) 
-- [x] For the full team budget remaining hero card, If both risks are present and features with days allocated then it may also be helpful to a PM who is trying to make a decision if they know how many days before they have to make a decision between features or risks. This data tells a story that empowers them to make pivots early. EG if we have 60 days remaining with 20 days at risk or lost to risks, and 50 days allocated to features then we know that in 10 days we will need to either reduce scope or risks as our buffer to feature completion is only 10 of our 60 days. 
+- [ ] Move project context up to above the Budget and spend section so that it sits as the first item beneath the hero cards.
+- [ ] Capacity remaining in the capacity section should specify that it's full-team capacity remaining
+- [ ] For remaining feature work in the Budget & spend, move the delivered amount to a new line instead of using a dot to separate it from the remaining % so that it is clearly cisually its own distinct data point. 
 
 ### Features, Requirements & Deliverables
-
 
 ### Decision Register
 
 ### Capacity
-- [ ] The capacity planner seems to be only counting forward from the current date when calculating remaining capacity. I would like to be able to retroactively add an adjustment to capacity for example adding an item for a previoous week because I just found out someone was away and then have it count forward from the project start date. 
-
 
 ### Notes
 
 ### Misc
+- [ ] Make sure test coverage is up-to-date and accounts for new features like the decision register
+- [ ] Ensure that import and export are robust and account for new features like decision register
 
 ## New Feature Items
+### Project snapshot comparison - Medium Priority
+- [ ] Being able to use the import feature to populate data not for the project itself but for a comparison report between two different project dates where differences between dashboard metrics (not at the granularity of individual deliverable deltas because it would be hard to account for new deliverables but maybe overall completion percentages of features) new risks, , etc are included and shown to the user to answer the question of "what has changed since the last time we exported the project" at a glance. The import feature may not be required for this if a deep copy of report-relevant information could be made for the snapshot comparison purposes. 
 
 ### Inter-Dashboard A single card per project designed to show what matters at a glance - High Priority
-* [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. 
+- [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. 
 
 #### Planning Activity
 
