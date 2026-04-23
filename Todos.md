@@ -5,18 +5,17 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-- [x] Project Icons. Add some more icons, I like the lightning bolt as that could be industry-specific. COuld you add more that indicate an industry? Maybe some that seem financial, related to construction, education, etc? Also in the sidebar, having the symbol's colour-coded square thing mathc the rest of the UI styling by using the rounded edges and maybe even subtlye gradient from the app icon would be good
-
-- [x] Add a project end date field, similar to the as-of date except that it defines the expected project deadline. 
+- [x] In the sidebar, having the project symbol's colour-coded square thing match the rest of the UI styling by using the rounded edges and maybe even subtlye gradient similar to the HealthCheck app's icon would be good
 
 ### Dashboard
-- [x] For spend delta, let it be coloured green if we're below delivery target but still leave the yellow badge that tells us why it's not entirely a good thing. 
+- [x] Reverse the order of the budget days remaining hero card sub-items. Start with the not at risk days at the top and end at the lost to risk days at the bottom.  
+- [x] Add the number of working days left until the project end date to the full-team-budget-days-remaining top level metric (e.g 59.9 becomes something like 59.9 available of 40 to end date) 
+- [x] For the full team budget remaining hero card, If both risks are present and features with days allocated then it may also be helpful to a PM who is trying to make a decision if they know how many days before they have to make a decision between features or risks. This data tells a story that empowers them to make pivots early. EG if we have 60 days remaining with 20 days at risk or lost to risks, and 50 days allocated to features then we know that in 10 days we will need to either reduce scope or risks as our buffer to feature completion is only 10 of our 60 days. 
 
 ### Features, Requirements & Deliverables
-- [x] The little arrows on each Requirement that let the user expand and collapse the deliverables are quite small compared to the title and are easy to miss. Making the symbol itself (not just the button) around 50% bigger to increase visual clarity.
+
 
 ### Decision Register
-- [x] Add a new long text field "Expected Outcome" to the decision register to track what the decision hoped to achieve. For example "Reduced overall risk for MVP by 10%" 
 
 ### Capacity
 - [ ] The capacity planner seems to be only counting forward from the current date when calculating remaining capacity. I would like to be able to retroactively add an adjustment to capacity for example adding an item for a previoous week because I just found out someone was away and then have it count forward from the project start date. 
