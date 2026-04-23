@@ -102,13 +102,17 @@
             <div class="row bad-row"><span class="lbl">Lost to realised risks</span><span class="val">− {{ realised_risk_days | days }}d</span></div>
             {% endif %}
             {% set total_risk_days = realised_risk_days + open_risk_days %}
-            {% if total_risk_days > 0 and total_feature_days > 0 %}
-            {% set decision_buffer = s.total_budget_days_remaining - total_feature_days %}
-            {% if decision_buffer > 0 %}
-            <div class="row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px; color:var(--warn);"><span class="lbl">Days before scope/risk decision</span><span class="val">~{{ decision_buffer | days }}d</span></div>
-            {% elif decision_buffer <= 0 %}
-            <div class="row bad-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;"><span class="lbl">Scope or risk decision overdue</span><span class="val">{{ (decision_buffer * -1) | days }}d over</span></div>
-            {% endif %}
+            {% set feature_team_days = (s.allocated_dollars / s.daily_burn) if s.daily_burn else 0 %}
+            {% if total_risk_days > 0 and feature_team_days > 0 %}
+            {% set decision_buffer = s.total_budget_days_remaining - feature_team_days %}
+            <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;">
+                <div class="row"><span class="lbl">Days allocated to features</span><span class="val">{{ feature_team_days | days }}d</span></div>
+                {% if decision_buffer > 0 %}
+                <div class="row" style="color:var(--warn);"><span class="lbl">Days before scope/risk decision</span><span class="val">≈{{ decision_buffer | days }}d</span></div>
+                {% else %}
+                <div class="row bad-row"><span class="lbl">Scope or risk decision overdue</span><span class="val">{{ (decision_buffer * -1) | days }}d over</span></div>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
     </div>

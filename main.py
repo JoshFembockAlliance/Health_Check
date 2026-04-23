@@ -490,7 +490,6 @@ def dashboard(request: Request, project_id: int):
         "cap_budget": cap_budget,
         "dashboard_notes": dashboard_notes,
         "notes_overflow": notes_overflow,
-        "total_feature_days": total_feature_days,
         "days_to_end": days_to_end,
     }
     ctx.update(shell_context(project_id))
