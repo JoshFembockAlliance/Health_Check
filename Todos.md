@@ -8,7 +8,7 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 - [ ] Move the visual settings lower below overheads as those are not frequently adjusted and remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. 
 ### Dashboard
 - [x] Move project context up to above the Budget and spend section so that it sits as the first item beneath the hero cards.
-- [ ] Capacity remaining in the capacity section should specify that it's full-team capacity remaining
+- [x] Capacity remaining in the capacity section should specify that it's full-team capacity remaining
 - [ ] For remaining feature work in the Budget & spend, move the delivered amount to a new line instead of using a dot to separate it from the remaining % so that it is clearly cisually its own distinct data point. 
 
 ### Features, Requirements & Deliverables
