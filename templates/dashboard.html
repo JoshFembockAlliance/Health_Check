@@ -232,7 +232,7 @@
             {% set delivered_dollars = s.allocated_dollars - s.remaining_dollars %}
             {% set remaining_pct = (s.remaining_dollars / s.allocated_dollars * 100) %}
             <div class="value val-lg">{{ s.remaining_dollars | currency }}</div>
-            <div class="meta">{{ remaining_pct | pct }} of {{ s.allocated_dollars | currency }}</div>
+            <div class="meta">{{ remaining_pct | pct }} of {{ s.allocated_dollars | currency }} remaining</div>
             <div class="meta">{{ delivered_dollars | currency }} delivered</div>
             {% else %}
             <div class="value val-lg muted">—</div>
