@@ -85,19 +85,31 @@
 
     <div class="hero-card">
         <div class="label">Full-Team Budget Days Remaining</div>
-        <div class="value" style="color: {{ days_color }}">{{ s.total_budget_days_remaining | days }}</div>
+        <div class="value" style="color: {{ days_color }}">
+            {{- s.total_budget_days_remaining | days -}}
+            {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;">of {{ days_to_end }}d to end date</span>{% endif %}
+        </div>
         <div class="sub-row">
             <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ p.team_size }} people</span></div>
             {% set realised_risk_days = (s.realised_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
             {% set open_risk_days = (s.open_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
             {% set not_at_risk_days = s.total_budget_days_remaining - realised_risk_days - open_risk_days %}
-            {% if realised_risk_days > 0 %}
-            <div class="row bad-row"><span class="lbl">Lost to realised risks</span><span class="val">− {{ realised_risk_days | days }}d</span></div>
-            {% endif %}
+            <div class="row" style="color: var(--good);"><span class="lbl">Not at risk</span><span class="val">{{ not_at_risk_days | days }}d</span></div>
             {% if open_risk_days > 0 %}
             <div class="row warn-row"><span class="lbl">Exposed to open risks</span><span class="val">− {{ open_risk_days | days }}d</span></div>
             {% endif %}
-            <div class="row" style="color: var(--good);"><span class="lbl">Not at risk</span><span class="val">{{ not_at_risk_days | days }}d</span></div>
+            {% if realised_risk_days > 0 %}
+            <div class="row bad-row"><span class="lbl">Lost to realised risks</span><span class="val">− {{ realised_risk_days | days }}d</span></div>
+            {% endif %}
+            {% set total_risk_days = realised_risk_days + open_risk_days %}
+            {% if total_risk_days > 0 and total_feature_days > 0 %}
+            {% set decision_buffer = s.total_budget_days_remaining - total_feature_days %}
+            {% if decision_buffer > 0 %}
+            <div class="row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px; color:var(--warn);"><span class="lbl">Days before scope/risk decision</span><span class="val">~{{ decision_buffer | days }}d</span></div>
+            {% elif decision_buffer <= 0 %}
+            <div class="row bad-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;"><span class="lbl">Scope or risk decision overdue</span><span class="val">{{ (decision_buffer * -1) | days }}d over</span></div>
+            {% endif %}
+            {% endif %}
         </div>
     </div>
 </div>

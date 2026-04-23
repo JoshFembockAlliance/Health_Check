@@ -25,6 +25,7 @@ from calculations import (
     capacity_budget_summary,
     get_week_monday,
     parse_date,
+    business_days_between,
 )
 
 app = FastAPI()
@@ -472,6 +473,8 @@ def dashboard(request: Request, project_id: int):
     notes_overflow = max(0, len(dashboard_notes) - 3)
     dashboard_notes = dashboard_notes[:3]
 
+    days_to_end = business_days_between(as_of, end_dt) if (as_of and end_dt and end_dt > as_of) else None
+
     ctx = {
         "request": request,
         "active": "dashboard",
@@ -487,6 +490,8 @@ def dashboard(request: Request, project_id: int):
         "cap_budget": cap_budget,
         "dashboard_notes": dashboard_notes,
         "notes_overflow": notes_overflow,
+        "total_feature_days": total_feature_days,
+        "days_to_end": days_to_end,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "dashboard.html", ctx)
