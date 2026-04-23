@@ -134,6 +134,52 @@
     </div>
 </div>
 
+{# ── Project Context ── #}
+<div class="section-title"><h2>Project Context</h2></div>
+<div class="card">
+    <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr);">
+        <div class="stat">
+            <div class="label">Initial Budget</div>
+            <div class="value val-lg">{{ s.initial_budget | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Budget Adjustments</div>
+            <div class="value val-lg">{% if s.total_adjustments >= 0 %}+ {% endif %}{{ s.total_adjustments | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Total Budget</div>
+            <div class="value val-lg">{{ s.total_budget | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Spent to Date</div>
+            <div class="value val-lg">{{ s.actual_spend | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Current Budget</div>
+            <div class="value val-lg">{{ s.current_budget | currency }}</div>
+        </div>
+    </div>
+    <hr class="hr">
+    <div class="field-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Allocated to Features</div>
+            <div class="mono" style="font-size:15px;">{{ s.allocated_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Allocated to Overheads</div>
+            <div class="mono" style="font-size:15px;">{{ s.overhead_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Absorbed by Realised Risks</div>
+            <div class="mono" style="font-size:15px; color: var(--bad);">{{ s.realised_risk_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Unallocated Budget</div>
+            <div class="mono" style="font-size:15px;">{{ s.unallocated_budget | currency }}</div>
+        </div>
+    </div>
+</div>
+
 {# ── Budget & Spend ── #}
 <div class="section-title"><h2>Budget &amp; Spend</h2></div>
 <div class="card">
@@ -190,52 +236,6 @@
             {% else %}
             <div class="value val-lg muted">—</div>
             {% endif %}
-        </div>
-    </div>
-</div>
-
-{# ── Project Context ── #}
-<div class="section-title"><h2>Project Context</h2></div>
-<div class="card">
-    <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr);">
-        <div class="stat">
-            <div class="label">Initial Budget</div>
-            <div class="value val-lg">{{ s.initial_budget | currency }}</div>
-        </div>
-        <div class="stat">
-            <div class="label">Budget Adjustments</div>
-            <div class="value val-lg">{% if s.total_adjustments >= 0 %}+ {% endif %}{{ s.total_adjustments | currency }}</div>
-        </div>
-        <div class="stat">
-            <div class="label">Total Budget</div>
-            <div class="value val-lg">{{ s.total_budget | currency }}</div>
-        </div>
-        <div class="stat">
-            <div class="label">Spent to Date</div>
-            <div class="value val-lg">{{ s.actual_spend | currency }}</div>
-        </div>
-        <div class="stat">
-            <div class="label">Current Budget</div>
-            <div class="value val-lg">{{ s.current_budget | currency }}</div>
-        </div>
-    </div>
-    <hr class="hr">
-    <div class="field-grid" style="grid-template-columns: repeat(4, 1fr);">
-        <div>
-            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Allocated to Features</div>
-            <div class="mono" style="font-size:15px;">{{ s.allocated_dollars | currency }}</div>
-        </div>
-        <div>
-            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Allocated to Overheads</div>
-            <div class="mono" style="font-size:15px;">{{ s.overhead_dollars | currency }}</div>
-        </div>
-        <div>
-            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Absorbed by Realised Risks</div>
-            <div class="mono" style="font-size:15px; color: var(--bad);">{{ s.realised_risk_dollars | currency }}</div>
-        </div>
-        <div>
-            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Unallocated Budget</div>
-            <div class="mono" style="font-size:15px;">{{ s.unallocated_budget | currency }}</div>
         </div>
     </div>
 </div>
