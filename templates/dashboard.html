@@ -129,7 +129,7 @@
 {# ── Budget & Spend ── #}
 <div class="section-title"><h2>Budget &amp; Spend</h2></div>
 <div class="card">
-    <div class="stat-grid">
+    <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr);">
         <div class="stat">
             <div class="label">Actual Spend to Date</div>
             <div class="value val-lg">{{ s.actual_spend | currency }}</div>
@@ -170,6 +170,17 @@
                     ⚠ {{ s.open_risk_dollars | currency }} at risk
                 </span>
             </div>
+            {% endif %}
+        </div>
+        <div class="stat">
+            <div class="label">Remaining Feature Work</div>
+            {% if s.allocated_dollars > 0 %}
+            {% set delivered_dollars = s.allocated_dollars - s.remaining_dollars %}
+            {% set remaining_pct = (s.remaining_dollars / s.allocated_dollars * 100) %}
+            <div class="value val-lg">{{ s.remaining_dollars | currency }}</div>
+            <div class="meta">{{ remaining_pct | pct }} of {{ s.allocated_dollars | currency }} · {{ delivered_dollars | currency }} delivered</div>
+            {% else %}
+            <div class="value val-lg muted">—</div>
             {% endif %}
         </div>
     </div>
