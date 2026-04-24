@@ -10,12 +10,22 @@ import zipfile
 import html as _html_module
 from datetime import datetime, date as _date, timedelta
 
-from database import init_db, get_db, seed_project_defaults, PROJECT_SCOPED_TABLES
+from database import (
+    init_db,
+    get_db,
+    seed_project_defaults,
+    PROJECT_SCOPED_TABLES,
+    PROJECT_TYPE_AGILE,
+    PROJECT_TYPE_FIXED_PRICE,
+    VALID_PROJECT_TYPES,
+)
 from calculations import (
     deliverable_summary,
     requirement_summary,
     feature_summary,
-    project_summary,
+    agile_project_summary,
+    fixed_price_project_summary,
+    milestones_summary,
     feature_health,
     effective_impact_days,
     unrealised_exposure_days,
@@ -198,7 +208,56 @@ def _dashboard_counts(project_id: int):
         "SELECT COUNT(*) FROM decisions WHERE project_id = ?",
         [project_id],
     ).fetchone()[0]
-    return {"features": feat_count, "risks": open_risks, "notes": open_notes, "decisions": decisions_count}
+    milestones_count = db.execute(
+        "SELECT COUNT(*) FROM milestones WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0] if "milestones" in db.table_names() else 0
+    return {
+        "features": feat_count,
+        "risks": open_risks,
+        "notes": open_notes,
+        "decisions": decisions_count,
+        "milestones": milestones_count,
+    }
+
+
+def is_fixed_price(project: dict) -> bool:
+    """True if the project opts into the fixed-price dashboard + milestones tab."""
+    return (project.get("project_type") or PROJECT_TYPE_AGILE) == PROJECT_TYPE_FIXED_PRICE
+
+
+def _fetch_milestones_data(project_id: int):
+    """Load milestones, invoices, and feature links for a project.
+    Returns ``(milestones, invoices, links)`` as lists of plain dicts ordered
+    the way the calculations and templates expect them.
+    """
+    db = get_db()
+    milestones = [dict(r) for r in db["milestones"].rows_where(
+        "project_id = ?", [project_id], order_by="sort_order, id"
+    )] if "milestones" in db.table_names() else []
+    if not milestones:
+        return [], [], []
+    mids = [m["id"] for m in milestones]
+    placeholders = ",".join("?" * len(mids))
+    invoice_rows = list(db.execute(
+        f"SELECT id, milestone_id, invoice_number, amount, status, issue_date, paid_date "
+        f"FROM milestone_invoices WHERE milestone_id IN ({placeholders}) "
+        f"ORDER BY issue_date, id",
+        mids,
+    ).fetchall())
+    invoices = [
+        {"id": r[0], "milestone_id": r[1], "invoice_number": r[2],
+         "amount": r[3] or 0.0, "status": r[4] or "invoiced",
+         "issue_date": r[5] or "", "paid_date": r[6] or ""}
+        for r in invoice_rows
+    ]
+    link_rows = list(db.execute(
+        f"SELECT milestone_id, feature_id FROM milestone_features "
+        f"WHERE milestone_id IN ({placeholders})",
+        mids,
+    ).fetchall())
+    links = [{"milestone_id": r[0], "feature_id": r[1]} for r in link_rows]
+    return milestones, invoices, links
 
 
 def _project_shell_meta(project_id: int):
@@ -261,8 +320,13 @@ def cross_project_dashboard(request: Request):
 # ── Project CRUD ──
 
 @app.post("/projects/add")
-def add_project(name: str = Form(...), description: str = Form("")):
+def add_project(
+    name: str = Form(...),
+    description: str = Form(""),
+    project_type: str = Form(PROJECT_TYPE_AGILE),
+):
     db = get_db()
+    safe_type = project_type if project_type in VALID_PROJECT_TYPES else PROJECT_TYPE_AGILE
     pid = db["projects"].insert({
         "name": name or "New Project",
         "description": description,
@@ -274,6 +338,7 @@ def add_project(name: str = Form(...), description: str = Form("")):
         "default_role_id": 0,
         "health_on_track_pct": 100.0,
         "health_at_risk_pct": 80.0,
+        "project_type": safe_type,
     }).last_pk
     seed_project_defaults(pid)
     return RedirectResponse(f"/p/{pid}/settings", status_code=303)
@@ -308,6 +373,16 @@ def delete_project(project_id: int):
         rip = ",".join("?" * len(risk_ids))
         db.execute(f"DELETE FROM risk_features WHERE risk_id IN ({rip})", risk_ids)
 
+    # Milestone children (features links + invoices) need explicit cleanup.
+    if "milestones" in db.table_names():
+        ms_ids = [r[0] for r in db.execute(
+            "SELECT id FROM milestones WHERE project_id = ?", [project_id]
+        ).fetchall()]
+        if ms_ids:
+            mp = ",".join("?" * len(ms_ids))
+            db.execute(f"DELETE FROM milestone_features WHERE milestone_id IN ({mp})", ms_ids)
+            db.execute(f"DELETE FROM milestone_invoices WHERE milestone_id IN ({mp})", ms_ids)
+
     for tbl in PROJECT_SCOPED_TABLES:
         db.execute(f"DELETE FROM {tbl} WHERE project_id = ?", [project_id])
     db["projects"].delete(project_id)
@@ -319,6 +394,14 @@ def delete_project(project_id: int):
 @app.get("/p/{project_id}/")
 @app.get("/p/{project_id}")
 def dashboard(request: Request, project_id: int):
+    project = get_project(project_id)
+    if is_fixed_price(project):
+        return _fixed_price_dashboard(request, project)
+    return _agile_dashboard(request, project)
+
+
+def _agile_dashboard(request: Request, project: dict):
+    project_id = project["id"]
     db = get_db()
     features, project, roles, default_rate = build_feature_data(project_id)
     adj_rows = list(db.execute(
@@ -347,7 +430,7 @@ def dashboard(request: Request, project_id: int):
     )
     open_risk_dollars = open_exposure_days * default_rate
 
-    summary = project_summary(
+    summary = agile_project_summary(
         project, features, adjustments, default_rate,
         realised_risk_dollars=realised_risk_dollars,
         overhead_dollars=overhead_total,
@@ -493,7 +576,247 @@ def dashboard(request: Request, project_id: int):
         "days_to_end": days_to_end,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse(request, "dashboard.html", ctx)
+    return templates.TemplateResponse(request, "dashboard_agile.html", ctx)
+
+
+def _fixed_price_dashboard(request: Request, project: dict):
+    project_id = project["id"]
+    features, project, roles, default_rate = build_feature_data(project_id)
+
+    milestones_raw, invoices, links = _fetch_milestones_data(project_id)
+    milestones = milestones_summary(milestones_raw, invoices, features, links)
+
+    summary = fixed_price_project_summary(project, features, milestones, default_rate)
+
+    # Risks and PM notes still apply to fixed-price projects (they affect
+    # delivery confidence and margin). Reuse the existing aggregation shape
+    # so the shared partials just work.
+    db = get_db()
+    risk_rows = db.execute(
+        "SELECT status, impact_days, realised_percentage FROM risks WHERE project_id = ?",
+        [project_id],
+    ).fetchall()
+    open_risks = [r for r in risk_rows if r[0] != "done"]
+    closed_risks = [r for r in risk_rows if r[0] == "done"]
+    realised_risk_days = sum(effective_impact_days(r[1], r[2] or 0.0) for r in risk_rows)
+    open_exposure_days = sum(unrealised_exposure_days(r[1], r[0], r[2] or 0.0) for r in risk_rows)
+    realised_risk_dollars = realised_risk_days * default_rate
+    open_risk_dollars = open_exposure_days * default_rate
+    avoided = sum(r[1] for r in closed_risks if (r[2] or 0.0) == 0)
+    risk_summary = {
+        "open_count": len(open_risks),
+        "done_count": len(closed_risks),
+        "open_impact_days": open_exposure_days,
+        "open_impact_dollars": open_risk_dollars,
+        "effective_impact_days": realised_risk_days,
+        "effective_impact_dollars": realised_risk_dollars,
+        "avoided_days": avoided,
+    }
+
+    as_of_str = project.get("as_of_date", "")
+    note_rows = list(db.execute(
+        "SELECT id, name, description, status, due_date FROM pm_notes "
+        "WHERE project_id = ? ORDER BY sort_order, id", [project_id]
+    ).fetchall())
+    sticky_notes = []
+    dated_notes = []
+    aof = parse_date(as_of_str)
+    for nr in note_rows:
+        nstatus = nr[3]
+        if nstatus == "done":
+            continue
+        note_dict = {"id": nr[0], "name": nr[1], "description": nr[2], "status": nstatus, "due_date": nr[4]}
+        if nstatus == "sticky":
+            sticky_notes.append(note_dict)
+            continue
+        ndue = parse_date(nr[4])
+        if aof and ndue and (ndue <= aof or ndue <= aof + timedelta(days=14)):
+            dated_notes.append(note_dict)
+    dated_notes.sort(key=lambda n: n["due_date"] or "9999-99-99")
+    dashboard_notes = sticky_notes + dated_notes
+    notes_overflow = max(0, len(dashboard_notes) - 3)
+    dashboard_notes = dashboard_notes[:3]
+
+    ctx = {
+        "request": request,
+        "active": "dashboard",
+        "active_page": "dashboard",
+        "project": project,
+        "features": features,
+        "milestones": milestones,
+        "summary": summary,
+        "risk_summary": risk_summary,
+        "dashboard_notes": dashboard_notes,
+        "notes_overflow": notes_overflow,
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse(request, "dashboard_fixed_price.html", ctx)
+
+
+# ── Milestones (fixed-price) ──
+
+@app.get("/p/{project_id}/milestones")
+def milestones_page(request: Request, project_id: int):
+    project = get_project(project_id)
+    features, _, _, _ = build_feature_data(project_id)
+    milestones_raw, invoices, links = _fetch_milestones_data(project_id)
+    enriched = milestones_summary(milestones_raw, invoices, features, links)
+    total_value = sum(m["value"] for m in enriched)
+    total_invoiced = sum(m["invoiced_amount"] for m in enriched)
+    total_paid = sum(m["paid_amount"] for m in enriched)
+    ctx = {
+        "request": request,
+        "active": "milestones",
+        "active_page": "milestones",
+        "project": project,
+        "milestones": enriched,
+        "features": features,
+        "totals": {
+            "value": total_value,
+            "invoiced": total_invoiced,
+            "paid": total_paid,
+        },
+    }
+    ctx.update(shell_context(project_id))
+    return templates.TemplateResponse(request, "milestones.html", ctx)
+
+
+@app.post("/p/{project_id}/milestones/add")
+def add_milestone(
+    project_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    value: float = Form(0),
+):
+    db = get_db()
+    max_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM milestones WHERE project_id = ?",
+        [project_id],
+    ).fetchone()[0]
+    db["milestones"].insert({
+        "project_id": project_id,
+        "name": name,
+        "description": description,
+        "value": value,
+        "sort_order": max_order + 1,
+    })
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/update")
+def update_milestone(
+    project_id: int,
+    milestone_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    value: float = Form(0),
+):
+    db = get_db()
+    db["milestones"].update(milestone_id, {
+        "name": name,
+        "description": description,
+        "value": value,
+    })
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/delete")
+def delete_milestone(project_id: int, milestone_id: int):
+    db = get_db()
+    db.execute("DELETE FROM milestone_features WHERE milestone_id = ?", [milestone_id])
+    db.execute("DELETE FROM milestone_invoices WHERE milestone_id = ?", [milestone_id])
+    db["milestones"].delete(milestone_id)
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/move")
+def move_milestone(project_id: int, milestone_id: int, direction: str = Form("up")):
+    """Swap this milestone's sort_order with the adjacent one."""
+    db = get_db()
+    rows = list(db.execute(
+        "SELECT id, sort_order FROM milestones WHERE project_id = ? ORDER BY sort_order, id",
+        [project_id],
+    ).fetchall())
+    ordered = [(r[0], r[1]) for r in rows]
+    idx = next((i for i, (mid, _) in enumerate(ordered) if mid == milestone_id), None)
+    if idx is None:
+        return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if 0 <= swap_idx < len(ordered):
+        a_id, a_order = ordered[idx]
+        b_id, b_order = ordered[swap_idx]
+        db["milestones"].update(a_id, {"sort_order": b_order})
+        db["milestones"].update(b_id, {"sort_order": a_order})
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/features")
+def set_milestone_features(
+    project_id: int,
+    milestone_id: int,
+    feature_ids: list[int] = Form(default=[]),
+):
+    """Replace the set of features linked to this milestone."""
+    db = get_db()
+    db.execute("DELETE FROM milestone_features WHERE milestone_id = ?", [milestone_id])
+    for fid in feature_ids:
+        db["milestone_features"].insert({"milestone_id": milestone_id, "feature_id": fid})
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/invoices/add")
+def add_milestone_invoice(
+    project_id: int,
+    milestone_id: int,
+    invoice_number: str = Form(""),
+    amount: float = Form(0),
+    status: str = Form("invoiced"),
+    issue_date: str = Form(""),
+    paid_date: str = Form(""),
+):
+    db = get_db()
+    safe_status = status if status in ("invoiced", "paid") else "invoiced"
+    if not issue_date:
+        issue_date = _date.today().isoformat()
+    db["milestone_invoices"].insert({
+        "milestone_id": milestone_id,
+        "invoice_number": invoice_number,
+        "amount": amount,
+        "status": safe_status,
+        "issue_date": issue_date,
+        "paid_date": paid_date,
+    })
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/invoices/{invoice_id}/update")
+def update_milestone_invoice(
+    project_id: int,
+    milestone_id: int,
+    invoice_id: int,
+    invoice_number: str = Form(""),
+    amount: float = Form(0),
+    status: str = Form("invoiced"),
+    issue_date: str = Form(""),
+    paid_date: str = Form(""),
+):
+    db = get_db()
+    safe_status = status if status in ("invoiced", "paid") else "invoiced"
+    db["milestone_invoices"].update(invoice_id, {
+        "invoice_number": invoice_number,
+        "amount": amount,
+        "status": safe_status,
+        "issue_date": issue_date,
+        "paid_date": paid_date,
+    })
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
+
+
+@app.post("/p/{project_id}/milestones/{milestone_id}/invoices/{invoice_id}/delete")
+def delete_milestone_invoice(project_id: int, milestone_id: int, invoice_id: int):
+    db = get_db()
+    db["milestone_invoices"].delete(invoice_id)
+    return RedirectResponse(f"/p/{project_id}/milestones", status_code=303)
 
 
 # ── Settings ──
@@ -533,9 +856,10 @@ def update_project(
     actual_spend: float = Form(0),
     health_on_track_pct: float = Form(100.0),
     health_at_risk_pct: float = Form(80.0),
+    project_type: Optional[str] = Form(None),
 ):
     db = get_db()
-    db["projects"].update(project_id, {
+    patch = {
         "name": name,
         "description": description,
         "start_date": start_date,
@@ -545,7 +869,10 @@ def update_project(
         "actual_spend": actual_spend,
         "health_on_track_pct": health_on_track_pct,
         "health_at_risk_pct": health_at_risk_pct,
-    })
+    }
+    if project_type is not None and project_type in VALID_PROJECT_TYPES:
+        patch["project_type"] = project_type
+    db["projects"].update(project_id, patch)
     return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
@@ -1448,11 +1775,12 @@ def update_capacity_defaults(
 EXPORT_TABLES = [
     "projects", "roles", "budget_adjustments", "features", "requirements",
     "deliverables", "risks", "risk_features", "overheads", "pm_notes",
-    "capacity_periods",
+    "capacity_periods", "decisions", "decision_features",
+    "milestones", "milestone_features", "milestone_invoices",
 ]
 
 
-def _scoped_rows(db, table: str, project_id: int, feature_ids: list, risk_ids: list):
+def _scoped_rows(db, table: str, project_id: int, feature_ids: list, risk_ids: list, milestone_ids: list = None):
     """Rows of a table belonging to the given project."""
     if table == "projects":
         return list(db.execute("SELECT * FROM projects WHERE id = ?", [project_id]).fetchall())
@@ -1481,6 +1809,25 @@ def _scoped_rows(db, table: str, project_id: int, feature_ids: list, risk_ids: l
             f"SELECT * FROM risk_features WHERE risk_id IN ({placeholders})",
             risk_ids,
         ).fetchall())
+    if table == "decision_features":
+        decision_ids = [r[0] for r in db.execute(
+            "SELECT id FROM decisions WHERE project_id = ?", [project_id]
+        ).fetchall()]
+        if not decision_ids:
+            return []
+        placeholders = ",".join("?" * len(decision_ids))
+        return list(db.execute(
+            f"SELECT * FROM decision_features WHERE decision_id IN ({placeholders})",
+            decision_ids,
+        ).fetchall())
+    if table in ("milestone_features", "milestone_invoices"):
+        if not milestone_ids:
+            return []
+        placeholders = ",".join("?" * len(milestone_ids))
+        return list(db.execute(
+            f"SELECT * FROM {table} WHERE milestone_id IN ({placeholders})",
+            milestone_ids,
+        ).fetchall())
     # default: project-scoped table
     return list(db.execute(
         f"SELECT * FROM {table} WHERE project_id = ?", [project_id]
@@ -1501,12 +1848,15 @@ def export_csv(project_id: int):
     risk_ids = [r[0] for r in db.execute(
         "SELECT id FROM risks WHERE project_id = ?", [project_id]
     ).fetchall()]
+    milestone_ids = [r[0] for r in db.execute(
+        "SELECT id FROM milestones WHERE project_id = ?", [project_id]
+    ).fetchall()] if "milestones" in db.table_names() else []
 
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for table_name in EXPORT_TABLES:
             if table_name not in db.table_names():
                 continue
-            rows = _scoped_rows(db, table_name, project_id, feat_ids, risk_ids)
+            rows = _scoped_rows(db, table_name, project_id, feat_ids, risk_ids, milestone_ids)
             if not rows:
                 continue
             # Get column names
@@ -1555,6 +1905,22 @@ async def import_csv(project_id: int, file: UploadFile = File(...)):
     if risk_ids:
         rip = ",".join("?" * len(risk_ids))
         db.execute(f"DELETE FROM risk_features WHERE risk_id IN ({rip})", risk_ids)
+    # Milestone children (links + invoices) must be purged before the parent rows.
+    if "milestones" in db.table_names():
+        ms_ids = [r[0] for r in db.execute(
+            "SELECT id FROM milestones WHERE project_id = ?", [project_id]
+        ).fetchall()]
+        if ms_ids:
+            mp = ",".join("?" * len(ms_ids))
+            db.execute(f"DELETE FROM milestone_features WHERE milestone_id IN ({mp})", ms_ids)
+            db.execute(f"DELETE FROM milestone_invoices WHERE milestone_id IN ({mp})", ms_ids)
+    # Decision children
+    decision_ids = [r[0] for r in db.execute(
+        "SELECT id FROM decisions WHERE project_id = ?", [project_id]
+    ).fetchall()]
+    if decision_ids:
+        dp = ",".join("?" * len(decision_ids))
+        db.execute(f"DELETE FROM decision_features WHERE decision_id IN ({dp})", decision_ids)
     for tbl in PROJECT_SCOPED_TABLES:
         db.execute(f"DELETE FROM {tbl} WHERE project_id = ?", [project_id])
 
@@ -1663,6 +2029,43 @@ async def import_csv(project_id: int, file: UploadFile = File(...)):
             old_role = row.get("role_id")
             cleaned["role_id"] = role_map.get(str(old_role)) if old_role else None
             db["capacity_periods"].insert(cleaned)
+
+        # decisions (remap id + link feature ids)
+        decision_map = {}
+        for row in csv_data.get("decisions", []):
+            old_id = row.get("id")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            new_id = db["decisions"].insert(cleaned).last_pk
+            if old_id:
+                decision_map[str(old_id)] = new_id
+        for row in csv_data.get("decision_features", []):
+            did = decision_map.get(str(row.get("decision_id")))
+            fid = feature_map.get(str(row.get("feature_id")))
+            if did and fid:
+                db["decision_features"].insert({"decision_id": did, "feature_id": fid})
+
+        # milestones (remap id)
+        milestone_map = {}
+        for row in csv_data.get("milestones", []):
+            old_id = row.get("id")
+            cleaned = {k: _coerce(v) for k, v in row.items() if k != "id"}
+            cleaned["project_id"] = project_id
+            new_id = db["milestones"].insert(cleaned).last_pk
+            if old_id:
+                milestone_map[str(old_id)] = new_id
+        for row in csv_data.get("milestone_features", []):
+            mid = milestone_map.get(str(row.get("milestone_id")))
+            fid = feature_map.get(str(row.get("feature_id")))
+            if mid and fid:
+                db["milestone_features"].insert({"milestone_id": mid, "feature_id": fid})
+        for row in csv_data.get("milestone_invoices", []):
+            mid = milestone_map.get(str(row.get("milestone_id")))
+            if not mid:
+                continue
+            cleaned = {k: _coerce(v) for k, v in row.items() if k not in ("id", "milestone_id")}
+            cleaned["milestone_id"] = mid
+            db["milestone_invoices"].insert(cleaned)
 
         # Update project settings (but keep id + project_id consistent)
         for row in csv_data.get("projects", []):

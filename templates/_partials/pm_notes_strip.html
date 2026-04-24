@@ -1,0 +1,20 @@
+{# PM Notes strip — shown on dashboards.
+   Expects: dashboard_notes, notes_overflow, pid
+#}
+{% if dashboard_notes %}
+<div class="section-title"><h2>PM Notes</h2><a class="link" href="/p/{{ pid }}/pm-notes">All notes →{% if notes_overflow > 0 %} <span class="chip chip-soft" style="margin-left:6px;">+{{ notes_overflow }} more</span>{% endif %}</a></div>
+<div class="card-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+    {% for n in dashboard_notes %}
+    {% set sev = 'med' if n.status == 'sticky' else ('med' if n.status == 'doing' else 'low') %}
+    <div class="risk-card sev-{{ sev }}">
+        <div class="head">
+            <span class="chip chip-{{ {'sticky':'info','todo':'bad','doing':'warn','done':'good'}[n.status] }}">{{ n.status | upper }}</span>
+            {% if n.due_date and n.status != 'sticky' %}
+            <span class="tiny muted mono">due {{ n.due_date }}</span>
+            {% endif %}
+        </div>
+        <div class="title" style="font-size:13px;">{{ n.name }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

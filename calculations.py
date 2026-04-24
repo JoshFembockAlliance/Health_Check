@@ -109,7 +109,7 @@ def feature_summary(feature: dict, requirements: list[dict]) -> dict:
     }
 
 
-def project_summary(
+def agile_project_summary(
     project: dict,
     features: list[dict],
     adjustments: list[dict],
@@ -237,6 +237,186 @@ def project_summary(
         "unallocated_budget": unallocated_budget,
         "budget_days_remaining": budget_days_remaining,
         "total_budget_days_remaining": total_budget_days_remaining,
+    }
+
+
+# Backwards-compatible alias. Some callers (and existing tests) still import
+# project_summary; for agile projects the behaviour is identical.
+project_summary = agile_project_summary
+
+
+# ─────────────────────────── Fixed-Price ───────────────────────────
+
+# Colour bands used to tint a milestone's progress-bar segment by the weighted
+# completion of its linked features. "invoiced"/"paid" override the linked-
+# completion colour once money has moved.
+MILESTONE_BAND_PENDING = "pending"       # 0–49% linked completion, no invoices
+MILESTONE_BAND_IN_PROGRESS = "in_progress"  # 50–99% linked completion
+MILESTONE_BAND_READY = "ready"           # 100% linked completion, not invoiced
+MILESTONE_BAND_INVOICED = "invoiced"     # at least one invoice issued
+MILESTONE_BAND_PAID = "paid"             # invoice amounts fully paid up to value
+
+
+def _milestone_linked_completion(milestone_id: int,
+                                 features_by_id: dict,
+                                 milestone_feature_links: list[dict]) -> float:
+    """Weighted-day completion across features linked to this milestone.
+
+    Matches the feature-level rollup used elsewhere: sum(total_days × completion) /
+    sum(total_days). Returns 0 if no linked features have budget.
+    """
+    linked_ids = [
+        link["feature_id"] for link in milestone_feature_links
+        if link["milestone_id"] == milestone_id
+    ]
+    linked = [features_by_id[fid] for fid in linked_ids if fid in features_by_id]
+    total_days = sum(f["total_days"] for f in linked)
+    if total_days <= 0:
+        return 0.0
+    return sum(f["total_days"] * f["weighted_completion"] for f in linked) / total_days
+
+
+def milestones_summary(
+    milestones: list[dict],
+    invoices: list[dict],
+    features: list[dict],
+    milestone_feature_links: list[dict],
+) -> list[dict]:
+    """Enrich milestones with bar geometry, linked-feature completion, and
+    invoice-derived payment status.
+
+    Each result dict contains:
+      * the original milestone fields
+      * invoiced_amount, paid_amount
+      * status: pending | invoiced | paid  (derived from invoices)
+      * linked_completion_pct: weighted completion of linked features (0–100)
+      * value_share: this milestone's fraction of total milestone value
+      * bar_start_pct / bar_width_pct: placement on the progress bar
+      * colour_band: which visual band to tint the segment with
+      * invoices: the subset of invoices belonging to this milestone
+    """
+    features_by_id = {f["id"]: f for f in features}
+    total_value = sum(m["value"] for m in milestones) or 0.0
+    ordered = sorted(milestones, key=lambda m: (m.get("sort_order", 0), m.get("id", 0)))
+
+    running = 0.0
+    enriched = []
+    for m in ordered:
+        mid = m["id"]
+        linked_feature_ids = [
+            link["feature_id"] for link in milestone_feature_links
+            if link["milestone_id"] == mid
+        ]
+        ms_invoices = [inv for inv in invoices if inv["milestone_id"] == mid]
+        invoiced_amount = sum(inv["amount"] for inv in ms_invoices)
+        paid_amount = sum(inv["amount"] for inv in ms_invoices if inv.get("status") == "paid")
+
+        if not ms_invoices:
+            status = "pending"
+        elif paid_amount >= m["value"] - 1e-6 and m["value"] > 0:
+            status = "paid"
+        else:
+            status = "invoiced"
+
+        linked_completion = _milestone_linked_completion(mid, features_by_id, milestone_feature_links)
+
+        if status == "paid":
+            band = MILESTONE_BAND_PAID
+        elif status == "invoiced":
+            band = MILESTONE_BAND_INVOICED
+        elif linked_completion >= 100:
+            band = MILESTONE_BAND_READY
+        elif linked_completion >= 50:
+            band = MILESTONE_BAND_IN_PROGRESS
+        else:
+            band = MILESTONE_BAND_PENDING
+
+        share = (m["value"] / total_value) if total_value > 0 else 0.0
+        width_pct = share * 100.0
+        start_pct = running
+        running += width_pct
+
+        enriched.append({
+            **m,
+            "invoices": ms_invoices,
+            "invoiced_amount": invoiced_amount,
+            "paid_amount": paid_amount,
+            "status": status,
+            "linked_completion_pct": linked_completion,
+            "linked_feature_ids": linked_feature_ids,
+            "value_share": share,
+            "bar_start_pct": start_pct,
+            "bar_width_pct": width_pct,
+            "colour_band": band,
+        })
+
+    return enriched
+
+
+def fixed_price_project_summary(
+    project: dict,
+    features: list[dict],
+    milestones_enriched: list[dict],
+    default_day_rate: float,
+) -> dict:
+    """Top-level fixed-price metrics.
+
+    total_budget is derived from the milestone values (not initial_budget /
+    adjustments). margin is paid_to_date − actual_spend; projected_margin is
+    invoiced_to_date − actual_spend. next_milestone is the first one not yet
+    fully paid. overall_completion uses the same weighted-days formula the
+    agile path uses so the bar reads on the same scale.
+    """
+    actual_spend = project["actual_spend"]
+    total_budget = sum(m["value"] for m in milestones_enriched)
+    invoiced_to_date = sum(m["invoiced_amount"] for m in milestones_enriched)
+    paid_to_date = sum(m["paid_amount"] for m in milestones_enriched)
+
+    margin = paid_to_date - actual_spend
+    projected_margin = invoiced_to_date - actual_spend
+
+    daily_burn = project["team_size"] * default_day_rate
+
+    allocated_days = sum(f["total_days"] for f in features)
+    allocated_dollars = sum(f["total_dollars"] for f in features)
+    total_remaining_days = sum(f["remaining_days"] for f in features)
+    total_remaining_dollars = sum(f["remaining_dollars"] for f in features)
+
+    if allocated_days > 0:
+        overall_completion = sum(
+            f["total_days"] * f["weighted_completion"] for f in features
+        ) / allocated_days
+    else:
+        overall_completion = 0
+
+    next_milestone = None
+    for m in milestones_enriched:
+        if m["status"] != "paid":
+            next_milestone = m
+            break
+
+    start = parse_date(project["start_date"])
+    as_of = parse_date(project["as_of_date"])
+    elapsed_days = business_days_between(start, as_of) if start and as_of else 0
+
+    return {
+        "total_budget": total_budget,
+        "invoiced_to_date": invoiced_to_date,
+        "paid_to_date": paid_to_date,
+        "margin": margin,
+        "projected_margin": projected_margin,
+        "actual_spend": actual_spend,
+        "daily_burn": daily_burn,
+        "elapsed_days": elapsed_days,
+        "allocated_days": allocated_days,
+        "allocated_dollars": allocated_dollars,
+        "remaining_days": total_remaining_days,
+        "remaining_dollars": total_remaining_dollars,
+        "overall_completion": overall_completion,
+        "next_milestone": next_milestone,
+        "milestone_count": len(milestones_enriched),
+        "paid_count": sum(1 for m in milestones_enriched if m["status"] == "paid"),
+        "invoiced_count": sum(1 for m in milestones_enriched if m["status"] == "invoiced"),
     }
 
 

@@ -18,6 +18,7 @@ class Project(BaseModel):
     accent: str = "cyan"
     theme: str = "light"
     icon: str = ""
+    project_type: str = "agile_feature_development"
 
 
 class Role(BaseModel):
@@ -104,3 +105,27 @@ class Overhead(BaseModel):
     description: str = ""
     amount: float = 0.0
     sort_order: int = 0
+
+
+class Milestone(BaseModel):
+    id: Optional[int] = None
+    project_id: int
+    name: str
+    description: str = ""
+    value: float = 0.0
+    sort_order: int = 0
+
+
+class MilestoneFeature(BaseModel):
+    milestone_id: int
+    feature_id: int
+
+
+class MilestoneInvoice(BaseModel):
+    id: Optional[int] = None
+    milestone_id: int
+    invoice_number: str = ""
+    amount: float = 0.0
+    status: str = "invoiced"
+    issue_date: str = ""
+    paid_date: str = ""

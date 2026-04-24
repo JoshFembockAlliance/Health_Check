@@ -5,8 +5,10 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 ## Enhancements to Existing 
 
 ### Settings
-- [ ] Move the visual settings lower below overheads as those are not frequently adjusted and remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. 
-### Dashboard 
+- [ ] Move the visual settings lower down in the page below overheads as those are not frequently adjusted and remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. 
+### Agile Project Dashboard Items
+
+### Fixed Price Project Dashboard Items
 
 ### Features, Requirements & Deliverables
 
@@ -14,11 +16,12 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
 
 ### Capacity
 
-### Notes
+### Inter-Project Navbar
+the side panel when collapsed does not show the project icons properly, only when expanded. 
 
-### Misc
+### General
 - [ ] Make sure test coverage is up-to-date and accounts for new features like the decision register
-- [ ] Ensure that import and export are robust and account for new features like decision register
+- [ ] Ensure that project import and export are still robust and account for new features like decision register
 
 ## New Feature Items
 ### Project snapshot comparison - Medium Priority
@@ -55,22 +58,20 @@ This is a list of ToDos. Read through it, plan to address items, and tick items 
   - Replace it
 
 
-### Distinct Project Types - Medium Priority
-* [ ] Every project has to strike a balance betwen Scope, Price, and Timeline. There are different types of project that a Project Manager might be working on to optimise for one or more of these, typically one must be left flexible or the project can't maneuver when issues arise. Plan and add one of the following that has not been implemented and then check it off. 
+### Distinct Project Types - Medium Priority, do not pick up or plan yet
+Every project has to strike a balance betwen Scope, Price, and Timeline. There are different types of project that a Project Manager might be working on to optimise for one or more of these, typically one must be left flexible or the project can't maneuver when issues arise. Plan and add one of the following that has not been implemented and then check it off. 
 Not all project types should to be added at once, in fact initially I'd like to add Fixed Price and see how this changes platform architecture.
 - Agile Feature Development: (Scope Very Slightly Flexible, Timeline Slightly Flexible, Budget Flexible) This is what we've been working on so far, primarily this a PM engaing with this kind of project wants to answer the question "Have I been getting a return roughly equal to my spend in an ongoing fashion. This kind of project tracks delivery against budget and risks.
-- Fixed Price with Milestones: (Budget inflexible, Scope inflexible, Timeline Flexible ) This kind of project has Milestones that unlock payments which increase the effective budget. Multiple features or even deliverables may contribute toward those milestones. Answers the question "Am I on track to have a return better than my investment overall and/o relative to each milestone."
+- Fixed Price with Milestones: (Budget inflexible, Scope inflexible, Timeline Flexible ) This kind of project has Milestones that unlock payments which increase the effective budget. Multiple features or even deliverables may contribute toward those milestones. Answers the question "Am I on track to have a return better than my investment overall and/or relative to each milestone." An easy way to illustrate this would be for Fixed-Price projects to have milestones show up on the overall completion progress bar instead of the expected completion, invoiced milestones being one colour and uninvoiced another. Then if the completion line passes a milestone it tells the story that work for something other than the next milestone must have been happening. Expected completion metrics are less important for fixed price projects, at least in the sense that projects are currently using them since "$X should earn $Y value" is a perspective that is seen through the lens of milestones in fixed price projects. 
 - Limited Scope SaaS Devekopment: (Budget Inflexible, Timeline slightly flexible, Scope Flexible) Budget infusions are assumed to be unlocked over time (eg every X weeks, increases by $Y), items chosen for development are typically those lower in size than current margin between spent and unlocked budget. Risks are not an issue for these, instead a manager needs to know which deliverables are financially viable at a given time and to be able to add them to a queue, removing their cost from the current accessible margin by basically adding it to what has been spent (and the opposite if removed)
 - [*] Agile Feature Development
-- [ ] Fixed Price with Milestones
+- [*] Fixed Price with Milestones
 - [ ] Limited Scope SaaS Development
-
-
 
 ### Rework to be based on Alliance Platform 2 - Very Low Priority, will consume lots of tokens 
 Alliance Platform 2 (https://github.com/AllianceSoftware/alliance-platform-py) provides a lot of tools and a uniform visual design. A redesign onto AP2 might provide more structure than our current flask-based setup.
 
-### Single sign-on - Very Low priority, do not  pick up before lliance Platform 2 rework
+### Single sign-on - Very Low priority, do not  pick up before Alliance Platform 2 rework
 Support for integration with various SSO to allow for multiple users each with their own projects in a single organisation.
 
 ### Mac App - Very, very Low Priority

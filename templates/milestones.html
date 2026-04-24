@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Milestones · {{ project.name }}{% endblock %}
+
+{% block content %}
+{% set pid = project.id %}
+
+<div class="page-head">
+    <div>
+        <div class="page-title">Milestones</div>
+        <div class="page-sub">Contract milestones and invoices. Total milestone value sets the project's contract budget.</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="stat">
+            <div class="label">Contract Value (sum of milestones)</div>
+            <div class="value val-lg">{{ totals.value | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Invoiced to Date</div>
+            <div class="value val-lg">{{ totals.invoiced | currency }}</div>
+        </div>
+        <div class="stat">
+            <div class="label">Paid to Date</div>
+            <div class="value val-lg">{{ totals.paid | currency }}</div>
+        </div>
+    </div>
+</div>
+
+{% if milestones %}
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><h3>Milestone table</h3></div>
+    <div class="table-scroll">
+    <table class="data-table">
+        <thead><tr>
+            <th style="width:36px;">#</th>
+            <th>Name</th>
+            <th class="right">Value</th>
+            <th class="right">Linked %</th>
+            <th class="right">Invoiced</th>
+            <th class="right">Paid</th>
+            <th>Status</th>
+            <th></th>
+        </tr></thead>
+        <tbody>
+            {% for m in milestones %}
+            <tr>
+                <td class="mono muted">{{ loop.index }}</td>
+                <td>
+                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/update" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" name="name" value="{{ m.name }}" required style="font-weight:600; min-width:160px;">
+                        <input type="text" name="description" value="{{ m.description }}" placeholder="Description" style="min-width:200px;">
+                        <input type="hidden" name="value" value="{{ m.value }}">
+                        <button type="submit" class="btn btn-sm">Save</button>
+                    </form>
+                </td>
+                <td class="cell-num">
+                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/update" style="display:flex; gap:4px; align-items:center;">
+                        <input type="hidden" name="name" value="{{ m.name }}">
+                        <input type="hidden" name="description" value="{{ m.description }}">
+                        <input type="number" name="value" value="{{ m.value }}" step="0.01" min="0" style="width:110px; text-align:right;">
+                        <button type="submit" class="btn btn-sm">↻</button>
+                    </form>
+                </td>
+                <td class="cell-num">{{ m.linked_completion_pct | pct }}</td>
+                <td class="cell-num">{{ m.invoiced_amount | currency }}</td>
+                <td class="cell-num">{{ m.paid_amount | currency }}</td>
+                <td>
+                    {% if m.status == 'paid' %}<span class="chip chip-good">PAID</span>
+                    {% elif m.status == 'invoiced' %}<span class="chip chip-info">INVOICED</span>
+                    {% else %}<span class="chip chip-soft">PENDING</span>{% endif %}
+                </td>
+                <td class="cell-actions" style="white-space:nowrap;">
+                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/move" style="display:inline;">
+                        <input type="hidden" name="direction" value="up">
+                        <button type="submit" class="btn btn-sm btn-icon" {% if loop.first %}disabled{% endif %} aria-label="Move up">↑</button>
+                    </form>
+                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/move" style="display:inline;">
+                        <input type="hidden" name="direction" value="down">
+                        <button type="submit" class="btn btn-sm btn-icon" {% if loop.last %}disabled{% endif %} aria-label="Move down">↓</button>
+                    </form>
+                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/delete" style="display:inline;">
+                        <button type="button" class="btn btn-danger-ghost btn-sm btn-icon"
+                                onclick="showConfirm('Delete milestone &quot;{{ m.name }}&quot; and its invoices?', this.form)" aria-label="Delete">✕</button>
+                    </form>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td colspan="7" style="background:var(--surface-sunk); padding:10px 14px;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                        <div>
+                            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px; font-weight:600;">Linked features</div>
+                            <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/features">
+                                {% if features %}
+                                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                    {% for f in features %}
+                                    <label style="display:flex; align-items:center; gap:4px; font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--surface);">
+                                        <input type="checkbox" name="feature_ids" value="{{ f.id }}" {% if f.id in m.linked_feature_ids %}checked{% endif %}>
+                                        {{ f.name }}
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                                <button type="submit" class="btn btn-sm" style="margin-top:8px;">Save links</button>
+                                {% else %}
+                                <p class="tiny muted" style="margin:0;">No features defined yet.</p>
+                                {% endif %}
+                            </form>
+                        </div>
+                        <div>
+                            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px; font-weight:600;">Invoices</div>
+                            {% if m.invoices %}
+                            <table class="data-table" style="min-width:0; margin-bottom:6px;">
+                                <thead><tr><th>Number</th><th class="right">Amount</th><th>Issued</th><th>Status</th><th>Paid</th><th></th></tr></thead>
+                                <tbody>
+                                {% for inv in m.invoices %}
+                                <tr>
+                                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/invoices/{{ inv.id }}/update">
+                                        <td><input type="text" name="invoice_number" value="{{ inv.invoice_number }}" style="width:100px;"></td>
+                                        <td class="cell-num"><input type="number" name="amount" value="{{ inv.amount }}" step="0.01" min="0" style="width:90px; text-align:right;"></td>
+                                        <td><input type="date" name="issue_date" value="{{ inv.issue_date }}"></td>
+                                        <td>
+                                            <select name="status">
+                                                <option value="invoiced" {% if inv.status == 'invoiced' %}selected{% endif %}>invoiced</option>
+                                                <option value="paid" {% if inv.status == 'paid' %}selected{% endif %}>paid</option>
+                                            </select>
+                                        </td>
+                                        <td><input type="date" name="paid_date" value="{{ inv.paid_date }}"></td>
+                                        <td class="cell-actions">
+                                            <button type="submit" class="btn btn-sm">Save</button>
+                                            <button type="submit" formaction="/p/{{ pid }}/milestones/{{ m.id }}/invoices/{{ inv.id }}/delete"
+                                                    class="btn btn-danger-ghost btn-sm"
+                                                    onclick="event.preventDefault(); showConfirm('Delete invoice?', this.closest('form'), '/p/{{ pid }}/milestones/{{ m.id }}/invoices/{{ inv.id }}/delete')">✕</button>
+                                        </td>
+                                    </form>
+                                </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <p class="muted tiny" style="margin:0 0 6px;">No invoices yet.</p>
+                            {% endif %}
+                            <details>
+                                <summary class="btn btn-sm" style="display:inline-block;">+ Add invoice</summary>
+                                <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/invoices/add" style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap:6px; align-items:end;">
+                                    <label class="field tiny">Number<input type="text" name="invoice_number" placeholder="INV-001"></label>
+                                    <label class="field tiny">Amount<input type="number" name="amount" step="0.01" min="0" required></label>
+                                    <label class="field tiny">Issued<input type="date" name="issue_date"></label>
+                                    <label class="field tiny">Status
+                                        <select name="status">
+                                            <option value="invoiced">invoiced</option>
+                                            <option value="paid">paid</option>
+                                        </select>
+                                    </label>
+                                    <button type="submit" class="btn btn-sm btn-primary">+ Add</button>
+                                </form>
+                            </details>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="margin-bottom:16px;">
+    <p style="margin:0;" class="muted">No milestones yet. Add your first milestone below.</p>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-head"><h3>Add milestone</h3></div>
+    <form method="post" action="/p/{{ pid }}/milestones/add" style="display:grid; grid-template-columns: 2fr 3fr 1fr auto; gap:10px; align-items:end;">
+        <label class="field">Name<input type="text" name="name" placeholder="e.g., Design sign-off" required></label>
+        <label class="field">Description<input type="text" name="description" placeholder="What this milestone covers…"></label>
+        <label class="field">Value ($)<input type="number" name="value" step="0.01" min="0" required></label>
+        <button type="submit" class="btn btn-primary">+ Add milestone</button>
+    </form>
+</div>
+{% endblock %}

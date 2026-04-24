@@ -651,6 +651,47 @@ input:focus, select:focus, textarea:focus {
   background: oklch(from var(--bad) l c h / 0.5);
 }
 
+/* Milestone progress bar (fixed-price dashboard).
+   Each .milestone-segment sits absolutely on the bar with width proportional
+   to the milestone's share of total contract value. The inner .milestone-fill
+   shows linked-feature completion within the segment. Status bands tint the
+   background from muted (pending) through in-progress → ready → invoiced → paid. */
+.progress.milestones-bar { overflow: visible; }
+.progress .milestone-segment {
+  position: absolute; top: 0; bottom: 0;
+  border-right: 1px solid var(--surface);
+  overflow: hidden;
+  z-index: 1;
+}
+.progress .milestone-segment:last-child { border-right: none; }
+.progress .milestone-fill {
+  position: absolute; inset: 0;
+  right: auto;
+  transition: width .3s ease;
+}
+.progress .milestone-segment.band-pending { background: oklch(from var(--muted) l calc(c * 0.3) h / 0.12); }
+.progress .milestone-segment.band-pending .milestone-fill { background: oklch(from var(--info) l c h / 0.35); }
+.progress .milestone-segment.band-in_progress { background: oklch(from var(--info) l c h / 0.12); }
+.progress .milestone-segment.band-in_progress .milestone-fill { background: oklch(from var(--info) l c h / 0.6); }
+.progress .milestone-segment.band-ready { background: oklch(from var(--good) l c h / 0.12); }
+.progress .milestone-segment.band-ready .milestone-fill { background: oklch(from var(--good) l c h / 0.7); }
+.progress .milestone-segment.band-invoiced { background: oklch(from var(--good) l c h / 0.25); }
+.progress .milestone-segment.band-invoiced .milestone-fill {
+  background: repeating-linear-gradient(-45deg,
+    oklch(from var(--good) l c h / 0.55) 0 5px,
+    oklch(from var(--good) l c h / 0.85) 5px 10px);
+}
+.progress .milestone-segment.band-paid { background: oklch(from var(--good) l c h / 0.4); }
+.progress .milestone-segment.band-paid .milestone-fill { background: var(--good); }
+
+/* Overall-completion fill on top of milestone segments */
+.progress .fill.milestones-overall {
+  background: transparent;
+  border-right: 2px solid var(--text-strong);
+  z-index: 3;
+  pointer-events: none;
+}
+
 /* ===================== DATA TABLE ===================== */
 .table-scroll { overflow-x: auto; }
 .data-table {

@@ -10,6 +10,9 @@ from calculations import (
     requirement_summary,
     feature_summary,
     project_summary,
+    agile_project_summary,
+    fixed_price_project_summary,
+    milestones_summary,
     feature_health,
     get_week_monday,
     capacity_days_remaining,
@@ -652,3 +655,172 @@ class TestCapacityBudgetSummary:
         )
         assert result["budget_days"] == pytest.approx(2.0)
         assert result["person_days"] == pytest.approx(4.0)
+
+
+# ── milestones_summary / fixed_price_project_summary ─────────────────────
+
+def _feat(fid, days, completion):
+    """Minimal feature dict shaped like feature_summary output for fixed-price tests."""
+    return {
+        "id": fid,
+        "name": f"F{fid}",
+        "total_days": days,
+        "total_dollars": days * 1000,
+        "weighted_completion": completion,
+        "remaining_days": days * (1 - completion / 100),
+        "remaining_dollars": days * (1 - completion / 100) * 1000,
+    }
+
+
+class TestMilestonesSummary:
+    def test_bar_widths_proportional_to_value(self):
+        milestones = [
+            {"id": 1, "name": "A", "description": "", "value": 10_000, "sort_order": 1},
+            {"id": 2, "name": "B", "description": "", "value": 20_000, "sort_order": 2},
+            {"id": 3, "name": "C", "description": "", "value": 30_000, "sort_order": 3},
+        ]
+        result = milestones_summary(milestones, [], [], [])
+        # Widths: 1/6 ≈ 16.67, 2/6 ≈ 33.33, 3/6 = 50.00
+        assert result[0]["bar_width_pct"] == pytest.approx(100 / 6)
+        assert result[1]["bar_width_pct"] == pytest.approx(200 / 6)
+        assert result[2]["bar_width_pct"] == pytest.approx(50.0)
+        # Starts are cumulative
+        assert result[0]["bar_start_pct"] == pytest.approx(0.0)
+        assert result[1]["bar_start_pct"] == pytest.approx(100 / 6)
+        assert result[2]["bar_start_pct"] == pytest.approx(50.0)
+
+    def test_empty_milestones_returns_empty(self):
+        assert milestones_summary([], [], [], []) == []
+
+    def test_status_derived_from_invoices(self):
+        milestones = [
+            {"id": 1, "name": "A", "description": "", "value": 10_000, "sort_order": 1},
+        ]
+        # No invoices → pending
+        out = milestones_summary(milestones, [], [], [])
+        assert out[0]["status"] == "pending"
+        # Partial invoice, not fully paid → invoiced
+        invoices = [{"id": 1, "milestone_id": 1, "amount": 5_000, "status": "invoiced"}]
+        out = milestones_summary(milestones, invoices, [], [])
+        assert out[0]["status"] == "invoiced"
+        assert out[0]["invoiced_amount"] == 5_000
+        assert out[0]["paid_amount"] == 0
+        # Fully paid up to value → paid
+        invoices = [{"id": 1, "milestone_id": 1, "amount": 10_000, "status": "paid"}]
+        out = milestones_summary(milestones, invoices, [], [])
+        assert out[0]["status"] == "paid"
+        assert out[0]["paid_amount"] == 10_000
+
+    def test_linked_completion_weighted_by_feature_days(self):
+        milestones = [{"id": 1, "name": "A", "description": "", "value": 10_000, "sort_order": 1}]
+        features = [_feat(1, 10, 100), _feat(2, 30, 0)]  # 10d @ 100% + 30d @ 0% = 25%
+        links = [{"milestone_id": 1, "feature_id": 1}, {"milestone_id": 1, "feature_id": 2}]
+        out = milestones_summary(milestones, [], features, links)
+        assert out[0]["linked_completion_pct"] == pytest.approx(25.0)
+        assert sorted(out[0]["linked_feature_ids"]) == [1, 2]
+
+    def test_colour_band_bands(self):
+        m = [{"id": 1, "name": "A", "description": "", "value": 100, "sort_order": 1}]
+        # 0% → pending
+        out = milestones_summary(m, [], [_feat(1, 10, 0)], [{"milestone_id": 1, "feature_id": 1}])
+        assert out[0]["colour_band"] == "pending"
+        # 60% → in_progress
+        out = milestones_summary(m, [], [_feat(1, 10, 60)], [{"milestone_id": 1, "feature_id": 1}])
+        assert out[0]["colour_band"] == "in_progress"
+        # 100% → ready
+        out = milestones_summary(m, [], [_feat(1, 10, 100)], [{"milestone_id": 1, "feature_id": 1}])
+        assert out[0]["colour_band"] == "ready"
+        # Any invoice → invoiced band wins over completion
+        invoices = [{"id": 1, "milestone_id": 1, "amount": 50, "status": "invoiced"}]
+        out = milestones_summary(m, invoices, [_feat(1, 10, 0)], [{"milestone_id": 1, "feature_id": 1}])
+        assert out[0]["colour_band"] == "invoiced"
+        # Fully paid → paid band
+        invoices = [{"id": 1, "milestone_id": 1, "amount": 100, "status": "paid"}]
+        out = milestones_summary(m, invoices, [_feat(1, 10, 0)], [{"milestone_id": 1, "feature_id": 1}])
+        assert out[0]["colour_band"] == "paid"
+
+    def test_sort_order_governs_bar_placement(self):
+        # Even if passed out of order, sort_order determines placement.
+        milestones = [
+            {"id": 2, "name": "Second", "description": "", "value": 10, "sort_order": 2},
+            {"id": 1, "name": "First", "description": "", "value": 10, "sort_order": 1},
+        ]
+        out = milestones_summary(milestones, [], [], [])
+        assert out[0]["id"] == 1
+        assert out[1]["id"] == 2
+
+
+class TestFixedPriceProjectSummary:
+    def _project(self, **overrides):
+        base = {
+            "id": 1,
+            "initial_budget": 0,
+            "actual_spend": 0,
+            "team_size": 1,
+            "start_date": "",
+            "as_of_date": "",
+        }
+        base.update(overrides)
+        return base
+
+    def test_total_budget_is_sum_of_milestone_values(self):
+        milestones = milestones_summary([
+            {"id": 1, "name": "A", "description": "", "value": 10_000, "sort_order": 1},
+            {"id": 2, "name": "B", "description": "", "value": 20_000, "sort_order": 2},
+            {"id": 3, "name": "C", "description": "", "value": 30_000, "sort_order": 3},
+        ], [], [], [])
+        result = fixed_price_project_summary(self._project(), [], milestones, default_day_rate=1_000.0)
+        assert result["total_budget"] == 60_000
+
+    def test_margin_equals_paid_minus_spent(self):
+        milestones = milestones_summary([
+            {"id": 1, "name": "A", "description": "", "value": 10_000, "sort_order": 1},
+        ], [{"id": 1, "milestone_id": 1, "amount": 10_000, "status": "paid"}], [], [])
+        result = fixed_price_project_summary(
+            self._project(actual_spend=4_000),
+            [],
+            milestones,
+            default_day_rate=1_000.0,
+        )
+        assert result["paid_to_date"] == 10_000
+        assert result["invoiced_to_date"] == 10_000
+        assert result["margin"] == 6_000
+        assert result["projected_margin"] == 6_000
+
+    def test_projected_margin_includes_invoiced_not_yet_paid(self):
+        milestones = milestones_summary([
+            {"id": 1, "name": "A", "description": "", "value": 10_000, "sort_order": 1},
+        ], [{"id": 1, "milestone_id": 1, "amount": 10_000, "status": "invoiced"}], [], [])
+        result = fixed_price_project_summary(
+            self._project(actual_spend=2_000),
+            [],
+            milestones,
+            default_day_rate=1_000.0,
+        )
+        assert result["paid_to_date"] == 0
+        assert result["invoiced_to_date"] == 10_000
+        assert result["margin"] == -2_000
+        assert result["projected_margin"] == 8_000
+
+    def test_next_milestone_skips_paid(self):
+        raw = [
+            {"id": 1, "name": "A", "description": "", "value": 10, "sort_order": 1},
+            {"id": 2, "name": "B", "description": "", "value": 10, "sort_order": 2},
+        ]
+        invoices = [{"id": 1, "milestone_id": 1, "amount": 10, "status": "paid"}]
+        milestones = milestones_summary(raw, invoices, [], [])
+        result = fixed_price_project_summary(self._project(), [], milestones, default_day_rate=1_000.0)
+        assert result["next_milestone"]["id"] == 2
+        assert result["paid_count"] == 1
+
+    def test_next_milestone_none_when_all_paid(self):
+        raw = [{"id": 1, "name": "A", "description": "", "value": 10, "sort_order": 1}]
+        invoices = [{"id": 1, "milestone_id": 1, "amount": 10, "status": "paid"}]
+        milestones = milestones_summary(raw, invoices, [], [])
+        result = fixed_price_project_summary(self._project(), [], milestones, default_day_rate=1_000.0)
+        assert result["next_milestone"] is None
+
+    def test_overall_completion_weighted_days(self):
+        features = [_feat(1, 10, 100), _feat(2, 30, 0)]  # 10/40 = 25%
+        result = fixed_price_project_summary(self._project(), features, [], default_day_rate=1_000.0)
+        assert result["overall_completion"] == pytest.approx(25.0)

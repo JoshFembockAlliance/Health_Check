@@ -26,7 +26,15 @@ PROJECT_SCOPED_TABLES = [
     "budget_adjustments",
     "capacity_periods",
     "overheads",
+    "milestones",
 ]
+
+# Project types. "agile_feature_development" is the legacy default; any project
+# without an explicit type will render as agile. "fixed_price" opts into the
+# milestone-driven dashboard and data model.
+PROJECT_TYPE_AGILE = "agile_feature_development"
+PROJECT_TYPE_FIXED_PRICE = "fixed_price"
+VALID_PROJECT_TYPES = {PROJECT_TYPE_AGILE, PROJECT_TYPE_FIXED_PRICE}
 
 
 def get_db() -> sqlite_utils.Database:
@@ -84,6 +92,8 @@ def init_db():
         db["projects"].add_column("icon", str, not_null_default="")
     if "end_date" not in existing_cols:
         db["projects"].add_column("end_date", str, not_null_default="")
+    if "project_type" not in existing_cols:
+        db["projects"].add_column("project_type", str, not_null_default=PROJECT_TYPE_AGILE)
 
     # roles — named day-rate buckets. Now per-project so each engagement can
     # have its own rate card.
@@ -241,6 +251,43 @@ def init_db():
             "sort_order": int,
         }, pk="id", foreign_keys=[("project_id", "projects")])
 
+    # Milestones — fixed-price project type only. Each milestone carries a
+    # contracted value; the sum of milestone values *is* the fixed-price
+    # project's total_budget. Bar position on the dashboard is determined
+    # by sort_order × value share.
+    if "milestones" not in db.table_names():
+        db["milestones"].create({
+            "id": int,
+            "project_id": int,
+            "name": str,
+            "description": str,
+            "value": float,
+            "sort_order": int,
+        }, pk="id", foreign_keys=[("project_id", "projects")])
+
+    # milestone_features — M2M link. Linked features colour the milestone's
+    # section of the progress bar by their weighted completion; they do NOT
+    # determine the bar position (value does).
+    if "milestone_features" not in db.table_names():
+        db["milestone_features"].create({
+            "milestone_id": int,
+            "feature_id": int,
+        }, foreign_keys=[("milestone_id", "milestones"), ("feature_id", "features")])
+
+    # milestone_invoices — a milestone can be billed in one or more instalments.
+    # status = "invoiced" or "paid"; summed invoice amounts must not exceed the
+    # milestone's value (enforced in the route layer).
+    if "milestone_invoices" not in db.table_names():
+        db["milestone_invoices"].create({
+            "id": int,
+            "milestone_id": int,
+            "invoice_number": str,
+            "amount": float,
+            "status": str,
+            "issue_date": str,
+            "paid_date": str,
+        }, pk="id", foreign_keys=[("milestone_id", "milestones")])
+
     # Backfill project_id on every project-scoped table (for DBs migrated from
     # the pre-multi-project schema).
     for tbl in PROJECT_SCOPED_TABLES:
@@ -260,6 +307,7 @@ def init_db():
             "default_role_id": 1,
             "health_on_track_pct": 100.0,
             "health_at_risk_pct": 80.0,
+            "project_type": PROJECT_TYPE_AGILE,
         })
 
     if db["roles"].count == 0:

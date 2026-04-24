@@ -1,0 +1,36 @@
+{# Risk Exposure summary card.
+   Expects:
+     rs = risk_summary dict with open_count, done_count, open_impact_days,
+          open_impact_dollars, effective_impact_days, effective_impact_dollars,
+          avoided_days
+     pid = project id (for the register link)
+#}
+{% if rs and (rs.open_count + rs.done_count) > 0 %}
+<div class="section-title"><h2>Risk Exposure</h2><a class="link" href="/p/{{ pid }}/risks">Full risk register →</a></div>
+<div class="card">
+    <div class="field-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Open risks (todo / doing)</div>
+            <div class="mono" style="font-size:15px;">{{ rs.open_count }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Open impact</div>
+            <div class="mono" style="font-size:15px; color: oklch(from var(--warn) calc(l - 0.2) c h);">{{ rs.open_impact_days | days }}d · {{ rs.open_impact_dollars | currency }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Closed risks</div>
+            <div class="mono" style="font-size:15px;">{{ rs.done_count }}</div>
+        </div>
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Realised impact</div>
+            <div class="mono" style="font-size:15px; color: var(--bad);">{{ rs.effective_impact_days | days }}d · {{ rs.effective_impact_dollars | currency }}</div>
+        </div>
+        {% if rs.avoided_days > 0 %}
+        <div>
+            <div class="tiny muted" style="text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; font-weight:500;">Avoided (closed successfully)</div>
+            <div class="mono" style="font-size:15px; color: oklch(from var(--good) calc(l - 0.1) c h);">{{ rs.avoided_days | days }}d saved</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

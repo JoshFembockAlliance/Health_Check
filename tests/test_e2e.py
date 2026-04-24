@@ -415,3 +415,76 @@ def test_create_and_delete_project(page: Page):
 
     # Back on the cross-project page, the project should be gone from the sidebar
     expect(page.locator(f".sidebar-item[href='/p/{new_pid}/']")).not_to_be_visible()
+
+
+# ── Fixed-Price projects & milestones ─────────────────────────────────────
+
+def test_fixed_price_project_full_flow(page: Page):
+    """Create a fixed-price project, add milestones with values 10k/20k/30k,
+    invoice and part-pay one, and assert dashboard margin/segments reflect the
+    resulting state. Cleans up afterwards via Danger zone."""
+    # Create via the dialog
+    page.goto(BASE)
+    page.locator("#new-project-link").click()
+    dlg = page.locator("#new-project-dialog")
+    expect(dlg).to_be_visible()
+    dlg.locator("input[name='name']").fill("E2E Fixed Price")
+    dlg.locator("input[name='project_type'][value='fixed_price']").check()
+    dlg.locator("button[type='submit']").click()
+    expect(page).to_have_url(re.compile(r"/p/\d+/settings"))
+    pid = page.url.split("/p/")[1].split("/")[0]
+
+    try:
+        # Milestones tab is visible for fixed-price projects
+        expect(page.locator(f".top-nav a[href='/p/{pid}/milestones']")).to_be_visible()
+
+        # Add 3 milestones
+        page.goto(f"{BASE}/p/{pid}/milestones")
+        for name, value in [("A", "10000"), ("B", "20000"), ("C", "30000")]:
+            page.locator("form[action$='/milestones/add'] input[name='name']").fill(name)
+            page.locator("form[action$='/milestones/add'] input[name='value']").fill(value)
+            page.locator("form[action$='/milestones/add'] button[type='submit']").click()
+            page.wait_for_load_state("networkidle")
+
+        # Totals visible on milestones page
+        expect(page.locator(".stat", has_text="Contract Value")).to_contain_text("$60,000")
+
+        # Dashboard shows segments and margin
+        page.goto(f"{BASE}/p/{pid}/")
+        # 3 milestone segments rendered
+        expect(page.locator(".milestone-segment")).to_have_count(3)
+        # Contract value shown in Margin hero card
+        expect(page.locator(".hero-card.primary")).to_contain_text("$60,000")
+
+        # Add an invoice for milestone B (second one created — we have to find its id)
+        # Discover milestone ids from the milestones page.
+        page.goto(f"{BASE}/p/{pid}/milestones")
+        # The second milestone's invoice-add form action looks like
+        # /p/{pid}/milestones/{mid}/invoices/add
+        forms = page.locator("form[action*='/invoices/add']")
+        assert forms.count() >= 3
+        second_form_action = forms.nth(1).get_attribute("action")
+
+        # Open the second invoice details + fill
+        details = page.locator("details:has(form[action='" + second_form_action + "'])")
+        details.locator("summary").click()
+        form = details.locator("form[action='" + second_form_action + "']")
+        form.locator("input[name='amount']").fill("10000")
+        form.locator("select[name='status']").select_option("paid")
+        form.locator("button[type='submit']").click()
+        page.wait_for_load_state("networkidle")
+
+        # Dashboard: margin reflects the $10k paid; no spend so margin = $10k.
+        page.goto(f"{BASE}/p/{pid}/")
+        expect(page.locator(".hero-card.primary")).to_contain_text("$10,000")
+        # Milestone B partial payment → "invoiced" band (not paid; value is $20k)
+        bands = page.locator(".milestone-segment").evaluate_all(
+            "els => els.map(e => [...e.classList].find(c => c.startsWith('band-')))"
+        )
+        assert bands[1] == "band-invoiced"
+    finally:
+        # Cleanup
+        page.goto(f"{BASE}/p/{pid}/settings")
+        page.locator(f"form[action='/projects/{pid}/delete'] button").click()
+        page.locator("#confirm-ok").click()
+        page.wait_for_load_state("networkidle")

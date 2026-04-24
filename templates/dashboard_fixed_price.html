@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ project.name }}{% endblock %}
+
+{% block content %}
+{% set p = project %}
+{% set s = summary %}
+{% set rs = risk_summary %}
+{% set pid = project.id %}
+
+<div class="page-head">
+    <div>
+        <div class="page-title">{{ p.name }}</div>
+        <div class="page-sub">
+            Fixed Price with Milestones
+            {% if p.as_of_date %} · as of {{ p.as_of_date }}{% endif %}
+            {% if s.elapsed_days %} · {{ s.elapsed_days }} business days elapsed{% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn" href="/p/{{ pid }}/export">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            Export
+        </a>
+        <a class="btn btn-primary" href="/p/{{ pid }}/settings">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            Edit project
+        </a>
+    </div>
+</div>
+
+{% if not milestones %}
+<div class="card" style="margin-bottom:16px;">
+    <p style="margin:0;">Add milestones in <a href="/p/{{ pid }}/milestones" class="link">Milestones</a> to populate the dashboard. Milestone values together form the project's contract budget.</p>
+</div>
+{% endif %}
+
+{# ── Hero trio — fixed-price: Margin / Completion / Next Milestone ── #}
+{% set margin_color = 'var(--good)' if s.margin >= 0 else 'var(--bad)' %}
+{% set proj_margin_color = 'var(--good)' if s.projected_margin >= 0 else 'var(--bad)' %}
+<div class="hero-grid">
+    <div class="hero-card primary">
+        <div class="label">Margin so far</div>
+        <div class="value" style="color: {{ margin_color }}">{{ s.margin | currency }}</div>
+        <div style="font-size:11px; font-weight:500; margin-top:-4px; margin-bottom:4px; opacity:0.7;">paid {{ s.paid_to_date | currency }} − spent {{ s.actual_spend | currency }}</div>
+        <div class="sub-row">
+            <div class="row"><span class="lbl">Invoiced to date</span><span class="val">{{ s.invoiced_to_date | currency }}</span></div>
+            <div class="row"><span class="lbl">Projected margin (invoiced − spent)</span><span class="val" style="color: {{ proj_margin_color }}">{{ s.projected_margin | currency }}</span></div>
+            <div class="row"><span class="lbl">Contract value</span><span class="val">{{ s.total_budget | currency }}</span></div>
+        </div>
+    </div>
+
+    {# Milestone progress bar. Each segment's width is the milestone's share of
+       total contract value. The overall-completion fill is drawn on top at the
+       project-wide weighted completion — if it crosses a segment that's not
+       green, work was happening outside the next milestone. #}
+    <div class="hero-card">
+        <div class="label">Overall Completion</div>
+        <div class="value">{{ s.overall_completion | pct }}</div>
+        <div class="progress progress-lg milestones-bar" role="progressbar" aria-valuenow="{{ s.overall_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100" style="margin-top:2px;">
+            {% for m in milestones %}
+            <div class="milestone-segment band-{{ m.colour_band }}"
+                 style="left: {{ m.bar_start_pct }}%; width: {{ m.bar_width_pct }}%;"
+                 title="{{ m.name }} — {{ m.value | currency }} · {{ m.linked_completion_pct | pct }} linked completion · {{ m.status }}">
+                <div class="milestone-fill" style="width: {{ [m.linked_completion_pct, 100] | min }}%;"></div>
+            </div>
+            {% endfor %}
+            <div class="fill fill-good milestones-overall" style="width: {{ [s.overall_completion, 100] | min }}%"></div>
+        </div>
+        <div class="sub-row">
+            <div class="row"><span class="lbl">Milestones</span><span class="val">{{ s.paid_count }} paid · {{ s.invoiced_count }} invoiced · {{ s.milestone_count }} total</span></div>
+            {% if s.allocated_dollars > 0 %}
+            <div class="row"><span class="lbl">Internal spend vs. allocated</span><span class="val">{{ s.actual_spend | currency }} / {{ s.allocated_dollars | currency }}</span></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="hero-card">
+        <div class="label">Next Milestone</div>
+        {% if s.next_milestone %}
+        {% set nm = s.next_milestone %}
+        <div class="value" style="font-size:22px;">{{ nm.name }}</div>
+        <div style="font-size:11px; font-weight:500; margin-top:-4px; margin-bottom:4px; opacity:0.75;">{{ nm.value | currency }} contract value</div>
+        <div class="sub-row">
+            <div class="row"><span class="lbl">Linked completion</span><span class="val">{{ nm.linked_completion_pct | pct }}</span></div>
+            <div class="row"><span class="lbl">Invoiced / Paid</span><span class="val">{{ nm.invoiced_amount | currency }} / {{ nm.paid_amount | currency }}</span></div>
+            <div class="row"><span class="lbl">Status</span><span class="val">
+                {% if nm.status == 'paid' %}<span class="chip chip-good">PAID</span>
+                {% elif nm.status == 'invoiced' %}<span class="chip chip-info">INVOICED</span>
+                {% else %}<span class="chip chip-soft">PENDING</span>{% endif %}
+            </span></div>
+        </div>
+        {% else %}
+        <div class="value muted" style="font-size:20px;">All milestones paid</div>
+        <div class="sub-row"><div class="row"><span class="lbl">Nothing outstanding — project can close.</span><span class="val"></span></div></div>
+        {% endif %}
+    </div>
+</div>
+
+{# ── Milestones summary ── #}
+{% if milestones %}
+<div class="section-title"><h2>Milestones</h2><a class="link" href="/p/{{ pid }}/milestones">Manage milestones →</a></div>
+<div class="card">
+    <div class="table-scroll">
+    <table class="data-table">
+        <thead><tr>
+            <th>#</th>
+            <th>Name</th>
+            <th class="right">Value</th>
+            <th class="right">Linked Completion</th>
+            <th class="right">Invoiced</th>
+            <th class="right">Paid</th>
+            <th>Status</th>
+        </tr></thead>
+        <tbody>
+            {% for m in milestones %}
+            <tr>
+                <td class="mono muted">{{ loop.index }}</td>
+                <td><strong>{{ m.name }}</strong>{% if m.description %}<br><span class="tiny muted">{{ m.description }}</span>{% endif %}</td>
+                <td class="cell-num">{{ m.value | currency }}</td>
+                <td class="cell-num">{{ m.linked_completion_pct | pct }}</td>
+                <td class="cell-num">{{ m.invoiced_amount | currency }}</td>
+                <td class="cell-num">{{ m.paid_amount | currency }}</td>
+                <td>
+                    {% if m.status == 'paid' %}<span class="chip chip-good">PAID</span>
+                    {% elif m.status == 'invoiced' %}<span class="chip chip-info">INVOICED</span>
+                    {% else %}<span class="chip chip-soft">PENDING</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% include "_partials/risk_exposure.html" %}
+
+{% include "_partials/pm_notes_strip.html" %}
+
+{# ── Feature list (no burn target on fixed-price — just show progress) ── #}
+{% if features %}
+<div class="section-title"><h2>Features</h2><a class="link" href="/p/{{ pid }}/features">All features →</a></div>
+<div class="card" style="padding:14px;">
+    <div class="feat-row">
+        {% for f in features %}
+        <div class="item">
+            <div class="name">
+                <a href="/p/{{ pid }}/features/{{ f.id }}">{{ f.name }}</a>
+            </div>
+            <div class="bar">
+                {% if f.total_days > 0 %}
+                <div class="progress" role="progressbar" aria-valuenow="{{ f.weighted_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="fill fill-good" style="width: {{ [f.weighted_completion, 100] | min }}%"></div>
+                </div>
+                <span class="pct">{{ f.weighted_completion | pct }}</span>
+                {% else %}
+                <span class="muted tiny" style="flex:1;">No deliverables yet</span>
+                {% endif %}
+            </div>
+            <div class="budget">
+                <strong>{{ f.total_days | days }}d</strong><br>
+                <span>{{ f.remaining_days | days }}d remaining</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
