@@ -16,6 +16,12 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 - [ ] Move the visual settings lower down in the page below overheads as those are not frequently adjusted and remove the really basic symbols like triangle, dot, diamond and circle from symbol selection.
 
 ### Agile Project Dashboard Items
+- [ ] **Burndown chart hero card X axis date overlap**
+Because the vertical line markers and their labels can move, it's possible for the text associated with them to overlap, which can look messy. Instead, move the dates to the legend only with one line each and use only line colours and the word part of the label on the chart itself. (or if it's simpler, stager the label text vertically to prevent overlap)
+
+- [ ] **Net Accessible Budget - add breakdown**
+Put oerheads at the top, then spent, then include more datapoints about where the spend went than just realised risk as other sub-items. We now have spend categories in the overall completion card and those values are a perfect fit to tell a story of where budget has gone here. 
+
 - [ ] **Burndown chart — historical actual line.** The current actual line is a stepped straight line from project-start-budget to today's-budget at a single rate (no historical snapshots). Two existing data sources could enrich it backward: (1) **capacity adjustments** (currently only counted forward from today — extend to look backward, so the historical slope reflects actual team availability rather than full-team flat); (2) **spend delta** (currently the only acknowledgement of reduced burn from sick days/etc — surface its shape on the actual line). Net effect: a more truthful jagged actual line that PMs can correlate against weeks they remember.
 - [ ] **Burndown chart — PDF export check.** The agile dashboard PDF export was written before the burndown SVG existed. Verify the chart renders correctly when exported, fix if not.
 - [ ] **Inconsistent-data soft warning.** Under the post-double-count model ([DESIGN_RULES §1](DESIGN_RULES.md)), `realised_risk_dollars > actual_spend` is an internally-inconsistent state (it means the PM has marked risks as realised without logging the team time). Surface a soft warning on the dashboard when this happens — e.g. a small amber banner on the Net Accessible Budget card pointing to the inconsistency.
