@@ -38,8 +38,8 @@
 {% set comp_color = 'var(--good)' if s.overall_completion >= s.feature_expected_burn_pct else ('var(--warn)' if s.overall_completion >= s.feature_expected_burn_pct * 0.8 else 'var(--bad)') %}
 {% set days_color = 'var(--bad)' if s.total_budget_days_remaining < 20 else ('var(--warn)' if s.total_budget_days_remaining < 60 else 'var(--good)') %}
 
-<div class="hero-grid">
-    <div class="hero-card primary">
+<div class="hero-grid two-row">
+    <div class="hero-card primary" style="grid-column: span 3;">
         <div class="label">Net Accessible Budget</div>
         <div class="value">{{ s.accessible_budget | currency }}</div>
         {% if s.remaining_dollars > 0 %}
@@ -97,8 +97,8 @@
     {% set wl_accessible = s.accessible_budget %}
     {% set wl_accessible_pct = (wl_accessible / wl_denom * 100) if wl_denom > 0 else 0 %}
 
-    <div class="hero-card" id="hero-overall-completion">
-        <div class="label">Overall Completion</div>
+    <div class="hero-card" id="hero-overall-completion" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="overall-completion-modal" title="Click for a sentence-form breakdown of how the budget is being used" style="cursor:pointer; position:relative; grid-column: span 3;">
+        <div class="label">Overall Completion <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></div>
         <div class="value" style="color: {{ comp_color }}">{{ s.overall_completion | pct }}</div>
 
         {# ── What's-left bar (denom = total_budget) ──
@@ -259,7 +259,7 @@
         </div>
     </div>
 
-    <div class="hero-card" id="hero-budget-days" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="budget-days-modal" title="Click for a sentence-form breakdown" style="cursor:pointer; position:relative;">
+    <div class="hero-card" id="hero-budget-days" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="budget-days-modal" title="Click for a sentence-form breakdown" style="cursor:pointer; position:relative; grid-column: span 2;">
         <div class="label">Full-Team Budget Days Remaining <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></div>
         <div class="value" style="color: {{ days_color }}">
             {{- s.total_budget_days_remaining | days -}}
@@ -297,6 +297,175 @@
             {% endif %}
         </div>
     </div>
+
+    {# ── Budget Burndown chart ──
+       Y axis: full-team budget days remaining (post-overhead, matching the
+       headline runway). X axis: calendar days from project start. Lines:
+       plan (linear to end_date), actual (start → today), and a forward
+       projection at full-team burn slope. Vertical markers show three
+       scope-finish dates (planned-cost / inefficiency-adjusted / risk-
+       included) and the project end-date. Risk projection toggleable.
+       See DESIGN_RULES §3 — realised risks NOT added forward (already in
+       past spend). #}
+    {% if burndown %}
+    {% set b = burndown %}
+    {# SVG layout constants #}
+    {% set CHART_W = 1000 %}
+    {% set CHART_H = 360 %}
+    {% set ML = 60 %}
+    {% set MR = 15 %}
+    {% set MT = 20 %}
+    {% set MB = 60 %}
+    {% set PW = CHART_W - ML - MR %}
+    {% set PH = CHART_H - MT - MB %}
+    {% set PB = MT + PH %}
+    {# Pixel coords for each key (date, days) point. x = ML + (days/total)*PW; y = MT + PH − (days/initial)*PH #}
+    {% set tcd = b.total_calendar_days %}
+    {% set ind = b.initial_days %}
+    {% set today_x = ML + (b.x_as_of / tcd * PW) %}
+    {% set today_y = (MT + PH) - (b.today_days / ind * PH) %}
+    {% set start_x = ML %}
+    {% set start_y = (MT + PH) - PH %}
+    {% set zero_y = MT + PH %}
+    {% set end_x = (ML + (b.x_end / tcd * PW)) if b.x_end is not none else None %}
+    {% set planned_x = ML + (b.x_planned_cost_finish / tcd * PW) %}
+    {% set inefficiency_x = ML + (b.x_inefficiency_finish / tcd * PW) %}
+    {% set risk_x = ML + (b.x_risk_finish / tcd * PW) %}
+    {% set exhaustion_x = ML + (b.x_budget_exhaustion / tcd * PW) %}
+    {# Build SVG polyline points strings from the stepped (offset, value) tuples. #}
+    {% macro _polyline_points(pts) %}{% for p in pts %}{{ ML + (p[0] / tcd * PW) }},{{ MT + PH - (p[1] / ind * PH) }} {% endfor %}{% endmacro %}
+    {# Locate where the projection line is at a given marker's X. Returns
+       the (x, y) pixel position if the projection is still above zero,
+       else None — markers past budget exhaustion get no circle on the
+       (already-zero) line. #}
+    {% macro _project_y(x_pixel) %}{% set frac = (x_pixel - today_x) / (exhaustion_x - today_x) if exhaustion_x > today_x else 1 %}{{ today_y + (zero_y - today_y) * frac }}{% endmacro %}
+    <div class="hero-card" id="hero-burndown" style="grid-column: span 4; padding:18px 20px;">
+        <div class="label" style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span>Budget Burndown</span>
+            <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="burndown-show-risk" checked style="margin:0;">
+                Include open-risk projection
+            </label>
+        </div>
+        <div class="value" style="font-size:14px; font-weight:500; margin-top:2px;">
+            <strong>{{ b.today_days | days }}</strong> remaining at <strong>{{ b.daily_burn | currency }}/day</strong> · scope finish <strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong>
+            {% if b.inefficiency_finish > b.planned_cost_finish %}<span class="muted"> → with inefficiency <strong style="color:var(--warn);">{{ b.inefficiency_finish.isoformat() }}</strong></span>{% endif %}
+        </div>
+
+        <svg viewBox="0 0 {{ CHART_W }} {{ CHART_H }}" style="width:100%; height:auto; margin-top:6px; display:block;" preserveAspectRatio="none" aria-label="Budget burndown chart">
+            {# Y-axis gridlines + labels (5 ticks) #}
+            {% for i in range(6) %}
+            {% set y = MT + (PH * i / 5) %}
+            {% set days_at = ind * (1 - i / 5) %}
+            <line x1="{{ ML }}" x2="{{ ML + PW }}" y1="{{ y }}" y2="{{ y }}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2 3"/>
+            <text x="{{ ML - 6 }}" y="{{ y + 3 }}" font-size="10" fill="var(--muted)" text-anchor="end">{{ days_at | round(0) | int }}d</text>
+            {% endfor %}
+
+            {# X-axis: a few date ticks (start, as_of, end if any, chart_end) #}
+            <line x1="{{ ML }}" x2="{{ ML + PW }}" y1="{{ zero_y }}" y2="{{ zero_y }}" stroke="var(--border-strong)" stroke-width="1"/>
+            <text x="{{ start_x }}" y="{{ zero_y + 16 }}" font-size="10" fill="var(--muted)" text-anchor="start">{{ b.start_date.isoformat() }}</text>
+            <text x="{{ today_x }}" y="{{ zero_y + 16 }}" font-size="10" fill="var(--text-strong)" text-anchor="middle" font-weight="600">today</text>
+            <text x="{{ ML + PW }}" y="{{ zero_y + 16 }}" font-size="10" fill="var(--muted)" text-anchor="end">{{ b.chart_end_date.isoformat() }}</text>
+
+            {# Plan line (dashed grey) — stepped: descends on Mon-Fri, flat
+               on weekends. Only drawn if end_date is set. #}
+            {% if b.plan_points %}
+            <polyline points="{{ _polyline_points(b.plan_points) }}"
+                      fill="none" stroke="var(--muted)" stroke-width="1.5"
+                      stroke-dasharray="5 4" opacity="0.65"/>
+            <text x="{{ end_x - 4 }}" y="{{ zero_y - 4 }}" font-size="10" fill="var(--muted)" text-anchor="end">plan</text>
+            {% endif %}
+
+            {# Actual line (solid info colour) — stepped from start to today. #}
+            <polyline points="{{ _polyline_points(b.actual_points) }}"
+                      fill="none" stroke="var(--info)" stroke-width="2.5"/>
+            <circle cx="{{ today_x }}" cy="{{ today_y }}" r="3.5" fill="var(--info)"/>
+
+            {# Projection line (dashed dark) — stepped from today to budget exhaustion. #}
+            <polyline points="{{ _polyline_points(b.projection_points) }}"
+                      fill="none" stroke="var(--text-strong)" stroke-width="1.5"
+                      stroke-dasharray="4 3" opacity="0.6"/>
+
+            {# Vertical markers always span the full chart height (top to X
+               axis) so they're visible regardless of whether the projection
+               has reached zero by that date. The circle sits on the
+               projection line — but only when the projection is still
+               positive at that X (i.e., budget hasn't run out yet). For
+               markers past budget exhaustion, no circle: the marker still
+               shows the date, but there's no line position to mark. #}
+
+            {# Planned project end (grey, dashed, full height) #}
+            {% if end_x is not none %}
+            <line x1="{{ end_x }}" x2="{{ end_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
+                  stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
+            <text x="{{ end_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--muted)" text-anchor="middle">end · {{ b.end_date.isoformat() }}</text>
+            {% endif %}
+
+            {# Planned-cost finish (green) — within budget by definition (planned_cost_days ≤ today_days when buffer is positive) #}
+            {% set py = _project_y(planned_x) | float %}
+            <line x1="{{ planned_x }}" x2="{{ planned_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
+                  stroke="var(--good)" stroke-width="1.5"/>
+            {% if planned_x <= exhaustion_x %}
+            <circle cx="{{ planned_x }}" cy="{{ py }}" r="3.5" fill="var(--good)"/>
+            {% endif %}
+            <text x="{{ planned_x }}" y="{{ zero_y + 32 }}" font-size="10" fill="var(--good)" text-anchor="middle" font-weight="600">scope · {{ b.planned_cost_finish.isoformat() }}</text>
+
+            {# Inefficiency-adjusted finish (amber) — only if it differs from planned #}
+            {% if inefficiency_x > planned_x %}
+            {% set iy = _project_y(inefficiency_x) | float %}
+            <line x1="{{ inefficiency_x }}" x2="{{ inefficiency_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
+                  stroke="var(--warn)" stroke-width="1.5"/>
+            {% if inefficiency_x <= exhaustion_x %}
+            <circle cx="{{ inefficiency_x }}" cy="{{ iy }}" r="3.5" fill="var(--warn)"/>
+            {% endif %}
+            <text x="{{ inefficiency_x }}" y="{{ zero_y + 46 }}" font-size="10" fill="var(--warn)" text-anchor="middle" font-weight="600">+inefficiency · {{ b.inefficiency_finish.isoformat() }}</text>
+            {% endif %}
+
+            {# Risk-included finish (red) — toggleable group. Vertical
+               always full-height; circle only if still on the projection
+               line. When risk_finish is past budget exhaustion, the area
+               between exhaustion and the risk vertical is shaded as a
+               "deficit" zone (subtle red stripes along the X axis) so the
+               viewer can see scope is finishing past where budget runs out. #}
+            {% if risk_x > inefficiency_x %}
+            {% set ry = _project_y(risk_x) | float %}
+            <g class="risk-projection">
+                {% if risk_x > exhaustion_x %}
+                <rect x="{{ exhaustion_x }}" y="{{ zero_y - 6 }}"
+                      width="{{ risk_x - exhaustion_x }}" height="6"
+                      fill="oklch(from var(--bad) l c h / 0.25)"/>
+                {% endif %}
+                <line x1="{{ risk_x }}" x2="{{ risk_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
+                      stroke="var(--bad)" stroke-width="1.5"/>
+                {% if risk_x <= exhaustion_x %}
+                <circle cx="{{ risk_x }}" cy="{{ ry }}" r="3.5" fill="var(--bad)"/>
+                {% endif %}
+                <text x="{{ risk_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--bad)" text-anchor="middle" font-weight="600">+risks · {{ b.risk_finish.isoformat() }}</text>
+            </g>
+            {% endif %}
+
+            {# Y-axis title #}
+            <text x="14" y="{{ MT + PH/2 }}" font-size="10" fill="var(--muted)" text-anchor="middle" transform="rotate(-90 14 {{ MT + PH/2 }})">full-team budget days</text>
+        </svg>
+
+        <div class="bar-legend" style="display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:6px; font-size:11px; line-height:1.3;">
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="The plan: linear consumption from start budget down to zero on the project end date."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--muted);"></span><span class="muted">Plan</span></span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Actual budget consumption from project start to today."><span aria-hidden="true" style="width:14px; height:2.5px; background:var(--info);"></span><span class="muted">Actual</span></span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Projection: full-team burn rate from today, ending when accessible budget hits zero."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--text-strong); opacity:0.6;"></span><span class="muted">Projection</span></span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Scope-finish at planned cost: today + remaining_dollars / daily_burn business days."><span aria-hidden="true" style="width:2px; height:11px; background:var(--good);"></span><span class="muted">Scope finish</span><strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong></span>
+            {% if b.inefficiency_finish > b.planned_cost_finish %}
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Scope-finish accounting for the historical unrealised-spend bleed factor ({{ b.unrealised_ratio_pct | round(1) }}% of past spend has been unrealised; same ratio assumed forward).">
+                <span aria-hidden="true" style="width:2px; height:11px; background:var(--warn);"></span>
+                <span class="muted">+inefficiency ({{ b.inefficiency_factor | round(2) }}×)</span>
+                <strong style="color:var(--warn);">{{ b.inefficiency_finish.isoformat() }}</strong>
+            </span>
+            {% endif %}
+            {% if b.risk_finish > b.inefficiency_finish %}
+            <span class="risk-projection-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Worst-case finish if all open risks land at full impact, on top of the inefficiency-adjusted timeline."><span aria-hidden="true" style="width:2px; height:11px; background:var(--bad);"></span><span class="muted">+open risks</span><strong style="color:var(--bad);">{{ b.risk_finish.isoformat() }}</strong></span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 {# ── Project Context ── #}
@@ -623,6 +792,149 @@
     </div>
 </dialog>
 
+{# ── Overall Completion — sentence-form detail modal.
+   Answers the questions a PM is asked while standing in front of the
+   Overall Completion bar: where did the budget go, what has spend
+   produced, are we ahead/behind, will the remaining budget cover what's
+   left. Realised risks appear in Q2 (decomposition of past spend) but NOT
+   as a forward-demand line (per DESIGN_RULES §3). #}
+{% set tb = s.total_budget %}
+{% set ev = earned_value %}
+{% set rv = s.realised_risk_dollars %}
+{% set uv = unrealised_spend %}
+{% set as_ = s.actual_spend %}
+{% set ab = s.accessible_budget %}
+{% set rd = s.remaining_dollars %}
+{% set or_ = s.open_risk_dollars %}
+{% set target_value = s.allocated_dollars * s.feature_expected_burn_pct / 100 %}
+{% set delivery_variance = ev - target_value %}
+{% set feature_buffer = ab - rd %}
+{% set total_demand = rd + or_ %}
+{% set overall_buffer = ab - total_demand %}
+{% set risk_free_accessible = [ab - or_, 0] | max %}
+{% set categorised_efficiency = ((ev + rv) / as_ * 100) if as_ > 0 else 0 %}
+{% set feature_efficiency_ratio = (ev / as_) if as_ > 0 else 0 %}
+<dialog id="overall-completion-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+    <div style="padding:20px 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Overall Completion — Detail</strong>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('overall-completion-modal').close()">✕</button>
+        </div>
+
+        {% if tb <= 0 %}
+        <p>Total budget is zero — set an initial budget in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to see meaningful answers here.</p>
+        {% else %}
+
+        <div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+            {# Q1 — Budget composition #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Where has the budget been allocated?</span>
+                Of the <strong>{{ tb | currency }}</strong> total budget,
+                <strong>{{ s.allocated_dollars | currency }}</strong> ({{ (s.allocated_dollars / tb * 100) | round(1) }}%) is allocated to features,
+                <strong>{{ s.overhead_dollars | currency }}</strong> ({{ (s.overhead_dollars / tb * 100) | round(1) }}%) to overheads,
+                <strong>{{ rv | currency }}</strong> ({{ (rv / tb * 100) | round(1) }}%) has been absorbed by realised risks,
+                and <strong>{{ s.unallocated_budget | currency }}</strong> ({{ (s.unallocated_budget / tb * 100) | round(1) }}%) is unallocated — free to direct to new scope, contingency, or risk absorption.
+            </p>
+
+            {# Q2 — What spend has produced #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What has the team produced for the money paid so far?</span>
+                {% if as_ <= 0 %}
+                No spend has been logged yet, so there's no value-for-money picture to break down.
+                {% else %}
+                Of <strong>{{ as_ | currency }}</strong> paid:
+                <strong style="color:var(--good);">{{ ev | currency }}</strong> has produced delivered features (earned value at planned rates),
+                <strong>{{ rv | currency }}</strong> went on realised risk handling (categorised non-feature work),
+                and <strong>{{ uv | currency }}</strong> is unrealised — paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, or non-feature work).
+                {% endif %}
+            </p>
+
+            {# Q3 — Delivery vs target #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Are we ahead or behind on delivery target?</span>
+                {% if s.allocated_dollars <= 0 %}
+                No features have been allocated a budget yet, so there's no delivery target to compare against.
+                {% else %}
+                By {{ s.elapsed_days }} business days elapsed, the on-track target says <strong>{{ s.feature_expected_burn_pct | pct }}</strong> of feature work should be delivered. Actual completion is <strong>{{ s.overall_completion | pct }}</strong> —
+                {% set gap = s.feature_expected_burn_pct - s.overall_completion %}
+                {% if gap > 0.05 %}
+                <strong style="color:var(--bad);">{{ gap | round(1) }}% behind target</strong>.
+                {% elif gap < -0.05 %}
+                <strong style="color:var(--good);">{{ (gap * -1) | round(1) }}% ahead of target</strong>.
+                {% else %}
+                <strong style="color:var(--good);">on target</strong>.
+                {% endif %}
+                In dollar terms, the team would have earned <strong>{{ target_value | currency }}</strong> at planned rates by now;
+                actual earned value is <strong>{{ ev | currency }}</strong> —
+                {% if delivery_variance >= 0 %}
+                <strong style="color:var(--good);">{{ delivery_variance | currency }} ahead</strong>.
+                {% else %}
+                <strong style="color:var(--bad);">{{ (delivery_variance * -1) | currency }} behind</strong>.
+                {% endif %}
+                {% endif %}
+            </p>
+
+            {# Q4 — Accessible budget vs remaining feature work #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Will the accessible budget cover remaining feature work?</span>
+                {% if rd <= 0 %}
+                All allocated feature work is complete — there is no remaining feature demand to weigh against the budget.
+                {% else %}
+                Remaining features need <strong>{{ rd | currency }}</strong> to complete. Accessible budget is <strong>{{ ab | currency }}</strong> —
+                {% if feature_buffer >= 0 %}
+                <strong style="color:var(--good);">{{ feature_buffer | currency }} buffer</strong> (covers remaining work with surplus).
+                {% else %}
+                <strong style="color:var(--bad);">{{ (feature_buffer * -1) | currency }} shortfall</strong> (cannot cover remaining feature work).
+                {% endif %}
+                {% endif %}
+            </p>
+
+            {# Q5 — Combined demand (features + open risks) vs accessible #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">After open-risk exposure, is there headroom for everything left?</span>
+                {% if or_ <= 0 and rd <= 0 %}
+                No remaining feature work and no open-risk exposure recorded — there is no forward demand against the accessible budget.
+                {% elif or_ <= 0 %}
+                No open risks are recorded, so feature delivery is the only forward demand. (See the prior line for that comparison.)
+                {% elif rd <= 0 %}
+                Features are complete, but open risks represent <strong>{{ or_ | currency }}</strong> of forward exposure against <strong>{{ ab | currency }}</strong> accessible —
+                {% set rb = ab - or_ %}
+                {% if rb >= 0 %}
+                <strong style="color:var(--good);">{{ rb | currency }} of risk-free runway</strong> in the worst case.
+                {% else %}
+                <strong style="color:var(--bad);">{{ (rb * -1) | currency }} short</strong> if all open risks land.
+                {% endif %}
+                {% else %}
+                Total forward demand: <strong>{{ rd | currency }}</strong> for remaining features + <strong>{{ or_ | currency }}</strong> for open-risk exposure = <strong>{{ total_demand | currency }}</strong>. Against <strong>{{ ab | currency }}</strong> accessible, that's
+                {% if overall_buffer >= 0 %}
+                <strong style="color:var(--good);">{{ overall_buffer | currency }} of headroom</strong>.
+                {% else %}
+                <strong style="color:var(--bad);">{{ (overall_buffer * -1) | currency }} short</strong>.
+                {% endif %}
+                Risk-free runway (assuming no open risks land) would still be <strong>{{ feature_buffer | currency }}</strong>.
+                {% endif %}
+            </p>
+
+            {% if as_ > 0 and s.allocated_dollars > 0 %}
+            <div style="border-top:1px solid var(--border); padding-top:12px; display:flex; flex-direction:column; gap:10px;">
+                <div class="muted tiny" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Also worth knowing</div>
+
+                <p style="margin:0;">
+                    Every $1 paid has produced about <strong>${{ '%.2f' % feature_efficiency_ratio }}</strong> of feature value at planned rates (earned-value efficiency). Below 1.0 means delivered features are worth less in plan-priced dollars than the cash spent producing them so far.
+                </p>
+
+                <p style="margin:0;">
+                    <strong>{{ categorised_efficiency | round(1) }}%</strong> of spend has been attributed to either feature delivery or realised risks; the remaining <strong>{{ (100 - categorised_efficiency) | round(1) }}%</strong> is unrealised — paid time the project doesn't yet have a categorised outcome for. As work in flight completes, that figure should drop.
+                </p>
+            </div>
+            {% endif %}
+
+        </div>
+        {% endif %}
+    </div>
+</dialog>
+
 {% endblock %}
 
 {% block scripts %}
@@ -645,6 +957,54 @@ function toggleStarted(projectId, featureId, btn) {
     }
     card.addEventListener('click', open);
     card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            if (modal.close) modal.close(); else modal.removeAttribute('open');
+        }
+    });
+})();
+
+(function() {
+    // Burndown chart — toggle the risk-projection group on/off. Persists
+    // per-project. Default: on.
+    const card = document.getElementById('hero-burndown');
+    if (!card) return;
+    const KEY = 'burndown_show_risk_{{ project.id }}';
+    const cb = card.querySelector('#burndown-show-risk');
+    if (!cb) return;
+    const saved = localStorage.getItem(KEY);
+    if (saved === '0') cb.checked = false;
+    function apply() {
+        const show = cb.checked;
+        card.querySelectorAll('.risk-projection, .risk-projection-legend').forEach(el => {
+            el.style.display = show ? '' : 'none';
+        });
+    }
+    apply();
+    cb.addEventListener('change', () => {
+        apply();
+        try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) {}
+    });
+})();
+
+(function() {
+    // Overall Completion hero card → modal. Whole card is clickable, but
+    // clicks inside the .detail-toggles row pass through to the toggles
+    // (and don't open the modal). Same dialog pattern as budget-days.
+    const card = document.getElementById('hero-overall-completion');
+    const modal = document.getElementById('overall-completion-modal');
+    if (!card || !modal) return;
+    function open() {
+        if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
+    }
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('.detail-toggles')) return;  // toggle clicks don't open the modal
+        open();
+    });
+    card.addEventListener('keydown', (e) => {
+        if (e.target.closest('.detail-toggles')) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
     modal.addEventListener('click', (e) => {

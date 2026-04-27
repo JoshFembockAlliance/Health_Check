@@ -23,6 +23,7 @@ from calculations import (
     deliverable_summary,
     requirement_summary,
     feature_summary,
+    agile_burndown_chart_data,
     agile_project_summary,
     fixed_price_project_summary,
     milestones_summary,
@@ -558,6 +559,8 @@ def _agile_dashboard(request: Request, project: dict):
 
     days_to_end = business_days_between(as_of, end_dt) if (as_of and end_dt and end_dt > as_of) else None
 
+    burndown = agile_burndown_chart_data(project, summary)
+
     ctx = {
         "request": request,
         "active": "dashboard",
@@ -574,6 +577,7 @@ def _agile_dashboard(request: Request, project: dict):
         "dashboard_notes": dashboard_notes,
         "notes_overflow": notes_overflow,
         "days_to_end": days_to_end,
+        "burndown": burndown,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "dashboard_agile.html", ctx)

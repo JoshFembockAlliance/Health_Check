@@ -28,6 +28,25 @@ def parse_date(s: str) -> date | None:
         return None
 
 
+def add_business_days(start: date, n: float) -> date:
+    """Return the date `n` business days after `start`. Fractional `n` rounds
+    to the nearest whole day for date arithmetic. Skips Saturdays/Sundays.
+    Holidays are not modelled — same convention as business_days_between.
+    """
+    if start is None:
+        return None
+    days_to_add = int(round(n))
+    current = start
+    if days_to_add <= 0:
+        return current
+    added = 0
+    while added < days_to_add:
+        current += timedelta(days=1)
+        if current.weekday() < 5:  # Mon–Fri
+            added += 1
+    return current
+
+
 def remaining_days(budget_days: float, percent_complete: int) -> float:
     """Days not yet consumed: budget_days × (1 - completion %)."""
     return budget_days * (1 - percent_complete / 100)
@@ -679,4 +698,173 @@ def feature_health(
         "label": label,
         "badge_class": badge_class,
         "target_pct": on_track_target,
+    }
+
+
+def agile_burndown_chart_data(
+    project: dict,
+    summary: dict,
+) -> dict | None:
+    """Build data for the budget burndown chart on the agile dashboard.
+
+    Y-axis: full-team budget days (post-overhead). The headline runway —
+    days the team can fund feature delivery for, given current spend and
+    overhead reservation.
+
+    X-axis: calendar dates from project start through the latest projection.
+
+    Three "scope-finish" projections, each at increasing pessimism:
+      * planned-cost  : remaining_dollars / daily_burn business days from now.
+                        Assumes future spend converts to features at planned
+                        rates with no inefficiency.
+      * inefficiency  : applies the historical unrealised-spend bleed factor
+                        (= 1 / (1 − unrealised_spend / actual_spend)) so the
+                        same fraction of future spend is assumed to vanish
+                        into work-in-flight, rework, etc.
+      * risk-included : adds open_risk_dollars / daily_burn additional days
+                        on top of the inefficiency-adjusted estimate. The
+                        worst-case "if everything that could go wrong does".
+
+    Returns None if the project doesn't have enough data (no team size,
+    no start/as-of dates) — callers should hide the chart in that case.
+    """
+    start = parse_date(project.get("start_date"))
+    end = parse_date(project.get("end_date"))
+    as_of = parse_date(project.get("as_of_date"))
+
+    daily_burn = summary.get("daily_burn", 0)
+    if daily_burn <= 0 or start is None or as_of is None:
+        return None
+
+    accessible = summary["accessible_budget"]
+    total_budget = summary["total_budget"]
+    overhead = summary["overhead_dollars"]
+    actual_spend = summary["actual_spend"]
+    allocated = summary["allocated_dollars"]
+    overall_completion = summary["overall_completion"]
+    realised_risk = summary["realised_risk_dollars"]
+    earned_value = allocated * overall_completion / 100
+    unrealised_spend = max(0.0, actual_spend - earned_value - realised_risk)
+    remaining_dollars_value = summary["remaining_dollars"]
+    open_risk = summary["open_risk_dollars"]
+
+    # initial_days: days the post-overhead budget could fund at start
+    # today_days: days the post-overhead budget can still fund (= accessible / burn)
+    initial_days = max(0.0, (total_budget - overhead) / daily_burn)
+    today_days = max(0.0, accessible / daily_burn)
+
+    # Scope-finish projections (business days from today)
+    planned_cost_days = remaining_dollars_value / daily_burn if daily_burn > 0 else 0.0
+
+    # Inefficiency factor: if 38% of past spend has been unrealised,
+    # 62% has produced visible output (features + categorised risks).
+    # To deliver $X of features going forward, expect to spend $X/0.62.
+    # Bounded: if unrealised_spend ≥ actual_spend (degenerate), the factor
+    # would explode — clamp to 1.0 in that edge case.
+    if actual_spend > 0 and unrealised_spend < actual_spend:
+        unrealised_ratio = unrealised_spend / actual_spend
+        inefficiency_factor = 1.0 / (1.0 - unrealised_ratio)
+    else:
+        unrealised_ratio = 0.0
+        inefficiency_factor = 1.0
+
+    inefficiency_days = planned_cost_days * inefficiency_factor
+    risk_days = inefficiency_days + (open_risk / daily_burn if daily_burn > 0 else 0.0)
+
+    # Convert projection durations to calendar dates
+    planned_cost_finish = add_business_days(as_of, planned_cost_days) if planned_cost_days > 0 else as_of
+    inefficiency_finish = add_business_days(as_of, inefficiency_days) if inefficiency_days > 0 else as_of
+    risk_finish = add_business_days(as_of, risk_days) if risk_days > 0 else as_of
+
+    # Where the projection line hits zero (budget exhausted at full-team burn)
+    budget_exhaustion = add_business_days(as_of, today_days)
+
+    # X-axis range: from start through the last meaningful date
+    candidates = [end, planned_cost_finish, inefficiency_finish, risk_finish, budget_exhaustion]
+    chart_end = max([d for d in candidates if d is not None], default=as_of)
+    # Add a small padding so markers near the right edge aren't clipped
+    chart_end_padded = chart_end + timedelta(days=7)
+
+    total_calendar_days = max(1, (chart_end_padded - start).days)
+
+    def _days_offset(d):
+        return (d - start).days if d is not None else None
+
+    def _stepped_polyline(start_offset, end_offset, start_value, daily_burn_per_bd):
+        """Build a stepped (calendar_offset, days_remaining) polyline that
+        burns by daily_burn_per_bd on each Mon-Fri and stays flat on
+        Saturdays/Sundays. End value clamped at 0 — once budget is gone the
+        line stays at the X axis. End_offset is inclusive."""
+        if end_offset <= start_offset or daily_burn_per_bd <= 0:
+            return [(start_offset, start_value), (max(end_offset, start_offset), start_value)]
+        points = [(start_offset, start_value)]
+        value = start_value
+        for offset in range(start_offset + 1, end_offset + 1):
+            day_just_ended = start + timedelta(days=offset - 1)
+            if day_just_ended.weekday() < 5:  # Mon–Fri burned
+                value = max(0.0, value - daily_burn_per_bd)
+            points.append((offset, value))
+        return points
+
+    # Actual line: from project start to today. Slope = (consumed days) /
+    # (business days elapsed). If as_of is on the same calendar day as
+    # start there's no elapsed burn yet.
+    bd_elapsed = business_days_between(start, as_of)
+    actual_burn_per_bd = ((initial_days - today_days) / bd_elapsed) if bd_elapsed > 0 else 0.0
+    actual_points = _stepped_polyline(0, _days_offset(as_of), initial_days, actual_burn_per_bd)
+
+    # Plan line: linear consumption across the planned project duration.
+    # If no end_date, skip — there's no plan to draw.
+    plan_points = None
+    if end is not None:
+        bd_to_end = business_days_between(start, end)
+        plan_burn_per_bd = (initial_days / bd_to_end) if bd_to_end > 0 else 0.0
+        plan_points = _stepped_polyline(0, _days_offset(end), initial_days, plan_burn_per_bd)
+
+    # Projection line: from today onward at full-team burn (1 budget day
+    # per business day), continues until budget hits zero (budget_exhaustion).
+    projection_points = _stepped_polyline(
+        _days_offset(as_of), _days_offset(budget_exhaustion), today_days, 1.0
+    )
+
+    return {
+        # Raw data (dates and figures, for tooltips / sentence rendering)
+        "start_date": start,
+        "as_of_date": as_of,
+        "end_date": end,
+        "chart_end_date": chart_end_padded,
+        "initial_days": initial_days,
+        "today_days": today_days,
+        "planned_cost_finish": planned_cost_finish,
+        "inefficiency_finish": inefficiency_finish,
+        "risk_finish": risk_finish,
+        "budget_exhaustion": budget_exhaustion,
+        "planned_cost_days": planned_cost_days,
+        "inefficiency_days": inefficiency_days,
+        "risk_days_total": risk_days,
+        "inefficiency_factor": inefficiency_factor,
+        "unrealised_ratio_pct": unrealised_ratio * 100,
+        "open_risk_days": (open_risk / daily_burn) if daily_burn > 0 else 0.0,
+        "remaining_dollars": remaining_dollars_value,
+        "open_risk": open_risk,
+        "daily_burn": daily_burn,
+        # Pre-computed offsets for SVG rendering. Each value is "calendar
+        # days from project start" — divide by total_calendar_days to get
+        # a 0..1 fraction along the X-axis. Y-axis fractions are days /
+        # initial_days. Keeps the template free of datetime arithmetic.
+        "total_calendar_days": total_calendar_days,
+        "x_start": 0,
+        "x_as_of": _days_offset(as_of),
+        "x_end": _days_offset(end),
+        "x_planned_cost_finish": _days_offset(planned_cost_finish),
+        "x_inefficiency_finish": _days_offset(inefficiency_finish),
+        "x_risk_finish": _days_offset(risk_finish),
+        "x_budget_exhaustion": _days_offset(budget_exhaustion),
+        # Stepped polyline points: each is (calendar_offset_days,
+        # days_remaining). Flat across weekends, descend on weekdays —
+        # honouring "1 budget day per business day" while plotting against
+        # a calendar-day X-axis.
+        "actual_points": actual_points,
+        "plan_points": plan_points,
+        "projection_points": projection_points,
     }
