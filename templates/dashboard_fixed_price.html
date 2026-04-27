@@ -66,7 +66,35 @@
             {% endfor %}
             <div class="fill fill-good milestones-overall" style="width: {{ [s.overall_completion, 100] | min }}%"></div>
         </div>
-        <div class="sub-row">
+        {% if s.total_budget > 0 and s.allocated_dollars > 0 %}
+        {% set earned_dollars = s.allocated_dollars * s.overall_completion / 100 %}
+        {% set earned_pct    = [earned_dollars      / s.total_budget * 100, 100] | min %}
+        {% set invoiced_pct  = [s.invoiced_to_date  / s.total_budget * 100, 100] | min %}
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="tiny muted" style="width:68px; text-align:right; flex-shrink:0;">Earned</span>
+                <div class="progress" style="flex:1; height:7px;" title="Earned {{ earned_dollars | currency }} of {{ s.total_budget | currency }} contract value">
+                    <div class="fill fill-good" style="width:{{ earned_pct }}%;"></div>
+                </div>
+                <span class="tiny" style="width:72px; flex-shrink:0;">{{ earned_dollars | currency }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="tiny muted" style="width:68px; text-align:right; flex-shrink:0;">Invoiced</span>
+                <div class="progress" style="flex:1; height:7px;" title="Invoiced {{ s.invoiced_to_date | currency }} of {{ s.total_budget | currency }} contract value">
+                    <div class="fill fill-info" style="width:{{ invoiced_pct }}%;"></div>
+                </div>
+                <span class="tiny" style="width:72px; flex-shrink:0;">{{ s.invoiced_to_date | currency }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="tiny muted" style="width:68px; text-align:right; flex-shrink:0;">Planned</span>
+                <div class="progress" style="flex:1; height:7px;" title="Feature value allocated {{ s.allocated_dollars | currency }} of {{ s.total_budget | currency }} contract value">
+                    <div class="fill" style="width:{{ [s.allocated_dollars / s.total_budget * 100, 100] | min }}%; background:var(--border-strong);"></div>
+                </div>
+                <span class="tiny" style="width:72px; flex-shrink:0;">{{ s.allocated_dollars | currency }}</span>
+            </div>
+        </div>
+        {% endif %}
+        <div class="sub-row" style="margin-top:8px;">
             <div class="row"><span class="lbl">Milestones</span><span class="val">{{ s.paid_count }} paid · {{ s.invoiced_count }} invoiced · {{ s.milestone_count }} total</span></div>
             {% if s.allocated_dollars > 0 %}
             <div class="row"><span class="lbl">Internal spend vs. allocated</span><span class="val">{{ s.actual_spend | currency }} / {{ s.allocated_dollars | currency }}</span></div>

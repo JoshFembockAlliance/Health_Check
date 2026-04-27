@@ -45,23 +45,21 @@
         </tr></thead>
         <tbody>
             {% for m in milestones %}
+            <form id="mil-{{ m.id }}" method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/update" data-autosave></form>
             <tr>
                 <td class="mono muted">{{ loop.index }}</td>
                 <td>
-                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/update" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                        <input type="text" name="name" value="{{ m.name }}" required style="font-weight:600; min-width:160px;">
-                        <input type="text" name="description" value="{{ m.description }}" placeholder="Description" style="min-width:200px;">
-                        <input type="hidden" name="value" value="{{ m.value }}">
-                        <button type="submit" class="btn btn-sm">Save</button>
-                    </form>
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <input form="mil-{{ m.id }}" type="text" name="name" value="{{ m.name }}" required style="font-weight:600; min-width:160px;">
+                        <input form="mil-{{ m.id }}" type="text" name="description" value="{{ m.description }}" placeholder="Description" style="min-width:200px;">
+                        <button form="mil-{{ m.id }}" type="submit" class="btn btn-sm">Save</button>
+                    </div>
                 </td>
                 <td class="cell-num">
-                    <form method="post" action="/p/{{ pid }}/milestones/{{ m.id }}/update" style="display:flex; gap:4px; align-items:center;">
-                        <input type="hidden" name="name" value="{{ m.name }}">
-                        <input type="hidden" name="description" value="{{ m.description }}">
-                        <input type="number" name="value" value="{{ m.value }}" step="0.01" min="0" style="width:110px; text-align:right;">
-                        <button type="submit" class="btn btn-sm">↻</button>
-                    </form>
+                    <div style="display:flex; gap:4px; align-items:center;">
+                        <input form="mil-{{ m.id }}" type="number" name="value" value="{{ m.value }}" step="0.01" min="0" style="width:110px; text-align:right;">
+                        <button form="mil-{{ m.id }}" type="submit" class="btn btn-sm">↻</button>
+                    </div>
                 </td>
                 <td class="cell-num">{{ m.linked_completion_pct | pct }}</td>
                 <td class="cell-num">{{ m.invoiced_amount | currency }}</td>
@@ -180,4 +178,21 @@
         <button type="submit" class="btn btn-primary">+ Add milestone</button>
     </form>
 </div>
+
+<script>
+function autoSaveMilestone(form) {
+    const params = new URLSearchParams(new FormData(form));
+    fetch(form.action, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: params.toString(),
+    }).catch(() => {});
+}
+
+document.querySelectorAll('form[data-autosave]').forEach(form => {
+    document.querySelectorAll(`[form="${form.id}"][type=text], [form="${form.id}"][type=number]`).forEach(inp => {
+        inp.addEventListener('blur', () => autoSaveMilestone(form));
+    });
+});
+</script>
 {% endblock %}
