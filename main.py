@@ -1233,7 +1233,8 @@ def _sort_risks(risks: list, sort_key: str) -> list:
 
 
 @app.get("/p/{project_id}/risks")
-def risks_page(request: Request, project_id: int, sort: str = "status", filter: str = "all"):
+def risks_page(request: Request, project_id: int, sort: str = "status", filter: str = "all",
+               date_from: str = "", date_to: str = ""):
     db = get_db()
     project = get_project(project_id)
     roles = _roles_as_dicts(project_id)
@@ -1296,6 +1297,19 @@ def risks_page(request: Request, project_id: int, sort: str = "status", filter: 
         visible_risks = [r for r in enriched_risks if r["status"] == "done"]
     else:
         visible_risks = list(enriched_risks)
+
+    if date_from or date_to:
+        def _in_date_window(r: dict) -> bool:
+            d = r.get("date_identified") or ""
+            if not d:
+                return False
+            if date_from and d < date_from:
+                return False
+            if date_to and d > date_to:
+                return False
+            return True
+        visible_risks = [r for r in visible_risks if _in_date_window(r)]
+
     visible_risks = _sort_risks(visible_risks, sort)
 
     ctx = {
@@ -1318,6 +1332,8 @@ def risks_page(request: Request, project_id: int, sort: str = "status", filter: 
         "default_rate": default_role_rate,
         "sort_key": sort,
         "filter_key": filter,
+        "date_from": date_from,
+        "date_to": date_to,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "risks.html", ctx)

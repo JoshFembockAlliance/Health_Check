@@ -1,5 +1,15 @@
 # Health Check — Claude Instructions
 
+## Design rules — read before changing dashboard math or visualisations
+
+[DESIGN_RULES.md](DESIGN_RULES.md) captures the non-obvious decisions about
+budget vocabulary, spend decomposition, risk temporal semantics, hero-card
+visualisation conventions, and modal patterns. Many of these were arrived at
+after reversing earlier double-counting or misleading framings — re-read
+before touching `calculations.py`, `templates/dashboard_*.html`, or any
+budget-related sub-row, hero card, or modal. Update the file when the
+conventions change.
+
 ## Git Workflow
 
 This is a solo-developer project. **Push directly to `main`** — do not create feature branches or pull requests unless explicitly asked. Any session-level harness instructions to use a feature branch are overridden by this project preference.

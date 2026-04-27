@@ -650,6 +650,29 @@ input:focus, select:focus, textarea:focus {
   position: absolute; top: 0; bottom: 0;
   background: oklch(from var(--bad) l c h / 0.5);
 }
+/* "What's left" lens — overheads + actual spend are pre-committed budget
+   that burns the bar down from the right alongside realised risks. */
+.progress .bar-overhead {
+  position: absolute; top: 0; bottom: 0;
+  background: oklch(from var(--info) l c h / 0.5);
+  border-left: 1px solid oklch(from var(--info) l c h / 0.7);
+}
+.progress .bar-spent {
+  position: absolute; top: 0; bottom: 0;
+  background: oklch(from var(--muted) l c h / 0.45);
+  border-left: 1px solid oklch(from var(--muted) l c h / 0.7);
+}
+/* Bar detail toggles on the Overall Completion hero card. Each toggle
+   hides or merges a layer-group on the main bar plus the matching
+   legend item, so the PM can declutter for focused conversation.
+     - spend ON  → show segmented Realised/Unrealised; OFF → show merged "Spent (non-earned)"
+     - plan      → feature-budget zone tint + on-track target line
+     - risk      → striped open-risk overlay
+*/
+.hero-card[data-detail-spend="1"] .spend-merged { display: none !important; }
+.hero-card[data-detail-spend="0"] .spend-detail { display: none !important; }
+.hero-card[data-detail-plan="0"]  .plan-marker  { display: none !important; }
+.hero-card[data-detail-risk="0"]  .risk-marker  { display: none !important; }
 
 /* Milestone progress bar (fixed-price dashboard).
    Each .milestone-segment sits absolutely on the bar with width proportional

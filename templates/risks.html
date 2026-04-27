@@ -86,7 +86,7 @@
     </form>
 </div>
 
-{% if risks or filter_key != 'all' %}
+{% if risks or filter_key != 'all' or date_from or date_to %}
 <div class="filters">
     <form method="get" action="/p/{{ pid }}/risks" id="risk-controls" style="display:contents;">
         <div class="pill-tabs">
@@ -102,6 +102,21 @@
                 <option value="age" {% if sort_key == 'age' %}selected{% endif %}>Age (oldest first)</option>
                 <option value="name" {% if sort_key == 'name' %}selected{% endif %}>Name (A–Z)</option>
             </select>
+        </div>
+        <div class="group">
+            <span>Raised</span>
+            <input type="date" name="date_from" value="{{ date_from }}"
+                   onchange="document.getElementById('risk-controls').submit()"
+                   title="From date (raised on or after)"
+                   style="font-size:12px; padding:3px 6px;">
+            <span class="muted" style="font-size:11px;">–</span>
+            <input type="date" name="date_to" value="{{ date_to }}"
+                   onchange="document.getElementById('risk-controls').submit()"
+                   title="To date (raised on or before)"
+                   style="font-size:12px; padding:3px 6px;">
+            {% if date_from or date_to %}
+            <a href="?filter={{ filter_key }}&sort={{ sort_key }}" class="btn btn-sm" title="Clear date filter" style="padding:2px 7px; font-size:12px;">✕</a>
+            {% endif %}
         </div>
     </form>
     <div class="group" style="margin-left:auto;">
@@ -220,7 +235,7 @@
     {% endfor %}
 </div>
 {% else %}
-<p class="muted">{% if filter_key != 'all' %}No risks match the current filter.{% else %}No risks tracked yet. Click <em>Add risk</em>.{% endif %}</p>
+<p class="muted">{% if filter_key != 'all' or date_from or date_to %}No risks match the current filter.{% else %}No risks tracked yet. Click <em>Add risk</em>.{% endif %}</p>
 {% endif %}
 
 <dialog id="risk-edit-modal" style="width:75vw; max-width:1200px;">

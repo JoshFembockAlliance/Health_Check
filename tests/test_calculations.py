@@ -241,16 +241,30 @@ class TestProjectSummary:
         assert result["total_budget"] == 110_000.0
         assert result["current_budget"] == 95_000.0
 
-    def test_realised_risk_reduces_accessible_budget(self):
+    def test_realised_risk_alone_does_not_reduce_accessible_budget(self):
+        # Realised risks represent team time already in actual_spend (a
+        # categorisation of how spend was used). Passing realised_risk_dollars
+        # without spend means the data is inconsistent — but the calc must
+        # not double-count. Accessible reflects only spend and overheads.
         proj = self._make_project(budget=100_000, team_size=1, spend=0)
         result = project_summary(proj, [], [], default_day_rate=1_000.0, realised_risk_dollars=10_000.0)
-        assert result["accessible_budget"] == 90_000.0
+        assert result["accessible_budget"] == 100_000.0
+        assert result["realised_risk_dollars"] == 10_000.0
+
+    def test_realised_risk_categorises_spend_not_additive(self):
+        # When realised risk time is reflected in actual_spend (the consistent
+        # case), accessible drops by the spend amount only — not by spend +
+        # realised. realised_risk_dollars then describes what slice of that
+        # spend went on risk handling.
+        proj = self._make_project(budget=100_000, team_size=1, spend=10_000)
+        result = project_summary(proj, [], [], default_day_rate=1_000.0, realised_risk_dollars=10_000.0)
+        assert result["accessible_budget"] == 90_000.0   # = 100k − spend; no extra realised deduction
         assert result["realised_risk_dollars"] == 10_000.0
 
     def test_budget_days_remaining_uses_accessible_budget(self):
-        proj = self._make_project(budget=100_000, team_size=1, spend=0,
+        proj = self._make_project(budget=100_000, team_size=1, spend=20_000,
                                   start="2024-01-15", as_of="2024-01-15")
-        # No elapsed days, so days remaining = accessible_budget / daily_burn
+        # spend=20k → current_budget=80k; no overhead → accessible=80k → 80 days
         result = project_summary(proj, [], [], default_day_rate=1_000.0, realised_risk_dollars=20_000.0)
         assert result["budget_days_remaining"] == pytest.approx(80.0)
 
@@ -304,9 +318,12 @@ class TestProjectSummary:
             realised_risk_dollars=5_000.0, open_risk_dollars=8_000.0,
         )
         assert result["open_risk_dollars"] == 8_000.0
-        # Accessible budget still excludes only realised_risk + overhead
-        assert result["accessible_budget"] == 95_000.0
-        # Unallocated still excludes realised_risk + overhead + features
+        # Accessible budget excludes spend + overhead. Realised risks are
+        # part of spend (here spend=0 so accessible == total).
+        assert result["accessible_budget"] == 100_000.0
+        # Unallocated is the *allocation* view: total − features − overhead
+        # − realised_risk earmark. So realised still appears here as an
+        # earmark even though it doesn't reduce accessible.
         assert result["unallocated_budget"] == 95_000.0
 
     def test_realised_risk_excluded_from_unallocated(self):
@@ -325,14 +342,16 @@ class TestProjectSummary:
         assert (result["allocated_dollars"] + result["overhead_dollars"]
                 + result["realised_risk_dollars"] + result["unallocated_budget"]) == pytest.approx(result["total_budget"])
 
-    def test_overhead_and_risk_both_reduce_accessible(self):
-        # Both deductions stack: $100k - $5k risk - $10k overhead → $85k accessible
+    def test_overhead_reduces_accessible_realised_does_not(self):
+        # Overhead is an additional deduction; realised risk is a sub-category
+        # of spend (here spend=0 so realised has no effect on accessible).
+        # $100k − $0 spend − $10k overhead = $90k accessible.
         proj = self._make_project(budget=100_000, team_size=1, spend=0)
         result = project_summary(
             proj, [], [], default_day_rate=1_000.0,
             realised_risk_dollars=5_000.0, overhead_dollars=10_000.0,
         )
-        assert result["accessible_budget"] == 85_000.0
+        assert result["accessible_budget"] == 90_000.0
         assert result["realised_risk_dollars"] == 5_000.0
         assert result["overhead_dollars"] == 10_000.0
 

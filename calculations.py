@@ -120,9 +120,13 @@ def agile_project_summary(
 ) -> dict:
     """Compute all top-level project financial metrics.
 
-    realised_risk_dollars: dollars already absorbed via realised_percentage
-    on any risk (open or closed). These reduce the accessible budget and
-    therefore the Budget Days Remaining figure.
+    realised_risk_dollars: dollars absorbed by risk handling — impact_days ×
+    realised% × day_rate, summed across risks. Treated as a CATEGORISATION
+    of actual_spend (the team time on realised risks IS part of logged
+    spend), not as an additional deduction. Used by the dashboard to split
+    spend into earned-value vs realised-risk vs unrealised-spend buckets.
+    Does NOT independently reduce accessible_budget — that subtraction
+    would double-count the spend already deducted via current_budget.
 
     open_risk_dollars: dollars of unrealised exposure from open risks —
     impact_days × (1 - realised%) × day_rate, summed. Reported on the
@@ -143,8 +147,10 @@ def agile_project_summary(
                              assigned to the project. Denominator for burn %.
       * current_budget     = total_budget − actual_spend. What remains to be
                              spent. "We can't spend what we've already spent."
-      * accessible_budget  = current_budget − realised_risk − overhead.
-                             What's still available for feature delivery.
+      * accessible_budget  = current_budget − overhead. What's still
+                             available for feature delivery (overheads are
+                             pre-committed; realised risks are already
+                             netted out via actual_spend).
     """
     total_adj = sum(a["amount"] for a in adjustments)
     actual_spend = project["actual_spend"]
@@ -160,10 +166,13 @@ def agile_project_summary(
     # from here.
     current_budget = total_budget - actual_spend
 
-    # accessible_budget: current_budget minus money already consumed by
-    # realised risks and money committed to overheads (non-delivery costs).
-    # This is what remains for feature delivery.
-    accessible_budget = current_budget - realised_risk_dollars - overhead_dollars
+    # accessible_budget: current_budget minus money committed to overheads
+    # (non-delivery costs). Realised risks are NOT subtracted here — they
+    # represent team time already spent on risk handling, which is already
+    # reflected in actual_spend (and therefore in current_budget). Subtracting
+    # them again would double-count. Realised risks remain available as a
+    # categorisation of how spend was used (see dashboard breakdown).
+    accessible_budget = current_budget - overhead_dollars
 
     start = parse_date(project["start_date"])
     as_of = parse_date(project["as_of_date"])
@@ -201,16 +210,17 @@ def agile_project_summary(
     # liquidity view, so it sits against total_budget, not current_budget.
     unallocated_budget = total_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
 
-    # budget_days_remaining: accessible delivery days — the PM's risk-adjusted
-    # runway. Flows from accessible_budget (spend + overheads + realised risks
-    # already removed), so no double-count.
+    # budget_days_remaining: full-team days available for team-on-feature
+    # work — accessible_budget converted to days at the team burn rate.
+    # Overheads are reserved off the top (cannot be redirected); realised
+    # risks are already netted out via actual_spend → current_budget.
     budget_days_remaining = accessible_budget / daily_burn if daily_burn else 0
 
-    # total_budget_days_remaining: full days the current (post-spend) budget
-    # can fund at the team burn rate — before any risk or overhead deductions.
-    # Used as the headline on the "days remaining" hero card so the PM can
-    # see the whole story, then drill into the breakdowns below.
-    total_budget_days_remaining = current_budget / daily_burn if daily_burn else 0
+    # total_budget_days_remaining: identical to budget_days_remaining under
+    # the current model (both flow from accessible_budget). Kept as a
+    # separate name because the agile dashboard hero card uses this label
+    # specifically; consolidate at a quieter time.
+    total_budget_days_remaining = budget_days_remaining
 
     return {
         "total_budget": total_budget,

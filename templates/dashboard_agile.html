@@ -52,55 +52,215 @@
         {% endif %}
         <div class="sub-row">
             {% if s.actual_spend > 0 %}
-            <div class="row"><span class="lbl">Spent to date</span><span class="val">− {{ s.actual_spend | currency }}</span></div>
+            <div class="row" title="Total spend logged against the project. Realised risks are a categorisation of this spend, not an additional deduction.">
+                <span class="lbl">Spent to date</span><span class="val">− {{ s.actual_spend | currency }}</span>
+            </div>
+            {% if s.realised_risk_dollars > 0 %}
+            <div class="row bad-row" style="opacity:0.85;" title="Of the spend above, this much went on realised risk handling rather than feature delivery.">
+                <span class="lbl" style="padding-left:14px;">↳ on realised risks</span><span class="val">{{ s.realised_risk_dollars | currency }}</span>
+            </div>
+            {% endif %}
             {% endif %}
             {% if s.overhead_dollars > 0 %}
-            <div class="row"><span class="lbl">Overheads</span><span class="val">− {{ s.overhead_dollars | currency }}</span></div>
-            {% endif %}
-            {% if s.realised_risk_dollars > 0 %}
-            <div class="row bad-row"><span class="lbl">Realised risks</span><span class="val">− {{ s.realised_risk_dollars | currency }}</span></div>
+            <div class="row" title="Earmarked for non-delivery costs (PM oversight, ceremonies, support).">
+                <span class="lbl">Overheads</span><span class="val">− {{ s.overhead_dollars | currency }}</span>
+            </div>
             {% endif %}
             {% if s.open_risk_dollars > 0 %}
-            <div class="row warn-row"><span class="lbl">⚠ Open risk exposure</span><span class="val">{{ s.open_risk_dollars | currency }}</span></div>
+            <div class="row warn-row" title="Open risks that could land and absorb accessible budget if not mitigated.">
+                <span class="lbl">⚠ Open risk exposure</span><span class="val">{{ s.open_risk_dollars | currency }}</span>
+            </div>
             {% endif %}
         </div>
     </div>
 
-    {% set bar_denom = s.total_budget - s.overhead_dollars %}
-    {% set feature_budget_pct = ([s.allocated_dollars / bar_denom * 100, 100] | min) if bar_denom > 0 else 0 %}
-    {% set comp_fill_pct = [s.overall_completion / 100 * feature_budget_pct, 100] | min %}
-    {% set target_pct = [s.feature_expected_burn_pct / 100 * feature_budget_pct, 100] | min %}
-    {% set bar_scale = (s.total_budget / bar_denom) if bar_denom > 0 else 1 %}
-    {% set bar_locked_risk_pct = [rs.locked_risk_pct * bar_scale, 100] | min %}
-    {% set bar_open_risk_pct = [rs.open_risk_pct * bar_scale, 100 - bar_locked_risk_pct] | min %}
-    <div class="hero-card">
+    {# ── What's-left bar (bar denom = total_budget) ── #}
+    {% set wl_denom = s.total_budget %}
+    {% set wl_feature_budget_pct = ([s.allocated_dollars / wl_denom * 100, 100] | min) if wl_denom > 0 else 0 %}
+    {% set wl_comp_fill_pct = [s.overall_completion / 100 * wl_feature_budget_pct, 100] | min %}
+    {% set wl_target_pct = [s.feature_expected_burn_pct / 100 * wl_feature_budget_pct, 100] | min %}
+    {% set wl_overhead_pct = (s.overhead_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
+    {# Spend decomposes into three buckets, each shown separately on the bar:
+        - earned_value         : spend that became delivered features (green left)
+        - realised_risk_dollars: spend that went on risk handling (red right)
+        - unrealised_spend     : the residual — paid but not yet visible as
+                                 features or risks (grey right)
+       Sum equals actual_spend, no double-count. If earned + realised > spend,
+       there's a favourable variance (delivered more value than paid for). #}
+    {% set earned_value = s.allocated_dollars * s.overall_completion / 100 %}
+    {% set unrealised_spend = [s.actual_spend - earned_value - s.realised_risk_dollars, 0] | max %}
+    {% set favourable_variance = [earned_value + s.realised_risk_dollars - s.actual_spend, 0] | max %}
+    {% set wl_unrealised_pct = (unrealised_spend / wl_denom * 100) if wl_denom > 0 else 0 %}
+    {% set wl_realised_pct = (s.realised_risk_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
+    {% set wl_committed_pct = wl_overhead_pct + wl_unrealised_pct + wl_realised_pct %}
+    {% set wl_open_pct = (s.open_risk_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
+    {% set wl_accessible = s.accessible_budget %}
+    {% set wl_accessible_pct = (wl_accessible / wl_denom * 100) if wl_denom > 0 else 0 %}
+
+    <div class="hero-card" id="hero-overall-completion">
         <div class="label">Overall Completion</div>
         <div class="value" style="color: {{ comp_color }}">{{ s.overall_completion | pct }}</div>
-        <div class="progress progress-lg" role="progressbar" aria-valuenow="{{ s.overall_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100" style="margin-top:2px;">
-            {% if feature_budget_pct > 0 %}
-            <div class="feature-budget-bar" style="width: {{ feature_budget_pct }}%"></div>
+
+        {# ── What's-left bar (denom = total_budget) ──
+           Right-side layers represent money gone WITHOUT corresponding delivery:
+           overheads (pre-committed), unrealised spend (paid but no completion to
+           show yet), and realised risks (absorbed). The green fill on the left is
+           earned value (delivery valued at planned rates) — it accounts for the
+           spend that has produced features. Together, left+right cover all spend
+           and commitments without double-counting; the gap in the middle is the
+           accessible budget. #}
+        {% set merged_pct = wl_unrealised_pct + wl_realised_pct %}
+        {% set merged_amount = unrealised_spend + s.realised_risk_dollars %}
+        <div class="progress progress-lg" role="progressbar" aria-valuenow="{{ s.overall_completion | round(1) }}" aria-valuemin="0" aria-valuemax="100" style="margin-top:2px;"
+             title="What's-left lens — bar represents {{ wl_denom | currency }} total budget. Right-side blocks are money gone without delivery to show for it; the green fill on the left is the spend that became features. The gap in the middle is what's accessible.">
+            {% if wl_feature_budget_pct > 0 %}
+            <div class="feature-budget-bar plan-marker" style="width: {{ wl_feature_budget_pct }}%"
+                 title="Feature budget zone — {{ s.allocated_dollars | currency }} ({{ wl_feature_budget_pct | round(1) }}% of total budget) allocated to feature work."></div>
             {% endif %}
-            <div class="fill {{ comp_fill }}" style="width: {{ comp_fill_pct }}%"></div>
-            {% if target_pct > 0 %}
-            <div class="target" style="left: {{ target_pct }}%"></div>
+            <div class="fill {{ comp_fill }}" style="width: {{ wl_comp_fill_pct }}%"
+                 title="Earned value — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates ({{ wl_comp_fill_pct | round(1) }}% of total budget)."></div>
+            {% if wl_target_pct > 0 %}
+            <div class="target plan-marker" style="left: {{ wl_target_pct }}%"
+                 title="On-track target — {{ s.feature_expected_burn_pct | pct }} of feature work should be delivered by now."></div>
             {% endif %}
-            {% if bar_locked_risk_pct > 0 %}
-            <div class="risk-realised" style="width: {{ bar_locked_risk_pct }}%; right: 0; left: auto;"></div>
+            {% if wl_overhead_pct > 0 %}
+            <div class="bar-overhead" style="width: {{ wl_overhead_pct }}%; right: 0; left: auto;"
+                 title="Overheads — {{ s.overhead_dollars | currency }} pre-committed to non-feature work (PM oversight, ceremonies, support). Cannot be redirected to features."></div>
             {% endif %}
-            {% if bar_open_risk_pct > 0 %}
-            <div class="risk-open" style="width: {{ bar_open_risk_pct }}%; right: {{ bar_locked_risk_pct }}%; left: auto;"></div>
+            {# Spend categories — segmented (when toggle ON) #}
+            {% if wl_unrealised_pct > 0 %}
+            <div class="bar-spent spend-detail" style="width: {{ wl_unrealised_pct }}%; right: {{ wl_overhead_pct }}%; left: auto;"
+                 title="Unrealised spend — {{ unrealised_spend | currency }} ({{ wl_unrealised_pct | round(1) }}% of total budget). Spend decomposes as: earned value {{ earned_value | currency }} + realised risk {{ s.realised_risk_dollars | currency }} + unrealised {{ unrealised_spend | currency }} = actual spend {{ s.actual_spend | currency }}. The unrealised portion is paid time that hasn't yet shown as feature delivery or as a categorised risk impact — work in flight, exploration, rework, or non-feature work."></div>
+            {% endif %}
+            {% if wl_realised_pct > 0 %}
+            <div class="risk-realised spend-detail" style="width: {{ wl_realised_pct }}%; right: {{ wl_overhead_pct + wl_unrealised_pct }}%; left: auto;"
+                 title="Realised risks — {{ s.realised_risk_dollars | currency }} absorbed by risks that have landed. This is spend on risk handling rather than feature delivery."></div>
+            {% endif %}
+            {# Spend merged — single muted block (when toggle OFF) #}
+            {% if merged_pct > 0 %}
+            <div class="bar-spent spend-merged" style="width: {{ merged_pct }}%; right: {{ wl_overhead_pct }}%; left: auto;"
+                 title="Spent (non-earned) — {{ merged_amount | currency }}. This combines {{ s.realised_risk_dollars | currency }} on realised risk handling with {{ unrealised_spend | currency }} of unrealised spend (work in flight, rework, exploration). Earned value (the green fill on the left) is shown separately as the spend that produced features."></div>
+            {% endif %}
+            {% if wl_open_pct > 0 %}
+            <div class="risk-open risk-marker" style="width: {{ wl_open_pct }}%; right: {{ wl_committed_pct }}%; left: auto;"
+                 title="Open-risk exposure — {{ s.open_risk_dollars | currency }} of accessible budget at risk if open risks materialise."></div>
             {% endif %}
         </div>
-        <div class="sub-row">
-            <div class="row"><span class="lbl">Target at this point</span><span class="val">{{ s.feature_expected_burn_pct | pct }}</span></div>
+
+        {# ── Main bar legend. Items carry the same plan-marker / spend-detail
+             / spend-merged / risk-marker classes as the corresponding bar
+             layers, so legend visibility tracks the toggles automatically. #}
+        <div class="bar-legend" style="display:flex; flex-wrap:wrap; gap:10px 14px; margin-top:8px; font-size:11px; line-height:1.3;">
+            {% if wl_feature_budget_pct > 0 %}
+            <span class="plan-marker" title="{{ s.allocated_dollars | currency }} of {{ wl_denom | currency }} total budget is allocated to feature work."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.15); border:1px solid oklch(from var(--info) l c h / 0.6);"></span>
+                <span class="muted">Feature budget</span>
+                <strong>{{ s.allocated_dollars | currency }}</strong>
+            </span>
+            {% endif %}
+            <span title="Earned value — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates. This is the spend that has produced visible features."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: {% if comp_fill == 'fill-good' %}var(--good){% elif comp_fill == 'fill-warn' %}var(--warn){% else %}var(--bad){% endif %};"></span>
+                <span class="muted">Earned value</span>
+                <strong>{{ earned_value | currency }}</strong>
+            </span>
+            {% if wl_overhead_pct > 0 %}
+            <span title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
+                <span class="muted">Overheads</span>
+                <strong>{{ s.overhead_dollars | currency }}</strong>
+            </span>
+            {% endif %}
+            {% if wl_unrealised_pct > 0 %}
+            <span class="spend-detail" title="Spend = earned value + realised risk + unrealised. {{ s.actual_spend | currency }} = {{ earned_value | currency }} + {{ s.realised_risk_dollars | currency }} + {{ unrealised_spend | currency }}. The unrealised portion is paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, non-feature work)."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
+                <span class="muted">Unrealised spend</span>
+                <strong>{{ unrealised_spend | currency }}</strong>
+            </span>
+            {% elif favourable_variance > 0 %}
+            <span title="Earned value ({{ earned_value | currency }}) plus realised risk impact ({{ s.realised_risk_dollars | currency }}) exceeds actual spend ({{ s.actual_spend | currency }}) — the team has produced more value-equivalent work than they've been paid for at planned rates. Favourable variance."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--good) l c h / 0.25); border:1px solid oklch(from var(--good) l c h / 0.6);"></span>
+                <span class="muted">Favourable variance</span>
+                <strong style="color:var(--good);">+{{ favourable_variance | currency }}</strong>
+            </span>
+            {% endif %}
+            {% if wl_realised_pct > 0 %}
+            <span class="spend-detail" title="{{ s.realised_risk_dollars | currency }} absorbed by realised risks."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--bad) l c h / 0.5);"></span>
+                <span class="muted">Realised risk</span>
+                <strong>{{ s.realised_risk_dollars | currency }}</strong>
+            </span>
+            {% endif %}
+            {% if merged_pct > 0 %}
+            <span class="spend-merged" title="Combined view: {{ s.realised_risk_dollars | currency }} on realised risk handling + {{ unrealised_spend | currency }} of unrealised spend = {{ merged_amount | currency }} that's been paid but didn't produce visible features. Toggle 'Spend categories' to split this back into its parts."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
+                <span class="muted">Spent (non-earned)</span>
+                <strong>{{ merged_amount | currency }}</strong>
+            </span>
+            {% endif %}
+            {% if wl_open_pct > 0 %}
+            <span class="risk-marker" title="{{ s.open_risk_dollars | currency }} of accessible budget at risk if open risks materialise."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: repeating-linear-gradient(-45deg, oklch(from var(--warn) l c h / 0.55) 0 2px, transparent 2px 4px);"></span>
+                <span class="muted">Open risk</span>
+                <strong>{{ s.open_risk_dollars | currency }}</strong>
+            </span>
+            {% endif %}
+            {% if wl_target_pct > 0 %}
+            <span class="plan-marker" title="Where completion should be by now if delivery tracks linearly with elapsed time."
+                  style="display:inline-flex; align-items:center; gap:5px;">
+                <span aria-hidden="true" style="width:2px; height:11px; background: var(--text-strong);"></span>
+                <span class="muted">On-track target</span>
+                <strong>{{ s.feature_expected_burn_pct | pct }}</strong>
+            </span>
+            {% endif %}
+            <span title="The empty space in the middle of the bar — budget that hasn't been spent, isn't reserved for overhead, and isn't already absorbed by realised risks. This is what you can still play with."
+                  style="display:inline-flex; align-items:center; gap:5px; margin-left:auto;">
+                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: var(--surface-sunk); border:1px dashed var(--border);"></span>
+                <span class="muted">Accessible</span>
+                <strong style="color: {% if wl_accessible >= s.remaining_dollars %}var(--good){% else %}var(--bad){% endif %};">{{ wl_accessible | currency }}</strong>
+            </span>
+        </div>
+
+        {# Detail toggles: each reveals a layer of breakdown on the main bar
+           above. All on by default. When OFF: the bar declutters by hiding
+           or merging the corresponding layers. Persisted per-project. #}
+        <div class="detail-toggles" style="display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); font-size:11px;">
+            <span class="muted" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Show</span>
+            <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;" title="Splits the right-side spend block into Realised risk and Unrealised spend. When off, they merge into a single 'Spent (non-earned)' block.">
+                <input type="checkbox" data-detail-toggle="spend" checked style="margin:0;"> Spend categories
+            </label>
+            <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;" title="Shows the feature-budget zone tint on the left and the on-track target line. When off, the left side shows just the delivered earned-value fill on a plain background.">
+                <input type="checkbox" data-detail-toggle="plan" checked style="margin:0;"> Plan markers
+            </label>
+            <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;" title="Shows the striped open-risk warning overlay. When off, the rosier accessible-budget gap is shown without the warning stripe.">
+                <input type="checkbox" data-detail-toggle="risk" checked style="margin:0;"> Risk overlay
+            </label>
+        </div>
+
+        <div class="sub-row" style="margin-top:14px;">
+            <div class="row" title="Where feature delivery should be by now if it tracks linearly with elapsed time.">
+                <span class="lbl">Delivery target ({{ s.elapsed_days }}d elapsed)</span><span class="val">{{ s.feature_expected_burn_pct | pct }}</span>
+            </div>
             {% set gap = s.feature_expected_burn_pct - s.overall_completion %}
-            <div class="row"><span class="lbl">Gap</span><span class="val" style="color: {% if gap > 0 %}var(--bad){% else %}var(--good){% endif %}">{{ '%+.1f' % -gap }}%</span></div>
-            <div class="row"><span class="lbl">Features started</span><span class="val">{{ s.started_feature_count }} / {{ s.total_feature_count }}</span></div>
+            <div class="row" title="Delivered minus target. Positive = ahead of schedule, negative = behind.">
+                <span class="lbl">Ahead / behind target</span>
+                <span class="val" style="color: {% if gap > 0 %}var(--bad){% else %}var(--good){% endif %}">{{ '%+.1f' % -gap }}%</span>
+            </div>
+            <div class="row" title="How many features have been marked as started (any deliverable kicked off).">
+                <span class="lbl">Features started</span><span class="val">{{ s.started_feature_count }} / {{ s.total_feature_count }}</span>
+            </div>
         </div>
     </div>
 
-    <div class="hero-card">
-        <div class="label">Full-Team Budget Days Remaining</div>
+    <div class="hero-card" id="hero-budget-days" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="budget-days-modal" title="Click for a sentence-form breakdown" style="cursor:pointer; position:relative;">
+        <div class="label">Full-Team Budget Days Remaining <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></div>
         <div class="value" style="color: {{ days_color }}">
             {{- s.total_budget_days_remaining | days -}}
             {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;">of {{ days_to_end }}d to end date</span>{% endif %}
@@ -109,17 +269,22 @@
             <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ p.team_size }} people</span></div>
             {% set realised_risk_days = (s.realised_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
             {% set open_risk_days = (s.open_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
-            {% set not_at_risk_days = s.total_budget_days_remaining - realised_risk_days - open_risk_days %}
+            {# Realised-risk days are already netted out via past spend, so the
+               headline runway only needs to be split into "free" vs "exposed
+               to open risks". Realised days are surfaced as a context note
+               below to show how much of past spend went on risk handling. #}
+            {% set not_at_risk_days = s.total_budget_days_remaining - open_risk_days %}
             <div class="row" style="color: var(--good);"><span class="lbl">Not at risk</span><span class="val">{{ not_at_risk_days | days }}d</span></div>
             {% if open_risk_days > 0 %}
-            <div class="row warn-row"><span class="lbl">Exposed to open risks</span><span class="val">− {{ open_risk_days | days }}d</span></div>
+            <div class="row warn-row" title="If all open risks land at full impact, this many days of runway would be absorbed."><span class="lbl">Exposed to open risks</span><span class="val">− {{ open_risk_days | days }}d</span></div>
             {% endif %}
             {% if realised_risk_days > 0 %}
-            <div class="row bad-row"><span class="lbl">Lost to realised risks</span><span class="val">− {{ realised_risk_days | days }}d</span></div>
+            <div class="row" style="opacity:0.7;" title="Already-realised risk impact, equivalent to this many days of past spend. Already netted out of the runway above — listed for context, not as a fresh deduction.">
+                <span class="lbl tiny" style="font-size:11px;">↳ realised-risk share of past spend</span><span class="val tiny" style="font-size:11px;">{{ realised_risk_days | days }}d</span>
+            </div>
             {% endif %}
-            {% set total_risk_days = realised_risk_days + open_risk_days %}
             {% set remaining_team_days = (s.remaining_dollars / s.daily_burn) if s.daily_burn else 0 %}
-            {% if total_risk_days > 0 and remaining_team_days > 0 %}
+            {% if open_risk_days > 0 and remaining_team_days > 0 %}
             {% set decision_buffer = s.total_budget_days_remaining - remaining_team_days %}
             <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;">
                 <div class="row"><span class="lbl">Days needed for remaining work</span><span class="val">{{ remaining_team_days | days }}d</span></div>
@@ -328,6 +493,136 @@
     <p class="muted">No features yet. <a class="link" href="/p/{{ pid }}/features">Add some features</a> to see health metrics.</p>
     {% endif %}
 </div>
+
+{# ── Budget Days Remaining — sentence-form detail modal ── #}
+{% set burn = s.daily_burn %}
+{% set runway_days = s.total_budget_days_remaining %}
+{% set feature_days = (s.remaining_dollars / burn) if burn > 0 else 0 %}
+{% set open_risk_days = (s.open_risk_dollars / burn) if burn > 0 else 0 %}
+{% set realised_risk_days = (s.realised_risk_dollars / burn) if burn > 0 else 0 %}
+{# Forward demand against the runway is features + open risks only.
+   Realised risks are PAST spend — they've already eaten into the runway
+   via actual_spend, so adding them as future demand would double-count. #}
+{% set risk_days = open_risk_days %}
+{% set risk_demand = feature_days + risk_days %}
+{% set unallocated_days = (s.unallocated_budget / burn) if burn > 0 else 0 %}
+{% set overhead_days = (s.overhead_dollars / burn) if burn > 0 else 0 %}
+<dialog id="budget-days-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+    <div style="padding:20px 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget Days Remaining — Detail</strong>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('budget-days-modal').close()">✕</button>
+        </div>
+
+        {% if burn <= 0 %}
+        <p>Daily burn rate is zero — set a team size and at least one role rate in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to see day-based answers.</p>
+        {% else %}
+
+        <div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+            {# Q1 — runway #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How many days can the budget fund?</span>
+                At the current burn rate of <strong>{{ s.daily_burn | currency }}/day</strong> for the
+                <strong>{{ p.team_size }}-person</strong> team,
+                {% if s.overhead_dollars > 0 %}
+                the remaining budget of <strong>{{ s.current_budget | currency }}</strong> — after reserving
+                <strong>{{ s.overhead_dollars | currency }}</strong> for overheads that are committed regardless of burn rate — can fund
+                {% else %}
+                the remaining budget of <strong>{{ s.current_budget | currency }}</strong> can fund
+                {% endif %}
+                <strong style="color:{{ days_color }};">{{ runway_days | days }}d</strong>
+                of team-on-feature work.
+            </p>
+
+            {# Q2 — vs end date #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is this enough to reach the project end date?</span>
+                {% if days_to_end is none %}
+                No project end date is set, so runway can't be compared to a deadline. Set one in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to enable this comparison.
+                {% else %}
+                {% set end_delta = runway_days - days_to_end %}
+                The project end date is <strong>{{ days_to_end }}d</strong> away.
+                {% if end_delta >= 0 %}
+                The budget covers that with <strong style="color:var(--good);">{{ end_delta | days }}d to spare</strong>.
+                {% else %}
+                The budget falls <strong style="color:var(--bad);">{{ (end_delta * -1) | days }}d short</strong> of reaching it.
+                {% endif %}
+                {% endif %}
+            </p>
+
+            {# Q3 — vs feature work, before risks #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is this enough to see out the remaining features (before risks)?</span>
+                {% if s.remaining_dollars <= 0 %}
+                All allocated feature work is complete — there is no remaining feature demand to weigh against the budget.
+                {% else %}
+                {% set feature_buffer = runway_days - feature_days %}
+                The remaining features are estimated to need <strong>{{ feature_days | days }}d</strong> of full-team effort.
+                {% if feature_buffer >= 0 %}
+                That leaves <strong style="color:var(--good);">{{ feature_buffer | days }}d of buffer</strong> against the {{ runway_days | days }}d of budget runway, before any risk allowance.
+                {% else %}
+                That <strong style="color:var(--bad);">exceeds the {{ runway_days | days }}d of budget runway by {{ (feature_buffer * -1) | days }}d</strong>, before any risk allowance.
+                {% endif %}
+                {% endif %}
+            </p>
+
+            {# Q4 — vs feature work + open risks. Realised risks are past
+               spend; they've already eaten into the runway via actual_spend
+               and don't appear here as future demand. #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is there enough budget to complete all remaining features after accounting for risks?</span>
+                {% if open_risk_days <= 0 %}
+                No open risk exposure is recorded, so feature delivery is the only forward demand against the budget. (See the prior line for that comparison.{% if realised_risk_days > 0 %} Realised risks of <strong>{{ realised_risk_days | days }}d</strong> are already netted out of the runway via past spend.{% endif %})
+                {% elif s.remaining_dollars <= 0 %}
+                Features are complete, but open risks still represent <strong>{{ open_risk_days | days }}d</strong> of forward exposure —
+                {% set risk_only_buffer = runway_days - open_risk_days %}
+                {% if risk_only_buffer >= 0 %}
+                <strong style="color:var(--good);">{{ risk_only_buffer | days }}d within</strong> the {{ runway_days | days }}d runway.
+                {% else %}
+                <strong style="color:var(--bad);">{{ (risk_only_buffer * -1) | days }}d beyond</strong> the {{ runway_days | days }}d runway.
+                {% endif %}
+                {% else %}
+                {% set risk_buffer = runway_days - risk_demand %}
+                Together, the <strong>{{ feature_days | days }}d</strong> to finish features and the
+                <strong>{{ open_risk_days | days }}d</strong> of open-risk exposure
+                total <strong>{{ risk_demand | days }}d</strong> of forward demand —
+                {% if risk_buffer >= 0 %}
+                <strong style="color:var(--good);">{{ risk_buffer | days }}d within</strong> the {{ runway_days | days }}d of runway.
+                {% else %}
+                <strong style="color:var(--bad);">{{ (risk_buffer * -1) | days }}d beyond</strong> the {{ runway_days | days }}d of runway.
+                {% endif %}
+                {% if realised_risk_days > 0 %}
+                <span class="muted" style="display:block; margin-top:4px; font-size:13px;">(Realised risks of <strong>{{ realised_risk_days | days }}d</strong> are already part of past spend and netted out of the runway — not added as forward demand.)</span>
+                {% endif %}
+                {% endif %}
+            </p>
+
+            {% if s.unallocated_budget > 0 or s.overhead_dollars > 0 %}
+            <div style="border-top:1px solid var(--border); padding-top:12px; display:flex; flex-direction:column; gap:10px;">
+                <div class="muted tiny" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Also worth knowing</div>
+
+                {% if s.unallocated_budget > 0 %}
+                <p style="margin:0;">
+                    <strong>{{ s.unallocated_budget | currency }}</strong>
+                    (≈<strong>{{ unallocated_days | days }}d</strong>) of the runway is not yet earmarked for any feature, overhead, or realised risk — extra capacity to absorb scope additions or risk realisation without eating into committed work.
+                </p>
+                {% endif %}
+
+                {% if s.overhead_dollars > 0 %}
+                <p style="margin:0;">
+                    Overheads of <strong>{{ s.overhead_dollars | currency }}</strong>
+                    (≈<strong>{{ overhead_days | days }}d</strong>) are <em>already excluded</em> from the {{ runway_days | days }} runway above — those days are pre-committed to non-feature work (PM oversight, ceremonies, support) and cannot be redirected to feature delivery. The headline reflects only what the team can actually spend on features.
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+        </div>
+        {% endif %}
+    </div>
+</dialog>
+
 {% endblock %}
 
 {% block scripts %}
@@ -340,5 +635,62 @@ function toggleStarted(projectId, featureId, btn) {
         if (data.ok) location.reload();
     });
 }
+
+(function() {
+    const card = document.getElementById('hero-budget-days');
+    const modal = document.getElementById('budget-days-modal');
+    if (!card || !modal) return;
+    function open() {
+        if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
+    }
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            if (modal.close) modal.close(); else modal.removeAttribute('open');
+        }
+    });
+})();
+
+(function() {
+    // Overall Completion hero card — bar detail toggles. Each toggle
+    // hides or merges a specific layer of the main bar so the PM can
+    // declutter for focused conversations. Preferences persist per-project.
+    const card = document.getElementById('hero-overall-completion');
+    if (!card) return;
+    const KEY = 'overall_completion_detail_{{ project.id }}';
+    const TOGGLES = ['spend', 'plan', 'risk'];
+
+    let prefs = {};
+    TOGGLES.forEach(t => prefs[t] = true);
+    try {
+        const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (saved && typeof saved === 'object') {
+            TOGGLES.forEach(t => {
+                if (typeof saved[t] === 'boolean') prefs[t] = saved[t];
+            });
+        }
+    } catch (e) {}
+
+    function applyPrefs() {
+        TOGGLES.forEach(t => {
+            card.setAttribute('data-detail-' + t, prefs[t] ? '1' : '0');
+            const cb = card.querySelector(`[data-detail-toggle="${t}"]`);
+            if (cb) cb.checked = !!prefs[t];
+        });
+    }
+    applyPrefs();
+
+    card.querySelectorAll('[data-detail-toggle]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const t = cb.getAttribute('data-detail-toggle');
+            prefs[t] = !!cb.checked;
+            applyPrefs();
+            try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {}
+        });
+    });
+})();
 </script>
 {% endblock %}
