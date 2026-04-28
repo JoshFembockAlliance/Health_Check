@@ -1165,4 +1165,23 @@ input:focus, select:focus, textarea:focus {
   /* Tables */
   .data-table { font-size: 11px; }
   .data-table .cell-actions { display: none; }
+
+  /* Burndown chart — span the full hero grid in print so the SVG has room
+     to render legibly. Force colour-printing on SVG strokes/fills since
+     some print engines drop CSS-variable strokes otherwise. The SVG keeps
+     whatever viewBox the user had selected (forward-from-today or full)
+     so the printed chart matches what was on screen. */
+  #hero-burndown { grid-column: 1 / -1 !important; break-inside: avoid; }
+  #hero-burndown svg { min-height: 220px; }
+  #hero-burndown svg polyline,
+  #hero-burndown svg line,
+  #hero-burndown svg circle,
+  #hero-burndown svg text,
+  #hero-burndown svg rect {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  /* Hide chart toggles in print — the chart shows whatever state was on
+     screen at print time; the toggles themselves aren't useful on paper. */
+  #hero-burndown .label label { display: none !important; }
 }
