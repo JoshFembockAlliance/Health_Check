@@ -12,6 +12,10 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 
 ## Enhancements to Existing
 
+### Demo Projects
+- [ ] **Demo Projects**
+Create a demo project dev dataset that contains a few items for each project type. The idea of this database is to keep it small and only change it infrequently for use in testing when new features are developed without impacting current projects during testing. If this is overly complex, make a note of why here and move on instead of picking it up. Ensure the note contains enough details tha the causes can be addressed to achieve the desired outcome some other way. 
+
 ### Agile Project Dashboard Items
 - [ ] **Budget Burndown - Open Risk Projection** 
 I'd like to rework open risk projection. Currently, it uses open risks but actually, the truth of risks is that new ones open periodically. A better way to factor in risks going forward is to use both the spend delta and the ratio of spend that to features to determine a projected case for if money continues to be spent on things other than feature development at the current rate.  
