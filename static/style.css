@@ -293,8 +293,7 @@ button { font-family: inherit; cursor: pointer; }
 .app[data-sidebar="collapsed"] .proj-name,
 .app[data-sidebar="collapsed"] .proj-meta,
 .app[data-sidebar="collapsed"] .avatar-name,
-.app[data-sidebar="collapsed"] .sidebar-item .dot,
-.app[data-sidebar="collapsed"] .sidebar-item .proj-icon { display: none; }
+.app[data-sidebar="collapsed"] .sidebar-item .dot { display: none; }
 .app[data-sidebar="collapsed"] .sidebar-item { justify-content: center; padding: 7px; }
 
 /* Main */

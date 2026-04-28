@@ -41,7 +41,7 @@ Remove the really basic symbols like triangle, dot, diamond and circle from symb
 ### Capacity
 
 ### Inter-Project Navbar
-- [ ] The side panel when collapsed does not show the project icons properly, only when expanded.
+- [x] The side panel when collapsed does not show the project icons properly, only when expanded.
 
 ### General
 ### Demo Projects
