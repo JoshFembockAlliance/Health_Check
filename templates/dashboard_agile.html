@@ -407,13 +407,23 @@
        else None — markers past budget exhaustion get no circle on the
        (already-zero) line. #}
     {% macro _project_y(x_pixel) %}{% set frac = (x_pixel - today_x) / (exhaustion_x - today_x) if exhaustion_x > today_x else 1 %}{{ today_y + (zero_y - today_y) * frac }}{% endmacro %}
-    <div class="hero-card" id="hero-burndown" style="grid-column: span 4; padding:18px 20px;">
-        <div class="label" style="display:flex; justify-content:space-between; align-items:baseline;">
+    <div class="hero-card" id="hero-burndown" data-burndown-view="forward"
+         data-today-x="{{ today_x }}" data-chart-w="{{ CHART_W }}" data-chart-h="{{ CHART_H }}"
+         style="grid-column: span 4; padding:18px 20px;">
+        <div class="label" style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
             <span>Budget Burndown</span>
-            <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;">
-                <input type="checkbox" id="burndown-show-risk" checked style="margin:0;">
-                Include open-risk projection
-            </label>
+            <div style="display:inline-flex; gap:14px; align-items:center;">
+                <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;"
+                       title="Default view zooms the chart to today → chart-end so the conversation is about runway and projected finish dates. Untick to extend the chart back to project start and see the historical actual-burn line.">
+                    <input type="checkbox" id="burndown-view-forward" checked style="margin:0;">
+                    View from today
+                </label>
+                <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;"
+                       title="Adds a worst-case finish line ('+open risks') based on every open risk landing at full impact on top of the inefficiency-adjusted projection. Open risk impact dollars convert to days at the current daily burn rate; that many additional days of work get added past the inefficiency finish. Realised risks are NOT added — they're already in past spend.">
+                    <input type="checkbox" id="burndown-show-risk" checked style="margin:0;">
+                    Include open-risk projection
+                </label>
+            </div>
         </div>
         <div class="value" style="font-size:14px; font-weight:500; margin-top:2px;">
             <strong>{{ b.today_days | days }}</strong> remaining at <strong>{{ b.daily_burn | currency }}/day</strong> · scope finish <strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong>
@@ -421,13 +431,20 @@
         </div>
 
         <svg viewBox="0 0 {{ CHART_W }} {{ CHART_H }}" style="width:100%; height:auto; margin-top:6px; display:block;" preserveAspectRatio="none" aria-label="Budget burndown chart">
-            {# Y-axis gridlines + labels (5 ticks) #}
+            {# Y-axis gridlines stay full-width; their tick labels and the
+               y-axis title sit in a translatable group so the "View from
+               today" toggle can shift them next to the cropped viewBox. #}
             {% for i in range(6) %}
             {% set y = MT + (PH * i / 5) %}
-            {% set days_at = ind * (1 - i / 5) %}
             <line x1="{{ ML }}" x2="{{ ML + PW }}" y1="{{ y }}" y2="{{ y }}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2 3"/>
-            <text x="{{ ML - 6 }}" y="{{ y + 3 }}" font-size="10" fill="var(--muted)" text-anchor="end">{{ days_at | round(0) | int }}d</text>
             {% endfor %}
+            <g class="y-axis-labels">
+                {% for i in range(6) %}
+                {% set y = MT + (PH * i / 5) %}
+                {% set days_at = ind * (1 - i / 5) %}
+                <text x="{{ ML - 6 }}" y="{{ y + 3 }}" font-size="10" fill="var(--muted)" text-anchor="end">{{ days_at | round(0) | int }}d</text>
+                {% endfor %}
+            </g>
 
             {# X-axis: a few date ticks (start, as_of, end if any, chart_end) #}
             <line x1="{{ ML }}" x2="{{ ML + PW }}" y1="{{ zero_y }}" y2="{{ zero_y }}" stroke="var(--border-strong)" stroke-width="1"/>
@@ -466,7 +483,7 @@
             {% if end_x is not none %}
             <line x1="{{ end_x }}" x2="{{ end_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
                   stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
-            <text x="{{ end_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--muted)" text-anchor="middle">end · {{ b.end_date.isoformat() }}</text>
+            <text x="{{ end_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--muted)" text-anchor="middle"><title>Project end date — {{ b.end_date.isoformat() }}.</title>end</text>
             {% endif %}
 
             {# Planned-cost finish (green) — within budget by definition (planned_cost_days ≤ today_days when buffer is positive) #}
@@ -476,7 +493,7 @@
             {% if planned_x <= exhaustion_x %}
             <circle cx="{{ planned_x }}" cy="{{ py }}" r="3.5" fill="var(--good)"/>
             {% endif %}
-            <text x="{{ planned_x }}" y="{{ zero_y + 32 }}" font-size="10" fill="var(--good)" text-anchor="middle" font-weight="600">scope · {{ b.planned_cost_finish.isoformat() }}</text>
+            <text x="{{ planned_x }}" y="{{ zero_y + 32 }}" font-size="10" fill="var(--good)" text-anchor="middle" font-weight="600"><title>Scope finish at planned cost — {{ b.planned_cost_finish.isoformat() }}.</title>scope</text>
 
             {# Inefficiency-adjusted finish (amber) — only if it differs from planned #}
             {% if inefficiency_x > planned_x %}
@@ -486,7 +503,7 @@
             {% if inefficiency_x <= exhaustion_x %}
             <circle cx="{{ inefficiency_x }}" cy="{{ iy }}" r="3.5" fill="var(--warn)"/>
             {% endif %}
-            <text x="{{ inefficiency_x }}" y="{{ zero_y + 46 }}" font-size="10" fill="var(--warn)" text-anchor="middle" font-weight="600">+inefficiency · {{ b.inefficiency_finish.isoformat() }}</text>
+            <text x="{{ inefficiency_x }}" y="{{ zero_y + 46 }}" font-size="10" fill="var(--warn)" text-anchor="middle" font-weight="600"><title>Inefficiency-adjusted scope finish — {{ b.inefficiency_finish.isoformat() }}.</title>+inefficiency</text>
             {% endif %}
 
             {# Risk-included finish (red) — toggleable group. Vertical
@@ -508,28 +525,32 @@
                 {% if risk_x <= exhaustion_x %}
                 <circle cx="{{ risk_x }}" cy="{{ ry }}" r="3.5" fill="var(--bad)"/>
                 {% endif %}
-                <text x="{{ risk_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--bad)" text-anchor="middle" font-weight="600">+risks · {{ b.risk_finish.isoformat() }}</text>
+                <text x="{{ risk_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--bad)" text-anchor="middle" font-weight="600"><title>Worst-case finish if all open risks land — {{ b.risk_finish.isoformat() }}.</title>+risks</text>
             </g>
             {% endif %}
 
-            {# Y-axis title #}
-            <text x="14" y="{{ MT + PH/2 }}" font-size="10" fill="var(--muted)" text-anchor="middle" transform="rotate(-90 14 {{ MT + PH/2 }})">full-team budget days</text>
+            {# Y-axis title — included in y-axis-labels group via JS so it
+               travels with the tick labels when the view shifts. #}
+            <text class="y-axis-title" x="14" y="{{ MT + PH/2 }}" font-size="10" fill="var(--muted)" text-anchor="middle" transform="rotate(-90 14 {{ MT + PH/2 }})">full-team budget days</text>
         </svg>
 
         <div class="bar-legend" style="display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:6px; font-size:11px; line-height:1.3;">
-            <span style="display:inline-flex; align-items:center; gap:5px;" title="The plan: linear consumption from start budget down to zero on the project end date."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--muted);"></span><span class="muted">Plan</span></span>
-            <span style="display:inline-flex; align-items:center; gap:5px;" title="Actual budget consumption from project start to today."><span aria-hidden="true" style="width:14px; height:2.5px; background:var(--info);"></span><span class="muted">Actual</span></span>
-            <span style="display:inline-flex; align-items:center; gap:5px;" title="Projection: full-team burn rate from today, ending when accessible budget hits zero."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--text-strong); opacity:0.6;"></span><span class="muted">Projection</span></span>
-            <span style="display:inline-flex; align-items:center; gap:5px;" title="Scope-finish at planned cost: today + remaining_dollars / daily_burn business days."><span aria-hidden="true" style="width:2px; height:11px; background:var(--good);"></span><span class="muted">Scope finish</span><strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong></span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="The plan line: linear consumption from start budget down to zero on the project end date. Steps: descends Mon–Fri, flat on weekends."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--muted);"></span><span class="muted">Plan</span></span>
+            <span class="historical-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Actual budget consumption from project start to today, valued post-overhead. Hidden in 'View from today' mode."><span aria-hidden="true" style="width:14px; height:2.5px; background:var(--info);"></span><span class="muted">Actual</span></span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Forward projection at full-team daily-burn rate, starting from today's runway and reaching zero when accessible budget runs out."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--text-strong); opacity:0.6;"></span><span class="muted">Projection</span></span>
+            {% if end_x is not none %}
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Project end date — when the plan line reaches zero. Distinct from finish-by-cost markers below."><span aria-hidden="true" style="width:2px; height:11px; background:var(--muted); border-left:1px dashed var(--muted);"></span><span class="muted">End</span><strong>{{ b.end_date.isoformat() }}</strong></span>
+            {% endif %}
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Date scope finishes at planned cost. Today plus (remaining feature dollars ÷ daily burn) business days — assumes future work is delivered at planned rates with no inefficiency."><span aria-hidden="true" style="width:2px; height:11px; background:var(--good);"></span><span class="muted">Scope finish</span><strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong></span>
             {% if b.inefficiency_finish > b.planned_cost_finish %}
-            <span style="display:inline-flex; align-items:center; gap:5px;" title="Scope-finish accounting for the historical unrealised-spend bleed factor ({{ b.unrealised_ratio_pct | round(1) }}% of past spend has been unrealised; same ratio assumed forward).">
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Scope finish adjusted for the historical unrealised-spend share ({{ b.unrealised_ratio_pct | round(1) }}% of past spend hasn't shown up as features or categorised risk). The same drag is projected forward as a {{ b.inefficiency_factor | round(2) }}× burn multiplier on remaining work.">
                 <span aria-hidden="true" style="width:2px; height:11px; background:var(--warn);"></span>
                 <span class="muted">+inefficiency ({{ b.inefficiency_factor | round(2) }}×)</span>
                 <strong style="color:var(--warn);">{{ b.inefficiency_finish.isoformat() }}</strong>
             </span>
             {% endif %}
             {% if b.risk_finish > b.inefficiency_finish %}
-            <span class="risk-projection-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Worst-case finish if all open risks land at full impact, on top of the inefficiency-adjusted timeline."><span aria-hidden="true" style="width:2px; height:11px; background:var(--bad);"></span><span class="muted">+open risks</span><strong style="color:var(--bad);">{{ b.risk_finish.isoformat() }}</strong></span>
+            <span class="risk-projection-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Worst-case finish if every open risk lands at full impact, on top of the inefficiency-adjusted timeline. Toggle 'Include open-risk projection' to hide."><span aria-hidden="true" style="width:2px; height:11px; background:var(--bad);"></span><span class="muted">+open risks</span><strong style="color:var(--bad);">{{ b.risk_finish.isoformat() }}</strong></span>
             {% endif %}
         </div>
     </div>
@@ -1049,6 +1070,63 @@ function toggleStarted(projectId, featureId, btn) {
         card.querySelectorAll('.risk-projection, .risk-projection-legend').forEach(el => {
             el.style.display = show ? '' : 'none';
         });
+    }
+    apply();
+    cb.addEventListener('change', () => {
+        apply();
+        try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) {}
+    });
+})();
+
+(function() {
+    // Burndown chart — "View from today" toggle. Default ON. When on, the
+    // SVG viewBox is cropped to today → chart-end so the conversation is
+    // about runway and projected finish dates, not history. The y-axis
+    // tick-label group (and the rotated axis title) are translated
+    // rightward to stay adjacent to the cropped left edge of the visible
+    // plot. The historical-actual line and start-date label fall outside
+    // the viewBox automatically; nothing else has to be hidden explicitly.
+    const card = document.getElementById('hero-burndown');
+    if (!card) return;
+    const cb = card.querySelector('#burndown-view-forward');
+    if (!cb) return;
+    const KEY = 'burndown_view_forward_{{ project.id }}';
+    const svg = card.querySelector('svg');
+    const yLabels = svg && svg.querySelector('.y-axis-labels');
+    const yTitle = svg && svg.querySelector('.y-axis-title');
+    const histLegend = card.querySelector('.historical-legend');
+    const todayX = parseFloat(card.dataset.todayX);
+    const chartW = parseFloat(card.dataset.chartW);
+    const chartH = parseFloat(card.dataset.chartH);
+    // Y-axis title rotates around its original (x, y); preserve that pivot
+    // so the rotation stays correct when we add a translate.
+    const titleCx = yTitle ? parseFloat(yTitle.getAttribute('x')) : 14;
+    const titleCy = yTitle ? parseFloat(yTitle.getAttribute('y')) : chartH / 2;
+    // Reserve enough left padding inside the cropped viewBox for the
+    // y-axis label gutter (matches ML=60 in the original layout).
+    const Y_GUTTER = 60;
+
+    const saved = localStorage.getItem(KEY);
+    if (saved === '0') cb.checked = false;
+
+    function apply() {
+        const forward = cb.checked;
+        card.setAttribute('data-burndown-view', forward ? 'forward' : 'full');
+        if (!svg) return;
+        if (forward && todayX > Y_GUTTER) {
+            const newLeft = todayX - Y_GUTTER;
+            svg.setAttribute('viewBox', `${newLeft} 0 ${chartW - newLeft} ${chartH}`);
+            const tx = newLeft;
+            if (yLabels) yLabels.setAttribute('transform', `translate(${tx}, 0)`);
+            if (yTitle) yTitle.setAttribute('transform',
+                `translate(${tx}, 0) rotate(-90 ${titleCx} ${titleCy})`);
+            if (histLegend) histLegend.style.display = 'none';
+        } else {
+            svg.setAttribute('viewBox', `0 0 ${chartW} ${chartH}`);
+            if (yLabels) yLabels.removeAttribute('transform');
+            if (yTitle) yTitle.setAttribute('transform', `rotate(-90 ${titleCx} ${titleCy})`);
+            if (histLegend) histLegend.style.display = '';
+        }
     }
     apply();
     cb.addEventListener('change', () => {
