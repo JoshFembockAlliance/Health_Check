@@ -28,7 +28,7 @@ Switch from using checkboxes to the same style of pill toggle as Overall Complet
 The modal lists a few items that unrealised spend could go toward but doesn't provide a solid metric for if it's a healthy amount of value to have in-flight at the time of the review. Because an agile sprint typically only includes enough items to finish them out during a single sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. More than that is unhealthy and should be discussed and accounted for. 
 
 ### Settings
-- [ ] **Page Layout and symbols restructure** 
+- [x] **Page Layout and symbols restructure** 
 Move the visual settings lower down in the page below overheads as those are not frequently adjusted 
 
 - [ ] **Project Symbols** 
