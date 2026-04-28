@@ -693,6 +693,28 @@ input:focus, select:focus, textarea:focus {
 .hero-card[data-detail-plan="0"]  .plan-marker  { display: none !important; }
 .hero-card[data-detail-risk="0"]  .risk-marker  { display: none !important; }
 
+/* Inconsistent-data soft warning — surfaced on the Net Accessible Budget
+   card when realised-risk impact exceeds actual spend (see DESIGN_RULES §1).
+   Amber banner so it doesn't compete with the bad-row red used elsewhere. */
+.inconsistent-data-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 6px 0 8px;
+    padding: 6px 8px;
+    border: 1px solid oklch(from var(--warn) l c h / 0.55);
+    background: oklch(from var(--warn) l c h / 0.12);
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-strong);
+}
+.inconsistent-data-warning [aria-hidden] {
+    color: var(--warn);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
 /* Bar legend rows (Overall Completion hero).
    Default row at the top shows always-visible items; one row per detail
    toggle below it leads with a pill-shaped switch on the left, followed

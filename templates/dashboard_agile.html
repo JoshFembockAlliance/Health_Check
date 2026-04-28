@@ -59,6 +59,18 @@
         <div style="font-size:11px; font-weight:500; margin-top:-4px; margin-bottom:4px; opacity:0.65;">of {{ s.remaining_dollars | currency }} remaining to deliver · {{ delivery_buffer | currency }} buffer</div>
         {% endif %}
         {% endif %}
+        {# Soft warning when realised-risk impact exceeds actual spend.
+           Under the post-double-count model (DESIGN_RULES §1) realised
+           risk is a categorisation of past spend, so it can't logically
+           exceed it — when it does, the PM has marked risks realised
+           without yet logging the team time. The decomposition below is
+           untrustworthy until that's reconciled. #}
+        {% if s.realised_risk_dollars > s.actual_spend %}
+        <div class="inconsistent-data-warning" title="Realised risk impact ({{ s.realised_risk_dollars | currency }}) is greater than actual spend ({{ s.actual_spend | currency }}). Realised risk is a categorisation of past spend, not an additional deduction — when it exceeds spend, the team time hasn't been logged yet. The breakdown below is unreliable until spend catches up or risk impact is corrected.">
+            <span aria-hidden="true">⚠</span>
+            <span>Realised risk exceeds spent — log team time or revise risk impact to reconcile.</span>
+        </div>
+        {% endif %}
         <div class="sub-row">
             {# Pre-committed: overheads sit at the top — money that was never
                available for feature work in the first place. #}
