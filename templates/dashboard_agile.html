@@ -38,6 +38,15 @@
 {% set comp_color = 'var(--good)' if s.overall_completion >= s.feature_expected_burn_pct else ('var(--warn)' if s.overall_completion >= s.feature_expected_burn_pct * 0.8 else 'var(--bad)') %}
 {% set days_color = 'var(--bad)' if s.total_budget_days_remaining < 20 else ('var(--warn)' if s.total_budget_days_remaining < 60 else 'var(--good)') %}
 
+{# Spend decomposition — used by both Net Accessible Budget and Overall
+   Completion. Three buckets sum to actual_spend, no double-count. See
+   DESIGN_RULES §1. The Net Accessible Budget card surfaces these as the
+   "where did the spend go?" breakdown for the Q2 status-meeting beat. #}
+{% set earned_value = s.allocated_dollars * s.overall_completion / 100 %}
+{% set unrealised_spend = [s.actual_spend - earned_value - s.realised_risk_dollars, 0] | max %}
+{% set favourable_variance = [earned_value + s.realised_risk_dollars - s.actual_spend, 0] | max %}
+{% set spend_delta_pct = (s.burn_delta / s.actual_spend * 100) if s.actual_spend > 0 else 0 %}
+
 <div class="hero-grid two-row">
     <div class="hero-card primary" style="grid-column: span 3;">
         <div class="label">Net Accessible Budget</div>
@@ -51,24 +60,52 @@
         {% endif %}
         {% endif %}
         <div class="sub-row">
+            {# Pre-committed: overheads sit at the top — money that was never
+               available for feature work in the first place. #}
+            {% if s.overhead_dollars > 0 %}
+            <div class="row" title="Pre-committed to non-delivery costs (PM oversight, ceremonies, support). Reserved at project start; never available to redirect to features.">
+                <span class="lbl">Overheads <span class="muted tiny" style="font-size:10px;">(pre-committed)</span></span><span class="val">− {{ s.overhead_dollars | currency }}</span>
+            </div>
+            {% endif %}
+            {# Spent — total cash gone, with the three-way decomposition
+               (feature delivery / realised risk / unexplained) as sub-rows
+               so the meeting can see where it actually went. Same vocabulary
+               as the Overall Completion legend. #}
             {% if s.actual_spend > 0 %}
-            <div class="row" title="Total spend logged against the project. Realised risks are a categorisation of this spend, not an additional deduction.">
+            <div class="row" title="Total spend logged against the project. Sub-rows below break it into feature delivery, realised risk, and unexplained — these sum to the spent total without double-counting.">
                 <span class="lbl">Spent to date</span><span class="val">− {{ s.actual_spend | currency }}</span>
             </div>
+            <div class="row" style="opacity:0.85;" title="Spend that produced delivered features, valued at planned rates.">
+                <span class="lbl" style="padding-left:14px;">↳ Feature delivery</span><span class="val">{{ earned_value | currency }} <span class="muted tiny" style="font-size:10px;">({{ (earned_value / s.actual_spend * 100) | round(0) | int }}%)</span></span>
+            </div>
             {% if s.realised_risk_dollars > 0 %}
-            <div class="row bad-row" style="opacity:0.85;" title="Of the spend above, this much went on realised risk handling rather than feature delivery.">
-                <span class="lbl" style="padding-left:14px;">↳ on realised risks</span><span class="val">{{ s.realised_risk_dollars | currency }}</span>
+            <div class="row bad-row" style="opacity:0.85;" title="Spend absorbed by realised risks — categorised non-feature work.">
+                <span class="lbl" style="padding-left:14px;">↳ Realised risk</span><span class="val">{{ s.realised_risk_dollars | currency }} <span class="muted tiny" style="font-size:10px;">({{ (s.realised_risk_dollars / s.actual_spend * 100) | round(0) | int }}%)</span></span>
             </div>
             {% endif %}
-            {% endif %}
-            {% if s.overhead_dollars > 0 %}
-            <div class="row" title="Earmarked for non-delivery costs (PM oversight, ceremonies, support).">
-                <span class="lbl">Overheads</span><span class="val">− {{ s.overhead_dollars | currency }}</span>
+            {% if unrealised_spend > 0 %}
+            <div class="row" style="opacity:0.85;" title="Paid time not yet visible as feature delivery or categorised risk impact — work in flight, rework, exploration, or non-feature work. The 'apparent inefficiency' line for the meeting.">
+                <span class="lbl" style="padding-left:14px;">↳ Unexplained</span><span class="val">{{ unrealised_spend | currency }} <span class="muted tiny" style="font-size:10px;">({{ (unrealised_spend / s.actual_spend * 100) | round(0) | int }}%)</span></span>
             </div>
             {% endif %}
+            {# Spend delta — pace of burn vs plan as a % of what's been
+               spent. Negative = under-burning (favourable). Distinct from
+               the three-way decomposition: that's where money went, this
+               is whether it left the account faster or slower than planned. #}
+            <div class="row" style="opacity:0.85;" title="Cumulative spend vs planned (daily-burn × elapsed days), as a percentage of actual spend. Negative = under-burning (e.g. team availability has been below full); positive = over-burning. Distinct from feature delivery — this is pace, not productivity.">
+                <span class="lbl">Spend delta vs plan</span>
+                <span class="val" style="color: {% if spend_delta_pct > 5 %}var(--bad){% elif spend_delta_pct < -5 %}var(--good){% else %}inherit{% endif %};">{{ '%+.1f' % spend_delta_pct }}%</span>
+            </div>
+            {% endif %}
+
+            {# Divider: above is committed cash (gone or earmarked); below
+               is forward-looking exposure that hasn't actually been spent
+               and may not be. #}
             {% if s.open_risk_dollars > 0 %}
-            <div class="row warn-row" title="Open risks that could land and absorb accessible budget if not mitigated.">
-                <span class="lbl">⚠ Open risk exposure</span><span class="val">{{ s.open_risk_dollars | currency }}</span>
+            <div style="border-top:1px solid var(--border); margin-top:6px; padding-top:6px;">
+                <div class="row warn-row" title="Open risks that could land and absorb accessible budget if not mitigated. Forward-looking — not yet spent.">
+                    <span class="lbl">⚠ Unrealised risk exposure</span><span class="val">{{ s.open_risk_dollars | currency }}</span>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -80,16 +117,9 @@
     {% set wl_comp_fill_pct = [s.overall_completion / 100 * wl_feature_budget_pct, 100] | min %}
     {% set wl_target_pct = [s.feature_expected_burn_pct / 100 * wl_feature_budget_pct, 100] | min %}
     {% set wl_overhead_pct = (s.overhead_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
-    {# Spend decomposes into three buckets, each shown separately on the bar:
-        - earned_value         : spend that became delivered features (green left)
-        - realised_risk_dollars: spend that went on risk handling (red right)
-        - unrealised_spend     : the residual — paid but not yet visible as
-                                 features or risks (grey right)
-       Sum equals actual_spend, no double-count. If earned + realised > spend,
-       there's a favourable variance (delivered more value than paid for). #}
-    {% set earned_value = s.allocated_dollars * s.overall_completion / 100 %}
-    {% set unrealised_spend = [s.actual_spend - earned_value - s.realised_risk_dollars, 0] | max %}
-    {% set favourable_variance = [earned_value + s.realised_risk_dollars - s.actual_spend, 0] | max %}
+    {# Spend decomposition (earned_value, unrealised_spend, favourable_variance)
+       is hoisted above the hero-grid because the Net Accessible Budget card
+       also uses it. See DESIGN_RULES §1 for the no-double-count rationale. #}
     {% set wl_unrealised_pct = (unrealised_spend / wl_denom * 100) if wl_denom > 0 else 0 %}
     {% set wl_realised_pct = (s.realised_risk_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
     {% set wl_committed_pct = wl_overhead_pct + wl_unrealised_pct + wl_realised_pct %}
