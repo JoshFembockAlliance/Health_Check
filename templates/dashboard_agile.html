@@ -409,9 +409,11 @@
     {% macro _project_y(x_pixel) %}{% set frac = (x_pixel - today_x) / (exhaustion_x - today_x) if exhaustion_x > today_x else 1 %}{{ today_y + (zero_y - today_y) * frac }}{% endmacro %}
     <div class="hero-card" id="hero-burndown" data-burndown-view="forward"
          data-today-x="{{ today_x }}" data-chart-w="{{ CHART_W }}" data-chart-h="{{ CHART_H }}"
-         style="grid-column: span 4; padding:18px 20px;">
+         role="button" tabindex="0" aria-haspopup="dialog" aria-controls="burndown-modal"
+         title="Click for a sentence-form breakdown of what the chart says about runway and scope finish."
+         style="grid-column: span 4; padding:18px 20px; cursor:pointer; position:relative;">
         <div class="label" style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
-            <span>Budget Burndown</span>
+            <span>Budget Burndown <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></span>
             <div style="display:inline-flex; gap:14px; align-items:center;">
                 <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;"
                        title="Default view zooms the chart to today → chart-end so the conversation is about runway and projected finish dates. Untick to extend the chart back to project start and see the historical actual-burn line.">
@@ -751,6 +753,142 @@
     <p class="muted">No features yet. <a class="link" href="/p/{{ pid }}/features">Add some features</a> to see health metrics.</p>
     {% endif %}
 </div>
+
+{# ── Budget Burndown — sentence-form detail modal.
+
+   Mirrors the agile status-meeting "how does this impact our ability
+   to reach our goals?" beat (script Q5). Walks through what the chart
+   shows, when the budget runs out at current pace, the three scope-
+   finish dates (planned-cost / +inefficiency / +open risks), the
+   comparison against the project end date, the meaning of the
+   inefficiency factor, and a synthesis paragraph that names which
+   pivot lever (scope, timeline, or budget) is most under pressure. #}
+{% if burndown %}
+{% set b_today = burndown.today_days %}
+{% set b_initial = burndown.initial_days %}
+{% set b_burn = burndown.daily_burn %}
+{% set b_exhaust = burndown.budget_exhaustion %}
+{% set b_planned = burndown.planned_cost_finish %}
+{% set b_inefficient = burndown.inefficiency_finish %}
+{% set b_risky = burndown.risk_finish %}
+{% set b_end = burndown.end_date %}
+{% set b_factor = burndown.inefficiency_factor %}
+{% set b_unrealised_ratio = burndown.unrealised_ratio_pct %}
+{% set b_open_days = burndown.open_risk_days %}
+{% set b_planned_days = burndown.planned_cost_days %}
+{% set b_inefficient_days = burndown.inefficiency_days %}
+<dialog id="burndown-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+    <div style="padding:20px 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget Burndown — Detail</strong>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('burndown-modal').close()">✕</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+            {# Q1 — what's on the chart? #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What is this chart showing?</span>
+                The Y axis is full-team budget days remaining (post-overhead — i.e. days the accessible budget can still fund the team for). The X axis is calendar dates from project start through the latest projected finish. Three lines tell the story: the dashed grey <em>plan</em> line is linear consumption from the start budget to zero on the project end date; the solid blue <em>actual</em> line is what's really been consumed up to today (shaped by per-week capacity history); the dashed dark <em>projection</em> line is full-team burn forward from today, ending when the budget runs out.
+            </p>
+
+            {# Q2 — where does the budget run out? #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">When does the budget run out at current pace?</span>
+                There are <strong style="color:{{ days_color }};">{{ b_today | days }}d</strong> of full-team runway left. At today's burn of <strong>{{ b_burn | currency }}/day</strong>, that runway exhausts on <strong>{{ b_exhaust.isoformat() }}</strong> — where the projection line meets the X axis. This is the floor: no more money to spend after that, regardless of what's left to deliver.
+            </p>
+
+            {# Q3 — when does scope finish? Three estimates. #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">When will scope finish?</span>
+                The chart shows three increasingly pessimistic finish estimates:
+            </p>
+            <ul style="margin:0; padding-left:20px; line-height:1.55;">
+                <li style="margin-bottom:4px;">
+                    <strong style="color:var(--good);">Scope finish ({{ b_planned.isoformat() }})</strong> — best case. Today plus the {{ b_planned_days | days }}d needed to deliver remaining feature work at planned rates. Assumes the team is fully productive on features from here.
+                </li>
+                {% if b_inefficient > b_planned %}
+                <li style="margin-bottom:4px;">
+                    <strong style="color:var(--warn);">+inefficiency ({{ b_inefficient.isoformat() }})</strong> — adjusts for the historical bleed. {{ b_unrealised_ratio | round(1) }}% of past spend has been unrealised (work in flight, rework, exploration), so the same fraction is assumed forward, applying a <strong>{{ b_factor | round(2) }}×</strong> burn multiplier to remaining work. This is the realistic-case finish.
+                </li>
+                {% endif %}
+                {% if b_risky > b_inefficient %}
+                <li>
+                    <strong style="color:var(--bad);">+open risks ({{ b_risky.isoformat() }})</strong> — worst case. Adds {{ b_open_days | days }}d of runway absorption if every open risk lands at full impact, layered onto the inefficiency-adjusted timeline.
+                </li>
+                {% endif %}
+            </ul>
+
+            {# Q4 — does scope finish before the budget runs out, and before the end date? #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Does scope land safely?</span>
+                {% set worst_finish = b_risky if b_risky > b_inefficient else b_inefficient %}
+                {% if worst_finish <= b_exhaust %}
+                Even the worst-case finish ({{ worst_finish.isoformat() }}) lands before the budget runs out ({{ b_exhaust.isoformat() }}) — there's headroom to absorb the inefficiency drag and any open risks landing.
+                {% elif b_inefficient <= b_exhaust %}
+                The realistic-case finish ({{ b_inefficient.isoformat() }}) is within budget, but the open-risk worst case ({{ b_risky.isoformat() }}) overruns the exhaustion date by some days — mitigation of open risks is what keeps the project on the safe side of that line.
+                {% elif b_planned <= b_exhaust %}
+                Best-case scope finish ({{ b_planned.isoformat() }}) just clears the budget exhaustion, but once inefficiency is factored in ({{ b_inefficient.isoformat() }}) the project would run out of money before scope is delivered. A pivot is likely needed.
+                {% else %}
+                <strong style="color:var(--bad);">Even the best-case scope finish ({{ b_planned.isoformat() }}) lands after the budget runs out ({{ b_exhaust.isoformat() }}).</strong> Current scope can't be delivered within the current budget; this is a pivot conversation, not a status conversation.
+                {% endif %}
+                {% if b_end is not none %}
+                Against the project end date of <strong>{{ b_end.isoformat() }}</strong>:
+                {% if b_inefficient <= b_end %}
+                the realistic-case finish lands inside the end date with <strong style="color:var(--good);">slack</strong>.
+                {% elif b_planned <= b_end %}
+                best-case finishes inside the end date but realistic-case <strong style="color:var(--warn);">overruns it</strong>.
+                {% else %}
+                even the best-case finish <strong style="color:var(--bad);">misses the end date</strong>.
+                {% endif %}
+                {% endif %}
+            </p>
+
+            {# Q5 — what does the inefficiency factor mean? #}
+            {% if b_factor > 1.0 %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How much is the inefficiency factor adding?</span>
+                Of the spend so far, <strong>{{ b_unrealised_ratio | round(1) }}%</strong> hasn't shown up as features or as categorised risk impact — it's gone on work-in-flight, rework, exploration, or non-feature activities. To deliver $1 of feature value going forward, the chart assumes ${{ '%.2f' % b_factor }} of spend will be needed at that same drag rate. As work-in-flight completes and gets attributed, this ratio should fall — and the +inefficiency finish would tighten back toward the planned-cost finish.
+            </p>
+            {% endif %}
+
+            {# Q6 — synthesis: which pivot lever is under pressure #}
+            <div style="border-top:1px solid var(--border); padding-top:12px;">
+                <p style="margin:0;">
+                    <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">If a pivot is needed, which lever is under pressure?</span>
+                    {% set pivot_points = [] %}
+                    {% if b_planned > b_exhaust %}
+                        {% set _ = pivot_points.append("Budget is the binding constraint — even at planned rates, scope cannot be delivered within the accessible budget. Options: cut scope, secure additional budget, or accept the timeline overrun and treat it as a fixed-price-style invoice conversation.") %}
+                    {% elif b_inefficient > b_exhaust %}
+                        {% set _ = pivot_points.append("The realistic finish overruns the budget. Tightening inefficiency (less rework, faster attribution of work-in-flight) is the cheapest lever; cutting scope or topping up budget are the alternatives.") %}
+                    {% endif %}
+                    {% if b_end is not none and b_planned > b_end %}
+                        {% set _ = pivot_points.append("Timeline is under pressure — best-case scope finish already misses the project end date. Either move the end date out, cut scope, or raise burn rate (more team) to compress the finish.") %}
+                    {% elif b_end is not none and b_inefficient > b_end %}
+                        {% set _ = pivot_points.append("The realistic finish overshoots the project end date even though the budget would cover it. Worth flagging early — either adjust the date, cut scope, or accept the inefficiency drag as the cost of staying on plan.") %}
+                    {% endif %}
+                    {% if b_risky > b_exhaust and b_inefficient <= b_exhaust %}
+                        {% set _ = pivot_points.append("Open risks are the only thing that pushes scope past the budget exhaustion date. Mitigating or accepting individual open risks is a cheaper conversation than a scope/timeline/budget pivot.") %}
+                    {% endif %}
+                    {% if b_factor >= 1.4 %}
+                        {% set _ = pivot_points.append("The inefficiency multiplier is ≥1.4× — a meaningful share of spend is going on non-feature work. Investigating where that time is going (and whether it's necessary) is likely a higher-leverage move than touching scope or budget.") %}
+                    {% endif %}
+                    {% if pivot_points %}
+                    </p>
+                    <ul style="margin:6px 0 0; padding-left:20px;">
+                        {% for pp in pivot_points %}
+                        <li style="margin-bottom:4px;">{{ pp }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    Nothing in the projection forces a pivot: realistic-case scope lands within both budget runway and the project end date, the inefficiency factor is modest, and open risks would only consume part of the buffer if they landed. Use the meeting to confirm the team's read of remaining work matches the numbers — projections are only as honest as the deliverable estimates feeding them.
+                    </p>
+                    {% endif %}
+            </div>
+        </div>
+    </div>
+</dialog>
+{% endif %}
 
 {# ── Net Accessible Budget — sentence-form detail modal.
 
@@ -1284,6 +1422,32 @@ function toggleStarted(projectId, featureId, btn) {
     cb.addEventListener('change', () => {
         apply();
         try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) {}
+    });
+})();
+
+(function() {
+    // Budget Burndown hero card → modal. Same dialog pattern as the
+    // other hero cards. Clicks inside the toggle labels (View from
+    // today / Include open-risk projection) pass through to the
+    // checkboxes and don't open the modal.
+    const card = document.getElementById('hero-burndown');
+    const modal = document.getElementById('burndown-modal');
+    if (!card || !modal) return;
+    function open() {
+        if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
+    }
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('label, input')) return;
+        open();
+    });
+    card.addEventListener('keydown', (e) => {
+        if (e.target.closest('label, input')) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            if (modal.close) modal.close(); else modal.removeAttribute('open');
+        }
     });
 })();
 
