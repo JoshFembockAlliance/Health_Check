@@ -93,6 +93,11 @@ templates.env.filters["render_rich"] = render_rich
 @app.on_event("startup")
 def startup():
     init_db()
+    css_path = os.path.join(os.path.dirname(__file__), "static", "style.css")
+    try:
+        templates.env.globals["css_version"] = int(os.path.getmtime(css_path))
+    except OSError:
+        templates.env.globals["css_version"] = "0"
 
 
 # ── Project-scoped helpers ──
