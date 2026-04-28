@@ -559,7 +559,7 @@ def _agile_dashboard(request: Request, project: dict):
 
     days_to_end = business_days_between(as_of, end_dt) if (as_of and end_dt and end_dt > as_of) else None
 
-    burndown = agile_burndown_chart_data(project, summary)
+    burndown = agile_burndown_chart_data(project, summary, enriched_capacity)
 
     ctx = {
         "request": request,

@@ -704,6 +704,7 @@ def feature_health(
 def agile_burndown_chart_data(
     project: dict,
     summary: dict,
+    capacity_periods: list[dict] | None = None,
 ) -> dict | None:
     """Build data for the budget burndown chart on the agile dashboard.
 
@@ -806,12 +807,53 @@ def agile_burndown_chart_data(
             points.append((offset, value))
         return points
 
-    # Actual line: from project start to today. Slope = (consumed days) /
-    # (business days elapsed). If as_of is on the same calendar day as
-    # start there's no elapsed burn yet.
+    # Actual line: from project start to today, shaped by historical
+    # team availability (capacity periods covering past weeks) and scaled
+    # so the cumulative burn at today matches reality (initial_days -
+    # today_days). The shape comes from capacity-modelled per-day burn
+    # (sick leave / partial weeks → shallower slope); the scale is
+    # whatever reconciles the modelled total with actual spend, so any
+    # spend-delta from informal time off shows up as overall slope rather
+    # than per-week jaggedness. Falls back to a flat line when there's no
+    # capacity history or when the modelled total is zero.
     bd_elapsed = business_days_between(start, as_of)
-    actual_burn_per_bd = ((initial_days - today_days) / bd_elapsed) if bd_elapsed > 0 else 0.0
-    actual_points = _stepped_polyline(0, _days_offset(as_of), initial_days, actual_burn_per_bd)
+    consumed_days = initial_days - today_days
+    historical_caps = capacity_periods or []
+    week_burns: dict[date, float] = {}
+    for cp in historical_caps:
+        monday = cp.get("week_monday")
+        if monday is None or monday > as_of:
+            continue
+        week_burns[monday] = week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
+
+    if bd_elapsed > 0 and week_burns and daily_burn > 0:
+        # Build the per-business-day modelled burn (in days-of-runway,
+        # i.e. each day's $ burn divided by full-team daily_burn).
+        per_day_burn_days: list[float] = []
+        for offset in range(0, _days_offset(as_of)):
+            day = start + timedelta(days=offset)
+            if day.weekday() >= 5:
+                per_day_burn_days.append(0.0)
+                continue
+            monday = get_week_monday(day)
+            week_dollar_burn = week_burns.get(monday, daily_burn)
+            per_day_burn_days.append(week_dollar_burn / daily_burn)
+        modelled_total = sum(per_day_burn_days)
+        if modelled_total > 0 and consumed_days > 0:
+            scale = consumed_days / modelled_total
+            actual_points = [(0, initial_days)]
+            value = initial_days
+            for i, burn in enumerate(per_day_burn_days):
+                value = max(0.0, value - burn * scale)
+                actual_points.append((i + 1, value))
+        else:
+            # No modelled burn (e.g. all past weeks at zero capacity) —
+            # fall back to a single-segment line at the actual rate.
+            actual_burn_per_bd = consumed_days / bd_elapsed
+            actual_points = _stepped_polyline(0, _days_offset(as_of), initial_days, actual_burn_per_bd)
+    else:
+        actual_burn_per_bd = (consumed_days / bd_elapsed) if bd_elapsed > 0 else 0.0
+        actual_points = _stepped_polyline(0, _days_offset(as_of), initial_days, actual_burn_per_bd)
 
     # Plan line: linear consumption across the planned project duration.
     # If no end_date, skip — there's no plan to draw.
