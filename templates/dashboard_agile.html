@@ -331,7 +331,7 @@
         <div class="label">Full-Team Budget Days Remaining <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></div>
         <div class="value" style="color: {{ days_color }}">
             {{- s.total_budget_days_remaining | days -}}
-            {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;">of {{ days_to_end }}d to end date</span>{% endif %}
+            {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;" title="Working days from today to the project end date (Mon–Fri, weekends excluded). Apples-to-apples with the budget-days figure on the left.">of {{ days_to_end }} working days to end date</span>{% endif %}
         </div>
         <div class="sub-row">
             <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ p.team_size }} people</span></div>
@@ -800,7 +800,7 @@
                 No project end date is set, so runway can't be compared to a deadline. Set one in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to enable this comparison.
                 {% else %}
                 {% set end_delta = runway_days - days_to_end %}
-                The project end date is <strong>{{ days_to_end }}d</strong> away.
+                The project end date is <strong>{{ days_to_end }} working days</strong> away (Mon–Fri, weekends excluded — same basis as the budget-days figure).
                 {% if end_delta >= 0 %}
                 The budget covers that with <strong style="color:var(--good);">{{ end_delta | days }}d to spare</strong>.
                 {% else %}
