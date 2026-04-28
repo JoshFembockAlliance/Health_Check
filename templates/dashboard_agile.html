@@ -48,8 +48,8 @@
 {% set spend_delta_pct = (s.burn_delta / s.actual_spend * 100) if s.actual_spend > 0 else 0 %}
 
 <div class="hero-grid two-row">
-    <div class="hero-card primary" style="grid-column: span 3;">
-        <div class="label">Net Accessible Budget</div>
+    <div class="hero-card primary" id="hero-net-accessible" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="net-accessible-modal" title="Click for a sentence-form breakdown of how the budget is being used" style="grid-column: span 3; cursor:pointer;">
+        <div class="label">Net Accessible Budget <span aria-hidden="true" style="opacity:0.65; margin-left:4px; font-weight:500;">›</span></div>
         <div class="value">{{ s.accessible_budget | currency }}</div>
         {% if s.remaining_dollars > 0 %}
         {% set delivery_buffer = s.accessible_budget - s.remaining_dollars %}
@@ -752,6 +752,158 @@
     {% endif %}
 </div>
 
+{# ── Net Accessible Budget — sentence-form detail modal.
+
+   Mirrors the agile status-meeting "where are we now?" beat: explains
+   each datapoint on the hero card in plain language plus what it tells
+   the PM about the project. Order follows the meeting flow:
+     1. The headline accessible figure and how it's net of everything else.
+     2. Pre-committed overheads.
+     3. Spend so far, broken into feature delivery / realised risk /
+        unexplained — with the meaning of each ratio.
+     4. Spend pace vs plan (the spend-delta).
+     5. Forward exposure from open risks (not committed yet).
+     6. A synthesis line pointing at where the meeting should focus
+        based on which of the above is most out of balance. #}
+{% set tb_n = s.total_budget %}
+{% set as_n = s.actual_spend %}
+{% set ev_n = earned_value %}
+{% set rv_n = s.realised_risk_dollars %}
+{% set uv_n = unrealised_spend %}
+{% set ab_n = s.accessible_budget %}
+{% set oh_n = s.overhead_dollars %}
+{% set or_n = s.open_risk_dollars %}
+{% set rd_n = s.remaining_dollars %}
+{% set ev_pct = (ev_n / as_n * 100) if as_n > 0 else 0 %}
+{% set rv_pct = (rv_n / as_n * 100) if as_n > 0 else 0 %}
+{% set uv_pct = (uv_n / as_n * 100) if as_n > 0 else 0 %}
+{% set categorised_pct = ev_pct + rv_pct %}
+<dialog id="net-accessible-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+    <div style="padding:20px 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Net Accessible Budget — Detail</strong>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('net-accessible-modal').close()">✕</button>
+        </div>
+
+        {% if tb_n <= 0 %}
+        <p>Total budget is zero — set an initial budget in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to see meaningful answers here.</p>
+        {% else %}
+
+        <div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+            {# Q1 — what is "accessible"? #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How much is left to play with?</span>
+                Of the <strong>{{ tb_n | currency }}</strong> total budget,
+                <strong style="color:var(--text-strong);">{{ ab_n | currency }}</strong> is accessible — what's left after subtracting overheads ({{ oh_n | currency }}) and money already spent ({{ as_n | currency }}).
+                {% if rd_n > 0 %}
+                {% set delivery_buffer_n = ab_n - rd_n %}
+                Remaining feature work needs <strong>{{ rd_n | currency }}</strong> to complete, leaving
+                {% if delivery_buffer_n >= 0 %}
+                <strong style="color:var(--good);">{{ delivery_buffer_n | currency }} of buffer</strong> for unplanned work or risk absorption.
+                {% else %}
+                a <strong style="color:var(--bad);">{{ (delivery_buffer_n * -1) | currency }} shortfall</strong> against the work still to deliver.
+                {% endif %}
+                {% else %}
+                All allocated feature work is complete — the entire accessible budget is free for new scope, contingency, or absorption of open risks.
+                {% endif %}
+            </p>
+
+            {# Q2 — overheads (pre-committed) #}
+            {% if oh_n > 0 %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What was reserved before any work started?</span>
+                <strong>{{ oh_n | currency }}</strong> ({{ (oh_n / tb_n * 100) | round(1) }}% of total budget) is allocated to overheads — PM oversight, ceremonies, support, and other non-delivery activities. This is pre-committed at project start and isn't available to redirect to features later, so it's the first deduction from the headline budget.
+            </p>
+            {% endif %}
+
+            {# Q3 — where did the spend go? #}
+            {% if as_n <= 0 %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Where has the spend gone so far?</span>
+                No spend has been logged yet, so there's no value-for-money picture to break down.
+            </p>
+            {% else %}
+            {% if rv_n > as_n %}
+            <p style="margin:0; padding:6px 8px; border:1px solid oklch(from var(--warn) l c h / 0.55); background:oklch(from var(--warn) l c h / 0.10); border-radius:4px;">
+                <span style="color:var(--warn); font-weight:700;">⚠</span>
+                Realised risk impact ({{ rv_n | currency }}) currently exceeds actual spend ({{ as_n | currency }}). Realised risk is a categorisation of past spend, not an additional deduction — when it exceeds spend, the team time hasn't been logged yet. Treat the breakdown below as approximate until that's reconciled.
+            </p>
+            {% endif %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Where has the spend gone so far?</span>
+                Of <strong>{{ as_n | currency }}</strong> paid:
+                <strong style="color:var(--good);">{{ ev_n | currency }}</strong> ({{ ev_pct | round(0) | int }}%) is feature delivery — the team's paid time that produced delivered features, valued at planned rates;
+                <strong style="color:var(--bad);">{{ rv_n | currency }}</strong> ({{ rv_pct | round(0) | int }}%) went on realised risk handling — categorised non-feature work the team explicitly took on;
+                and <strong>{{ uv_n | currency }}</strong> ({{ uv_pct | round(0) | int }}%) is unexplained — paid time that hasn't yet shown as feature delivery or as a categorised risk impact (work in flight, rework, exploration, or non-feature work).
+                The unexplained slice is the one to interrogate in the meeting: a high share usually means feature work is still in flight, or that time has gone on activities the project hasn't yet been able to attribute.
+            </p>
+            {% endif %}
+
+            {# Q4 — pace of spend vs plan (spend delta) #}
+            {% if as_n > 0 %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How does spend pace compare to plan?</span>
+                Expected spend by now is <strong>{{ s.expected_spend | currency }}</strong> ({{ s.elapsed_days }} business days × full-team daily burn). Actual is <strong>{{ as_n | currency }}</strong>, a delta of
+                {% if s.burn_delta > 0 %}
+                <strong style="color:var(--bad);">+{{ s.burn_delta | currency }}</strong> — over-burning by <strong>{{ '%+.1f' % spend_delta_pct }}%</strong> of actual spend.
+                {% elif s.burn_delta < 0 %}
+                <strong style="color:var(--good);">−{{ (s.burn_delta * -1) | currency }}</strong> — under-burning by <strong>{{ '%+.1f' % spend_delta_pct }}%</strong> of actual spend.
+                {% else %}
+                <strong>0</strong> — spend pace matches plan exactly.
+                {% endif %}
+                Pace is distinct from productivity: a healthy under-burn often reflects reduced team availability (sick leave, holidays, partial weeks), not a problem. Pair this with the feature-delivery share above to read the story — under-burn with strong delivery is fine; over-burn with weak delivery is the worst combination.
+            </p>
+            {% endif %}
+
+            {# Q5 — forward exposure (open risks) #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What's exposed but not yet committed?</span>
+                {% if or_n <= 0 %}
+                No open risks are recorded — the accessible budget figure has no forward what-ifs hanging over it.
+                {% else %}
+                Open risks could absorb up to <strong style="color:var(--warn);">{{ or_n | currency }}</strong> ({{ (or_n / tb_n * 100) | round(1) }}% of total budget) if every one of them lands at full impact. This is forward-looking exposure — not yet spent and not deducted from the headline accessible figure — but it's what could erode the buffer between now and project end. The meeting question this raises: which of these risks are we actively mitigating, and which are accepted?
+                {% endif %}
+            </p>
+
+            {# Q6 — synthesis: where to focus #}
+            <div style="border-top:1px solid var(--border); padding-top:12px;">
+                <p style="margin:0;">
+                    <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Where should this meeting focus?</span>
+                    {% set focal_points = [] %}
+                    {% if as_n > 0 and uv_pct >= 25 %}
+                        {% set _ = focal_points.append(("Unexplained spend is a sizeable share (" ~ (uv_pct | round(0) | int) ~ "%). Walk through who has been on what to attribute this time — features-in-flight should drop the share once they complete.")) %}
+                    {% endif %}
+                    {% if as_n > 0 and rv_pct >= 25 %}
+                        {% set _ = focal_points.append(("A meaningful share of spend (" ~ (rv_pct | round(0) | int) ~ "%) has gone on realised risks. Review the realised-risk register to make sure the categorisation reflects reality and to surface root causes.")) %}
+                    {% endif %}
+                    {% if as_n > 0 and s.burn_delta > 0 and spend_delta_pct > 5 %}
+                        {% set _ = focal_points.append(("Burn pace is " ~ ('%+.1f' % spend_delta_pct) ~ "% ahead of plan. Worth confirming this is a temporary push (e.g. a deadline) and not a sustained over-run that erodes runway.")) %}
+                    {% endif %}
+                    {% if rd_n > 0 and (ab_n - rd_n) < 0 %}
+                        {% set _ = focal_points.append(("Accessible budget is below remaining feature cost — the project cannot finish current scope without a budget, scope, or timeline pivot.")) %}
+                    {% endif %}
+                    {% if or_n > 0 and (ab_n - rd_n - or_n) < 0 %}
+                        {% set _ = focal_points.append(("Combined demand from features plus open-risk exposure exceeds accessible budget. Mitigation or risk-acceptance decisions are needed before the buffer thins further.")) %}
+                    {% endif %}
+                    {% if focal_points %}
+                    </p>
+                    <ul style="margin:6px 0 0; padding-left:20px;">
+                        {% for fp in focal_points %}
+                        <li style="margin-bottom:4px;">{{ fp }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    Nothing in the budget picture is significantly out of balance: spend is attributable to either feature delivery or known risk handling, pace is close to plan, and forward exposure is within the accessible buffer. Use the rest of the meeting to confirm the team's read aligns with this — surprises usually live in the conversation, not the dashboard.
+                    </p>
+                    {% endif %}
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
+</dialog>
+
 {# ── Budget Days Remaining — sentence-form detail modal ── #}
 {% set burn = s.daily_burn %}
 {% set runway_days = s.total_budget_days_remaining %}
@@ -1132,6 +1284,26 @@ function toggleStarted(projectId, featureId, btn) {
     cb.addEventListener('change', () => {
         apply();
         try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) {}
+    });
+})();
+
+(function() {
+    // Net Accessible Budget hero card → modal. Same dialog pattern as
+    // budget-days and overall-completion.
+    const card = document.getElementById('hero-net-accessible');
+    const modal = document.getElementById('net-accessible-modal');
+    if (!card || !modal) return;
+    function open() {
+        if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
+    }
+    card.addEventListener('click', () => open());
+    card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            if (modal.close) modal.close(); else modal.removeAttribute('open');
+        }
     });
 })();
 

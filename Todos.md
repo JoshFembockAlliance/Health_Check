@@ -21,7 +21,14 @@ I'd like to rework open risk projection. Currently, it uses open risks but actua
 
 
 ### Fixed Price Project Dashboard Items
-- [ ] **Burndown chart for fixed-price projects.** The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
+- [ ] **Burndown chart for fixed-price projects - projections** 
+The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
+
+- [ ] **Burndown chart for fixed-price projects - Toggles** 
+Switch from using checkboxes to the same style of pill toggle as Overall Completion uses.
+
+- [ ] **Net Accessible Budget Modal - Unrealised Spend**
+The modal lists a few items that unrealised spend could go toward. Because an agile sprint typically only includes enough items to finish them out during a sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. 
 
 ### Features, Requirements & Deliverables
 
