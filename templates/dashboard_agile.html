@@ -118,7 +118,7 @@
                  title="Feature budget zone — {{ s.allocated_dollars | currency }} ({{ wl_feature_budget_pct | round(1) }}% of total budget) allocated to feature work."></div>
             {% endif %}
             <div class="fill {{ comp_fill }}" style="width: {{ wl_comp_fill_pct }}%"
-                 title="Earned value — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates ({{ wl_comp_fill_pct | round(1) }}% of total budget)."></div>
+                 title="Feature delivery — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates ({{ wl_comp_fill_pct | round(1) }}% of total budget)."></div>
             {% if wl_target_pct > 0 %}
             <div class="target plan-marker" style="left: {{ wl_target_pct }}%"
                  title="On-track target — {{ s.feature_expected_burn_pct | pct }} of feature work should be delivered by now."></div>
@@ -139,7 +139,7 @@
             {# Spend merged — single muted block (when toggle OFF) #}
             {% if merged_pct > 0 %}
             <div class="bar-spent spend-merged" style="width: {{ merged_pct }}%; right: {{ wl_overhead_pct }}%; left: auto;"
-                 title="Spent (non-earned) — {{ merged_amount | currency }}. This combines {{ s.realised_risk_dollars | currency }} on realised risk handling with {{ unrealised_spend | currency }} of unrealised spend (work in flight, rework, exploration). Earned value (the green fill on the left) is shown separately as the spend that produced features."></div>
+                 title="Spent (non-features) — {{ merged_amount | currency }}. This combines {{ s.realised_risk_dollars | currency }} on realised risk handling with {{ unrealised_spend | currency }} of unrealised spend (work in flight, rework, exploration). The green fill on the left — feature delivery — is shown separately as the spend that produced features."></div>
             {% endif %}
             {% if wl_open_pct > 0 %}
             <div class="risk-open risk-marker" style="width: {{ wl_open_pct }}%; right: {{ wl_committed_pct }}%; left: auto;"
@@ -147,101 +147,127 @@
             {% endif %}
         </div>
 
-        {# ── Main bar legend. Items carry the same plan-marker / spend-detail
-             / spend-merged / risk-marker classes as the corresponding bar
-             layers, so legend visibility tracks the toggles automatically. #}
-        <div class="bar-legend" style="display:flex; flex-wrap:wrap; gap:10px 14px; margin-top:8px; font-size:11px; line-height:1.3;">
-            {% if wl_feature_budget_pct > 0 %}
-            <span class="plan-marker" title="{{ s.allocated_dollars | currency }} of {{ wl_denom | currency }} total budget is allocated to feature work."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.15); border:1px solid oklch(from var(--info) l c h / 0.6);"></span>
-                <span class="muted">Feature budget</span>
-                <strong>{{ s.allocated_dollars | currency }}</strong>
-            </span>
-            {% endif %}
-            <span title="Earned value — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates. This is the spend that has produced visible features."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: {% if comp_fill == 'fill-good' %}var(--good){% elif comp_fill == 'fill-warn' %}var(--warn){% else %}var(--bad){% endif %};"></span>
-                <span class="muted">Earned value</span>
-                <strong>{{ earned_value | currency }}</strong>
-            </span>
-            {% if wl_overhead_pct > 0 %}
-            <span title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
-                <span class="muted">Overheads</span>
-                <strong>{{ s.overhead_dollars | currency }}</strong>
-            </span>
-            {% endif %}
-            {% if wl_unrealised_pct > 0 %}
-            <span class="spend-detail" title="Spend = earned value + realised risk + unrealised. {{ s.actual_spend | currency }} = {{ earned_value | currency }} + {{ s.realised_risk_dollars | currency }} + {{ unrealised_spend | currency }}. The unrealised portion is paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, non-feature work)."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
-                <span class="muted">Unrealised spend</span>
-                <strong>{{ unrealised_spend | currency }}</strong>
-            </span>
-            {% elif favourable_variance > 0 %}
-            <span title="Earned value ({{ earned_value | currency }}) plus realised risk impact ({{ s.realised_risk_dollars | currency }}) exceeds actual spend ({{ s.actual_spend | currency }}) — the team has produced more value-equivalent work than they've been paid for at planned rates. Favourable variance."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--good) l c h / 0.25); border:1px solid oklch(from var(--good) l c h / 0.6);"></span>
-                <span class="muted">Favourable variance</span>
-                <strong style="color:var(--good);">+{{ favourable_variance | currency }}</strong>
-            </span>
-            {% endif %}
-            {% if wl_realised_pct > 0 %}
-            <span class="spend-detail" title="{{ s.realised_risk_dollars | currency }} absorbed by realised risks."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--bad) l c h / 0.5);"></span>
-                <span class="muted">Realised risk</span>
-                <strong>{{ s.realised_risk_dollars | currency }}</strong>
-            </span>
-            {% endif %}
-            {% if merged_pct > 0 %}
-            <span class="spend-merged" title="Combined view: {{ s.realised_risk_dollars | currency }} on realised risk handling + {{ unrealised_spend | currency }} of unrealised spend = {{ merged_amount | currency }} that's been paid but didn't produce visible features. Toggle 'Spend categories' to split this back into its parts."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
-                <span class="muted">Spent (non-earned)</span>
-                <strong>{{ merged_amount | currency }}</strong>
-            </span>
-            {% endif %}
-            {% if wl_open_pct > 0 %}
-            <span class="risk-marker" title="{{ s.open_risk_dollars | currency }} of accessible budget at risk if open risks materialise."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: repeating-linear-gradient(-45deg, oklch(from var(--warn) l c h / 0.55) 0 2px, transparent 2px 4px);"></span>
-                <span class="muted">Open risk</span>
-                <strong>{{ s.open_risk_dollars | currency }}</strong>
-            </span>
-            {% endif %}
-            {% if wl_target_pct > 0 %}
-            <span class="plan-marker" title="Where completion should be by now if delivery tracks linearly with elapsed time."
-                  style="display:inline-flex; align-items:center; gap:5px;">
-                <span aria-hidden="true" style="width:2px; height:11px; background: var(--text-strong);"></span>
-                <span class="muted">On-track target</span>
-                <strong>{{ s.feature_expected_burn_pct | pct }}</strong>
-            </span>
-            {% endif %}
-            <span title="The empty space in the middle of the bar — budget that hasn't been spent, isn't reserved for overhead, and isn't already absorbed by realised risks. This is what you can still play with."
-                  style="display:inline-flex; align-items:center; gap:5px; margin-left:auto;">
-                <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: var(--surface-sunk); border:1px dashed var(--border);"></span>
-                <span class="muted">Accessible</span>
-                <strong style="color: {% if wl_accessible >= s.remaining_dollars %}var(--good){% else %}var(--bad){% endif %};">{{ wl_accessible | currency }}</strong>
-            </span>
-        </div>
+        {# ── Main bar legend, grouped by detail toggle.
 
-        {# Detail toggles: each reveals a layer of breakdown on the main bar
-           above. All on by default. When OFF: the bar declutters by hiding
-           or merging the corresponding layers. Persisted per-project. #}
-        <div class="detail-toggles" style="display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); font-size:11px;">
-            <span class="muted" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Show</span>
-            <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;" title="Splits the right-side spend block into Realised risk and Unrealised spend. When off, they merge into a single 'Spent (non-earned)' block.">
-                <input type="checkbox" data-detail-toggle="spend" checked style="margin:0;"> Spend categories
-            </label>
-            <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;" title="Shows the feature-budget zone tint on the left and the on-track target line. When off, the left side shows just the delivered earned-value fill on a plain background.">
-                <input type="checkbox" data-detail-toggle="plan" checked style="margin:0;"> Plan markers
-            </label>
-            <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;" title="Shows the striped open-risk warning overlay. When off, the rosier accessible-budget gap is shown without the warning stripe.">
-                <input type="checkbox" data-detail-toggle="risk" checked style="margin:0;"> Risk overlay
-            </label>
+           Layout: one default row of items that always show (no toggle gates
+           them), then one row per toggle. Each toggle row leads with its
+           pill-shaped switch on the left, followed by the items that
+           appear/merge depending on its state. The CSS rules on
+           `.hero-card[data-detail-*]` still drive item visibility, so this
+           markup is a pure layout reshuffle from the previous flat row.
+
+           Renames vs prior version: "Earned value" → "Feature delivery";
+           "Spent (non-earned)" → "Spent (non-features)". The earned/unearned
+           dichotomy was misleading — realised risk is "earned" in the sense
+           the team was paid for it, it just didn't deliver a feature. #}
+        <div class="bar-legend" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+
+            {# Default row: items that show regardless of toggle state. #}
+            <div class="legend-row legend-row-default">
+                <span title="Feature delivery — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates. This is the spend that has produced visible features."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: {% if comp_fill == 'fill-good' %}var(--good){% elif comp_fill == 'fill-warn' %}var(--warn){% else %}var(--bad){% endif %};"></span>
+                    <span class="muted">Feature delivery</span>
+                    <strong>{{ earned_value | currency }}</strong>
+                </span>
+                {% if wl_overhead_pct > 0 %}
+                <span title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
+                    <span class="muted">Overheads</span>
+                    <strong>{{ s.overhead_dollars | currency }}</strong>
+                </span>
+                {% endif %}
+                {% if wl_unrealised_pct == 0 and favourable_variance > 0 %}
+                <span title="Feature delivery ({{ earned_value | currency }}) plus realised risk impact ({{ s.realised_risk_dollars | currency }}) exceeds actual spend ({{ s.actual_spend | currency }}) — the team has produced more value-equivalent work than they've been paid for at planned rates. Favourable variance."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--good) l c h / 0.25); border:1px solid oklch(from var(--good) l c h / 0.6);"></span>
+                    <span class="muted">Favourable variance</span>
+                    <strong style="color:var(--good);">+{{ favourable_variance | currency }}</strong>
+                </span>
+                {% endif %}
+                <span title="The empty space in the middle of the bar — budget that hasn't been spent, isn't reserved for overhead, and isn't already absorbed by realised risks. This is what you can still play with."
+                      style="display:inline-flex; align-items:center; gap:5px; margin-left:auto;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: var(--surface-sunk); border:1px dashed var(--border);"></span>
+                    <span class="muted">Accessible</span>
+                    <strong style="color: {% if wl_accessible >= s.remaining_dollars %}var(--good){% else %}var(--bad){% endif %};">{{ wl_accessible | currency }}</strong>
+                </span>
+            </div>
+
+            {# Spend toggle row: pill switch + (split / merged) spend items. #}
+            <div class="legend-row">
+                <button type="button" class="pill-toggle" data-detail-toggle="spend" role="switch" aria-checked="true"
+                        title="Splits the right-side spend block into Realised risk and Unrealised spend. When off, they merge into a single 'Spent (non-features)' block.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">Spend categories</span>
+                </button>
+                {% if wl_unrealised_pct > 0 %}
+                <span class="spend-detail" title="Spend = feature delivery + realised risk + unrealised. {{ s.actual_spend | currency }} = {{ earned_value | currency }} + {{ s.realised_risk_dollars | currency }} + {{ unrealised_spend | currency }}. The unrealised portion is paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, non-feature work)."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
+                    <span class="muted">Unrealised spend</span>
+                    <strong>{{ unrealised_spend | currency }}</strong>
+                </span>
+                {% endif %}
+                {% if wl_realised_pct > 0 %}
+                <span class="spend-detail" title="{{ s.realised_risk_dollars | currency }} absorbed by realised risks."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--bad) l c h / 0.5);"></span>
+                    <span class="muted">Realised risk</span>
+                    <strong>{{ s.realised_risk_dollars | currency }}</strong>
+                </span>
+                {% endif %}
+                {% if merged_pct > 0 %}
+                <span class="spend-merged" title="Combined view: {{ s.realised_risk_dollars | currency }} on realised risk handling + {{ unrealised_spend | currency }} of unrealised spend = {{ merged_amount | currency }} that's been paid but didn't produce visible features. Toggle 'Spend categories' to split this back into its parts."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
+                    <span class="muted">Spent (non-features)</span>
+                    <strong>{{ merged_amount | currency }}</strong>
+                </span>
+                {% endif %}
+            </div>
+
+            {# Plan markers row: pill switch + feature budget zone + on-track target. #}
+            <div class="legend-row">
+                <button type="button" class="pill-toggle" data-detail-toggle="plan" role="switch" aria-checked="true"
+                        title="Shows the feature-budget zone tint on the left and the on-track target line. When off, the left side shows just the delivered feature-delivery fill on a plain background.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">Plan markers</span>
+                </button>
+                {% if wl_feature_budget_pct > 0 %}
+                <span class="plan-marker" title="{{ s.allocated_dollars | currency }} of {{ wl_denom | currency }} total budget is allocated to feature work."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.15); border:1px solid oklch(from var(--info) l c h / 0.6);"></span>
+                    <span class="muted">Feature budget</span>
+                    <strong>{{ s.allocated_dollars | currency }}</strong>
+                </span>
+                {% endif %}
+                {% if wl_target_pct > 0 %}
+                <span class="plan-marker" title="Where completion should be by now if delivery tracks linearly with elapsed time."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:2px; height:11px; background: var(--text-strong);"></span>
+                    <span class="muted">On-track target</span>
+                    <strong>{{ s.feature_expected_burn_pct | pct }}</strong>
+                </span>
+                {% endif %}
+            </div>
+
+            {# Risk overlay row: pill switch + open-risk indicator. #}
+            <div class="legend-row">
+                <button type="button" class="pill-toggle" data-detail-toggle="risk" role="switch" aria-checked="true"
+                        title="Shows the striped open-risk warning overlay. When off, the rosier accessible-budget gap is shown without the warning stripe.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">Risk overlay</span>
+                </button>
+                {% if wl_open_pct > 0 %}
+                <span class="risk-marker" title="{{ s.open_risk_dollars | currency }} of accessible budget at risk if open risks materialise."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: repeating-linear-gradient(-45deg, oklch(from var(--warn) l c h / 0.55) 0 2px, transparent 2px 4px);"></span>
+                    <span class="muted">Open risk</span>
+                    <strong>{{ s.open_risk_dollars | currency }}</strong>
+                </span>
+                {% endif %}
+            </div>
         </div>
 
         <div class="sub-row" style="margin-top:14px;">
@@ -844,7 +870,7 @@
                 No spend has been logged yet, so there's no value-for-money picture to break down.
                 {% else %}
                 Of <strong>{{ as_ | currency }}</strong> paid:
-                <strong style="color:var(--good);">{{ ev | currency }}</strong> has produced delivered features (earned value at planned rates),
+                <strong style="color:var(--good);">{{ ev | currency }}</strong> is feature delivery (delivered features valued at planned rates),
                 <strong>{{ rv | currency }}</strong> went on realised risk handling (categorised non-feature work),
                 and <strong>{{ uv | currency }}</strong> is unrealised — paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, or non-feature work).
                 {% endif %}
@@ -865,8 +891,8 @@
                 {% else %}
                 <strong style="color:var(--good);">on target</strong>.
                 {% endif %}
-                In dollar terms, the team would have earned <strong>{{ target_value | currency }}</strong> at planned rates by now;
-                actual earned value is <strong>{{ ev | currency }}</strong> —
+                In dollar terms, feature delivery would be <strong>{{ target_value | currency }}</strong> at planned rates by now;
+                actual feature delivery is <strong>{{ ev | currency }}</strong> —
                 {% if delivery_variance >= 0 %}
                 <strong style="color:var(--good);">{{ delivery_variance | currency }} ahead</strong>.
                 {% else %}
@@ -991,8 +1017,8 @@ function toggleStarted(projectId, featureId, btn) {
 
 (function() {
     // Overall Completion hero card → modal. Whole card is clickable, but
-    // clicks inside the .detail-toggles row pass through to the toggles
-    // (and don't open the modal). Same dialog pattern as budget-days.
+    // clicks on a pill toggle pass through to the toggle (and don't open
+    // the modal). Same dialog pattern as budget-days.
     const card = document.getElementById('hero-overall-completion');
     const modal = document.getElementById('overall-completion-modal');
     if (!card || !modal) return;
@@ -1000,11 +1026,11 @@ function toggleStarted(projectId, featureId, btn) {
         if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
     }
     card.addEventListener('click', (e) => {
-        if (e.target.closest('.detail-toggles')) return;  // toggle clicks don't open the modal
+        if (e.target.closest('[data-detail-toggle]')) return;  // toggle clicks don't open the modal
         open();
     });
     card.addEventListener('keydown', (e) => {
-        if (e.target.closest('.detail-toggles')) return;
+        if (e.target.closest('[data-detail-toggle]')) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
     modal.addEventListener('click', (e) => {
@@ -1015,9 +1041,10 @@ function toggleStarted(projectId, featureId, btn) {
 })();
 
 (function() {
-    // Overall Completion hero card — bar detail toggles. Each toggle
-    // hides or merges a specific layer of the main bar so the PM can
-    // declutter for focused conversations. Preferences persist per-project.
+    // Overall Completion hero card — bar detail toggles, now rendered as
+    // pill-shaped switches (role="switch", aria-checked). Each toggle hides
+    // or merges a specific layer of the main bar so the PM can declutter
+    // for focused conversations. Preferences persist per-project.
     const card = document.getElementById('hero-overall-completion');
     if (!card) return;
     const KEY = 'overall_completion_detail_{{ project.id }}';
@@ -1037,18 +1064,26 @@ function toggleStarted(projectId, featureId, btn) {
     function applyPrefs() {
         TOGGLES.forEach(t => {
             card.setAttribute('data-detail-' + t, prefs[t] ? '1' : '0');
-            const cb = card.querySelector(`[data-detail-toggle="${t}"]`);
-            if (cb) cb.checked = !!prefs[t];
+            const btn = card.querySelector(`[data-detail-toggle="${t}"]`);
+            if (btn) btn.setAttribute('aria-checked', prefs[t] ? 'true' : 'false');
         });
     }
     applyPrefs();
 
-    card.querySelectorAll('[data-detail-toggle]').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const t = cb.getAttribute('data-detail-toggle');
-            prefs[t] = !!cb.checked;
+    card.querySelectorAll('[data-detail-toggle]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const t = btn.getAttribute('data-detail-toggle');
+            prefs[t] = !prefs[t];
             applyPrefs();
             try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {}
+        });
+        btn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                btn.click();
+            }
         });
     });
 })();
