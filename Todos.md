@@ -12,10 +12,6 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 
 ## Enhancements to Existing
 
-### Demo Projects
-- [ ] **Demo Projects**
-Create a demo project dev dataset that contains a few items for each project type. The idea of this database is to keep it small and only change it infrequently for use in testing when new features are developed without impacting current projects during testing. If this is overly complex, make a note of why here and move on instead of picking it up. Ensure the note contains enough details tha the causes can be addressed to achieve the desired outcome some other way. 
-
 ### Agile Project Dashboard Items
 - [ ] **Budget Burndown - Open Risk Projection** 
 I'd like to rework open risk projection. Currently, it uses open risks but actually, the truth of risks is that new ones open periodically. A better way to factor in risks going forward is to use both the spend delta and the ratio of spend that to features to determine a projected case for if money continues to be spent on things other than feature development at the current rate.  
@@ -48,6 +44,10 @@ Remove the really basic symbols like triangle, dot, diamond and circle from symb
 - [ ] The side panel when collapsed does not show the project icons properly, only when expanded.
 
 ### General
+### Demo Projects
+- [ ] **Demo Projects**
+Create a demo project dev dataset that contains a few items for each project type. The idea of this database is to keep it small and only change it infrequently for use in testing when new features are developed without impacting current projects during testing. If this is overly complex, make a note of why here and move on instead of picking it up. Ensure the note contains enough details tha the causes can be addressed to achieve the desired outcome some other way. 
+
 - [ ] Make sure test coverage is up-to-date and accounts for new features like the decision register, burndown chart projections, spend decomposition (`earned_value + realised_risk + unrealised_spend = actual_spend`), and the budget-model change in [DESIGN_RULES §1](DESIGN_RULES.md).
 - [ ] Ensure that project import and export are still robust and account for new features like decision register.
 - [ ] **Save-on-blur form-association sweep.** Standardise inline-edit forms across the codebase on the HTML5 `form="..."` association pattern — single `<form>` element per row with inputs in different cells referencing it by `id`. This avoids the stale-data bug we hit on milestones (where two separate forms held duplicated hidden inputs and editing one stole the other's stale state).
