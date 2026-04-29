@@ -383,7 +383,7 @@
     {% set ML = 60 %}
     {% set MR = 15 %}
     {% set MT = 20 %}
-    {% set MB = 60 %}
+    {% set MB = 90 %}
     {% set PW = CHART_W - ML - MR %}
     {% set PH = CHART_H - MT - MB %}
     {% set PB = MT + PH %}
@@ -398,7 +398,8 @@
     {% set end_x = (ML + (b.x_end / tcd * PW)) if b.x_end is not none else None %}
     {% set planned_x = ML + (b.x_planned_cost_finish / tcd * PW) %}
     {% set inefficiency_x = ML + (b.x_inefficiency_finish / tcd * PW) %}
-    {% set risk_x = ML + (b.x_risk_finish / tcd * PW) %}
+    {% set pace_x = ML + (b.x_pace_finish / tcd * PW) %}
+    {% set ratio_x = ML + (b.x_ratio_finish / tcd * PW) %}
     {% set exhaustion_x = ML + (b.x_budget_exhaustion / tcd * PW) %}
     {# Build SVG polyline points strings from the stepped (offset, value) tuples. #}
     {% macro _polyline_points(pts) %}{% for p in pts %}{{ ML + (p[0] / tcd * PW) }},{{ MT + PH - (p[1] / ind * PH) }} {% endfor %}{% endmacro %}
@@ -414,17 +415,17 @@
          style="grid-column: span 4; padding:18px 20px; cursor:pointer; position:relative;">
         <div class="label" style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
             <span>Budget Burndown <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></span>
-            <div style="display:inline-flex; gap:14px; align-items:center;">
-                <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;"
-                       title="Default view zooms the chart to today → chart-end so the conversation is about runway and projected finish dates. Untick to extend the chart back to project start and see the historical actual-burn line.">
-                    <input type="checkbox" id="burndown-view-forward" checked style="margin:0;">
-                    View from today
-                </label>
-                <label class="muted" style="font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;"
-                       title="Adds a worst-case finish line ('+open risks') based on every open risk landing at full impact on top of the inefficiency-adjusted projection. Open risk impact dollars convert to days at the current daily burn rate; that many additional days of work get added past the inefficiency finish. Realised risks are NOT added — they're already in past spend.">
-                    <input type="checkbox" id="burndown-show-risk" checked style="margin:0;">
-                    Include open-risk projection
-                </label>
+            <div class="burndown-toggles" style="display:inline-flex; gap:8px; align-items:center;">
+                <button type="button" class="pill-toggle" data-burndown-toggle="view-forward" role="switch" aria-checked="true"
+                        title="Default view zooms the chart to today → chart-end so the conversation is about runway and projected finish dates. Switch off to extend the chart back to project start and see the historical actual-burn line.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">View from today</span>
+                </button>
+                <button type="button" class="pill-toggle" data-burndown-toggle="lever-decomposition" role="switch" aria-checked="true"
+                        title="Shows the +pace and +ratio markers — single-lever projections that isolate which axis is moving the finish date. +pace asks 'where would scope land if pace were the only issue?'; +ratio asks 'where would scope land if productivity were the only issue?'. Useful for diagnosing whether a status-meeting pivot conversation is about staffing/timeline (pace) or focus/scope (productivity). Switch off to declutter the chart back to scope + inefficiency only.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">Show lever decomposition</span>
+                </button>
             </div>
         </div>
         <div class="value" style="font-size:14px; font-weight:500; margin-top:2px;">
@@ -508,26 +509,48 @@
             <text x="{{ inefficiency_x }}" y="{{ zero_y + 46 }}" font-size="10" fill="var(--warn)" text-anchor="middle" font-weight="600"><title>Inefficiency-adjusted scope finish — {{ b.inefficiency_finish.isoformat() }}.</title>+inefficiency</text>
             {% endif %}
 
-            {# Risk-included finish (red) — toggleable group. Vertical
-               always full-height; circle only if still on the projection
-               line. When risk_finish is past budget exhaustion, the area
-               between exhaustion and the risk vertical is shaded as a
-               "deficit" zone (subtle red stripes along the X axis) so the
-               viewer can see scope is finishing past where budget runs out. #}
-            {% if risk_x > inefficiency_x %}
-            {% set ry = _project_y(risk_x) | float %}
-            <g class="risk-projection">
-                {% if risk_x > exhaustion_x %}
+            {# Lever-decomposition markers — single-axis projections that
+               isolate which lever (pace or productivity) is moving the
+               finish date. Toggleable as a group so the chart can be
+               simplified back to the headline scope/inefficiency view.
+               Each marker has its own colour and is rendered only when
+               it differs meaningfully from the planned-cost finish. #}
+
+            {# +pace — pace is the only issue (productivity at plan).
+               Coloured info-blue to echo the actual-line colour, since
+               this projection is about burn behaviour. #}
+            {% if pace_x > planned_x + 1 %}
+            {% set py_pace = _project_y(pace_x) | float %}
+            <g class="lever-projection">
+                <line x1="{{ pace_x }}" x2="{{ pace_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
+                      stroke="var(--info)" stroke-width="1.5" stroke-dasharray="3 2"/>
+                {% if pace_x <= exhaustion_x %}
+                <circle cx="{{ pace_x }}" cy="{{ py_pace }}" r="3" fill="var(--info)"/>
+                {% endif %}
+                <text x="{{ pace_x }}" y="{{ zero_y + 60 }}" font-size="10" fill="var(--info)" text-anchor="middle" font-weight="600"><title>+pace finish — {{ b.pace_finish.isoformat() }}. Where scope lands if PACE is the only issue: actual cumulative burn per business day ({{ b.actual_daily_pace | currency }}/day vs full-team {{ b.daily_burn | currency }}/day) but productivity at planned rates. If this is later than scope, pace is part of the diagnosis (team availability, sick leave, partial weeks).</title>+pace</text>
+            </g>
+            {% endif %}
+
+            {# +ratio — productivity is the only issue (pace at plan).
+               Coloured red — typically the most pessimistic of the four
+               markers because it includes both unexplained drag and
+               realised-risk pattern drag. When ratio_finish is past
+               budget exhaustion, the area between exhaustion and the
+               ratio vertical is shaded as a "deficit" zone. #}
+            {% if ratio_x > planned_x + 1 %}
+            {% set py_ratio = _project_y(ratio_x) | float %}
+            <g class="lever-projection">
+                {% if ratio_x > exhaustion_x %}
                 <rect x="{{ exhaustion_x }}" y="{{ zero_y - 6 }}"
-                      width="{{ risk_x - exhaustion_x }}" height="6"
+                      width="{{ ratio_x - exhaustion_x }}" height="6"
                       fill="oklch(from var(--bad) l c h / 0.25)"/>
                 {% endif %}
-                <line x1="{{ risk_x }}" x2="{{ risk_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
+                <line x1="{{ ratio_x }}" x2="{{ ratio_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
                       stroke="var(--bad)" stroke-width="1.5"/>
-                {% if risk_x <= exhaustion_x %}
-                <circle cx="{{ risk_x }}" cy="{{ ry }}" r="3.5" fill="var(--bad)"/>
+                {% if ratio_x <= exhaustion_x %}
+                <circle cx="{{ ratio_x }}" cy="{{ py_ratio }}" r="3.5" fill="var(--bad)"/>
                 {% endif %}
-                <text x="{{ risk_x }}" y="{{ MT - 6 }}" font-size="10" fill="var(--bad)" text-anchor="middle" font-weight="600"><title>Worst-case finish if all open risks land — {{ b.risk_finish.isoformat() }}.</title>+risks</text>
+                <text x="{{ ratio_x }}" y="{{ zero_y + 74 }}" font-size="10" fill="var(--bad)" text-anchor="middle" font-weight="600"><title>+ratio finish — {{ b.ratio_finish.isoformat() }}. Where scope lands if PRODUCTIVITY is the only issue: pace at plan but feature efficiency at the historical ratio ({{ b.feature_efficiency_pct | round(1) }}% feature, {{ b.non_feature_ratio_pct | round(1) }}% non-feature). Includes both unexplained drag and realised-risk-pattern drag — the gap between this and +inefficiency is the realised-risk component.</title>+ratio</text>
             </g>
             {% endif %}
 
@@ -551,8 +574,19 @@
                 <strong style="color:var(--warn);">{{ b.inefficiency_finish.isoformat() }}</strong>
             </span>
             {% endif %}
-            {% if b.risk_finish > b.inefficiency_finish %}
-            <span class="risk-projection-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Worst-case finish if every open risk lands at full impact, on top of the inefficiency-adjusted timeline. Toggle 'Include open-risk projection' to hide."><span aria-hidden="true" style="width:2px; height:11px; background:var(--bad);"></span><span class="muted">+open risks</span><strong style="color:var(--bad);">{{ b.risk_finish.isoformat() }}</strong></span>
+            {% if b.pace_finish > b.planned_cost_finish %}
+            <span class="lever-projection-legend" style="display:inline-flex; align-items:center; gap:5px;" title="+pace finish: where scope lands if PACE alone is the issue. Actual cumulative pace ({{ b.actual_daily_pace | currency }}/day) extrapolated forward, with productivity at planned rates. The gap between this and 'Scope finish' is the cost (in days) of the current pace deviation. Toggle 'Show lever decomposition' to hide.">
+                <span aria-hidden="true" style="width:2px; height:11px; background:var(--info); border-left:1px dashed var(--info);"></span>
+                <span class="muted">+pace</span>
+                <strong style="color:var(--info);">{{ b.pace_finish.isoformat() }}</strong>
+            </span>
+            {% endif %}
+            {% if b.ratio_finish > b.planned_cost_finish %}
+            <span class="lever-projection-legend" style="display:inline-flex; align-items:center; gap:5px;" title="+ratio finish: where scope lands if PRODUCTIVITY alone is the issue. Burn at full-team planned pace, but feature delivery at the historical {{ (100 - b.non_feature_ratio_pct) | round(1) }}% feature / {{ b.non_feature_ratio_pct | round(1) }}% non-feature ratio. Includes realised-risk-pattern drag (the part +inefficiency excludes), so newly-opening risks are absorbed implicitly. Toggle 'Show lever decomposition' to hide.">
+                <span aria-hidden="true" style="width:2px; height:11px; background:var(--bad);"></span>
+                <span class="muted">+ratio</span>
+                <strong style="color:var(--bad);">{{ b.ratio_finish.isoformat() }}</strong>
+            </span>
             {% endif %}
         </div>
     </div>
@@ -758,11 +792,14 @@
 
    Mirrors the agile status-meeting "how does this impact our ability
    to reach our goals?" beat (script Q5). Walks through what the chart
-   shows, when the budget runs out at current pace, the three scope-
-   finish dates (planned-cost / +inefficiency / +open risks), the
+   shows, when the budget runs out at current pace, the four scope-
+   finish dates (planned-cost / +inefficiency / +pace / +ratio), the
    comparison against the project end date, the meaning of the
    inefficiency factor, and a synthesis paragraph that names which
-   pivot lever (scope, timeline, or budget) is most under pressure. #}
+   pivot lever (scope, timeline, or budget) is most under pressure.
+   Pace and ratio are surfaced as separate single-lever projections so
+   the meeting can diagnose which axis is hurting (vs. lumping them
+   into a single "trend" figure that hides which lever to pull). #}
 {% if burndown %}
 {% set b_today = burndown.today_days %}
 {% set b_initial = burndown.initial_days %}
@@ -770,13 +807,19 @@
 {% set b_exhaust = burndown.budget_exhaustion %}
 {% set b_planned = burndown.planned_cost_finish %}
 {% set b_inefficient = burndown.inefficiency_finish %}
-{% set b_risky = burndown.risk_finish %}
+{% set b_pace_finish = burndown.pace_finish %}
+{% set b_ratio_finish = burndown.ratio_finish %}
+{% set b_pace_rate = burndown.actual_daily_pace %}
+{% set b_pace_delta_pct = ((b_pace_rate - b_burn) / b_burn * 100) if b_burn > 0 else 0 %}
+{% set b_feature_eff_pct = burndown.feature_efficiency_pct %}
+{% set b_non_feature_pct = burndown.non_feature_ratio_pct %}
 {% set b_end = burndown.end_date %}
 {% set b_factor = burndown.inefficiency_factor %}
 {% set b_unrealised_ratio = burndown.unrealised_ratio_pct %}
-{% set b_open_days = burndown.open_risk_days %}
 {% set b_planned_days = burndown.planned_cost_days %}
 {% set b_inefficient_days = burndown.inefficiency_days %}
+{% set b_pace_days = burndown.pace_days %}
+{% set b_ratio_days = burndown.ratio_days %}
 <dialog id="burndown-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -798,23 +841,30 @@
                 There are <strong style="color:{{ days_color }};">{{ b_today | days }}d</strong> of full-team runway left. At today's burn of <strong>{{ b_burn | currency }}/day</strong>, that runway exhausts on <strong>{{ b_exhaust.isoformat() }}</strong> — where the projection line meets the X axis. This is the floor: no more money to spend after that, regardless of what's left to deliver.
             </p>
 
-            {# Q3 — when does scope finish? Three estimates. #}
+            {# Q3 — when does scope finish? Best case + lever decomposition. #}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">When will scope finish?</span>
-                The chart shows three increasingly pessimistic finish estimates:
+                The chart shows up to four finish estimates. The first two are the headline view; the last two break down which lever (pace or productivity) is moving the date — useful when diagnosing what to pivot on:
             </p>
             <ul style="margin:0; padding-left:20px; line-height:1.55;">
                 <li style="margin-bottom:4px;">
-                    <strong style="color:var(--good);">Scope finish ({{ b_planned.isoformat() }})</strong> — best case. Today plus the {{ b_planned_days | days }}d needed to deliver remaining feature work at planned rates. Assumes the team is fully productive on features from here.
+                    <strong style="color:var(--good);">Scope finish ({{ b_planned.isoformat() }})</strong> — best case. Today plus the {{ b_planned_days | days }}d needed to deliver remaining feature work at planned rates. Assumes pace AND productivity match plan exactly.
                 </li>
                 {% if b_inefficient > b_planned %}
                 <li style="margin-bottom:4px;">
-                    <strong style="color:var(--warn);">+inefficiency ({{ b_inefficient.isoformat() }})</strong> — adjusts for the historical bleed. {{ b_unrealised_ratio | round(1) }}% of past spend has been unrealised (work in flight, rework, exploration), so the same fraction is assumed forward, applying a <strong>{{ b_factor | round(2) }}×</strong> burn multiplier to remaining work. This is the realistic-case finish.
+                    <strong style="color:var(--warn);">+inefficiency ({{ b_inefficient.isoformat() }})</strong> — adjusts for the historical unexplained-spend bleed. {{ b_unrealised_ratio | round(1) }}% of past spend has been unrealised (work in flight, rework, exploration), so the same fraction is assumed forward, applying a <strong>{{ b_factor | round(2) }}×</strong> burn multiplier to remaining work. Realised-risk drag is NOT included here — see +ratio below for that. This is the realistic-case finish under "things attribute properly going forward".
                 </li>
                 {% endif %}
-                {% if b_risky > b_inefficient %}
+                {% if b_pace_finish > b_planned %}
+                <li style="margin-bottom:4px;">
+                    <strong style="color:var(--info);">+pace ({{ b_pace_finish.isoformat() }})</strong> — pace as the only issue. If productivity matched plan but the team kept burning at the historical pace of <strong>{{ b_pace_rate | currency }}/day</strong>
+                    {% if b_pace_delta_pct < -0.5 %}({{ '%+.1f' % b_pace_delta_pct }}% vs full-team {{ b_burn | currency }}/day — under-burn from sick leave, partial weeks, or below-plan staffing){% elif b_pace_delta_pct > 0.5 %}({{ '%+.1f' % b_pace_delta_pct }}% vs full-team {{ b_burn | currency }}/day — over-burn from extra hands or longer days){% endif %},
+                    scope would finish on this date. The gap between this and the Scope finish is the cost of the pace deviation. If pace is fine, this marker won't appear.
+                </li>
+                {% endif %}
+                {% if b_ratio_finish > b_planned %}
                 <li>
-                    <strong style="color:var(--bad);">+open risks ({{ b_risky.isoformat() }})</strong> — worst case. Adds {{ b_open_days | days }}d of runway absorption if every open risk lands at full impact, layered onto the inefficiency-adjusted timeline.
+                    <strong style="color:var(--bad);">+ratio ({{ b_ratio_finish.isoformat() }})</strong> — productivity as the only issue. If pace matched plan but the team kept producing features at the historical efficiency of <strong>{{ b_feature_eff_pct | round(1) }}%</strong> (i.e. {{ b_non_feature_pct | round(1) }}% of spend going on non-feature work — realised risks, unexplained, exploration), scope would finish on this date. Includes both the unexplained drag (which +inefficiency captures) AND the realised-risk pattern drag — so the gap between this and +inefficiency is the realised-risk component, projected forward as new risks continue to emerge. If the productivity ratio is fine, this marker won't appear.
                 </li>
                 {% endif %}
             </ul>
@@ -822,11 +872,11 @@
             {# Q4 — does scope finish before the budget runs out, and before the end date? #}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Does scope land safely?</span>
-                {% set worst_finish = b_risky if b_risky > b_inefficient else b_inefficient %}
+                {% set worst_finish = [b_inefficient, b_pace_finish, b_ratio_finish] | max %}
                 {% if worst_finish <= b_exhaust %}
-                Even the worst-case finish ({{ worst_finish.isoformat() }}) lands before the budget runs out ({{ b_exhaust.isoformat() }}) — there's headroom to absorb the inefficiency drag and any open risks landing.
+                Even the most pessimistic single-lever finish ({{ worst_finish.isoformat() }}) lands before the budget runs out ({{ b_exhaust.isoformat() }}) — there's headroom for the project to keep behaving as it has been and still finish in budget.
                 {% elif b_inefficient <= b_exhaust %}
-                The realistic-case finish ({{ b_inefficient.isoformat() }}) is within budget, but the open-risk worst case ({{ b_risky.isoformat() }}) overruns the exhaustion date by some days — mitigation of open risks is what keeps the project on the safe side of that line.
+                The realistic-case finish ({{ b_inefficient.isoformat() }}) is within budget, but at least one lever (pace or productivity) extrapolates past the exhaustion date — see the diagnosis below for which one to focus on.
                 {% elif b_planned <= b_exhaust %}
                 Best-case scope finish ({{ b_planned.isoformat() }}) just clears the budget exhaustion, but once inefficiency is factored in ({{ b_inefficient.isoformat() }}) the project would run out of money before scope is delivered. A pivot is likely needed.
                 {% else %}
@@ -867,8 +917,18 @@
                     {% elif b_end is not none and b_inefficient > b_end %}
                         {% set _ = pivot_points.append("The realistic finish overshoots the project end date even though the budget would cover it. Worth flagging early — either adjust the date, cut scope, or accept the inefficiency drag as the cost of staying on plan.") %}
                     {% endif %}
-                    {% if b_risky > b_exhaust and b_inefficient <= b_exhaust %}
-                        {% set _ = pivot_points.append("Open risks are the only thing that pushes scope past the budget exhaustion date. Mitigating or accepting individual open risks is a cheaper conversation than a scope/timeline/budget pivot.") %}
+                    {# Lever-decomposition diagnosis: distinguish whether
+                       pace, productivity, or both are pushing scope past
+                       the budget exhaustion date. Only fires when at
+                       least one lever fails the budget test. #}
+                    {% set pace_overruns = b_pace_finish > b_exhaust %}
+                    {% set ratio_overruns = b_ratio_finish > b_exhaust %}
+                    {% if pace_overruns and ratio_overruns %}
+                        {% set _ = pivot_points.append("Both pace and productivity, on their own, push scope past the budget exhaustion date — the project is squeezed on both axes. Tightening only one won't be enough; the conversation is whether to (a) staff up while also tightening attribution and risk handling, or (b) cut scope. Topping up the budget is the third option.") %}
+                    {% elif pace_overruns %}
+                        {% set _ = pivot_points.append("Pace is the lever pushing scope past the budget exhaustion date — productivity alone (the +ratio finish) would still fit in budget. The conversation is about team availability: are people on this project as fully as planned, or are partial weeks / sick leave / shared resources eating into burn? Productivity is fine; staffing isn't.") %}
+                    {% elif ratio_overruns %}
+                        {% set _ = pivot_points.append("Productivity is the lever pushing scope past the budget exhaustion date — pace alone (the +pace finish) would still fit in budget. The conversation is about where time is going: " ~ (b_non_feature_pct | round(1) | string) ~ "% of spend has been on non-feature work (realised risks, work-in-flight, exploration). Investigating that share — and whether it can be reduced — is the leverage point. Pace is fine; focus isn't.") %}
                     {% endif %}
                     {% if b_factor >= 1.4 %}
                         {% set _ = pivot_points.append("The inefficiency multiplier is ≥1.4× — a meaningful share of spend is going on non-feature work. Investigating where that time is going (and whether it's necessary) is likely a higher-leverage move than touching scope or budget.") %}
@@ -1346,41 +1406,21 @@ function toggleStarted(projectId, featureId, btn) {
 })();
 
 (function() {
-    // Burndown chart — toggle the risk-projection group on/off. Persists
-    // per-project. Default: on.
+    // Burndown chart — pill toggles for "View from today" and "Show
+    // lever decomposition", plus card-click → modal. Both toggles use
+    // the role="switch" / aria-checked pattern from the Overall
+    // Completion hero card so the styling and interaction stay
+    // consistent. Each toggle's preference is persisted per-project.
     const card = document.getElementById('hero-burndown');
     if (!card) return;
-    const KEY = 'burndown_show_risk_{{ project.id }}';
-    const cb = card.querySelector('#burndown-show-risk');
-    if (!cb) return;
-    const saved = localStorage.getItem(KEY);
-    if (saved === '0') cb.checked = false;
-    function apply() {
-        const show = cb.checked;
-        card.querySelectorAll('.risk-projection, .risk-projection-legend').forEach(el => {
-            el.style.display = show ? '' : 'none';
-        });
-    }
-    apply();
-    cb.addEventListener('change', () => {
-        apply();
-        try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) {}
-    });
-})();
+    const modal = document.getElementById('burndown-modal');
 
-(function() {
-    // Burndown chart — "View from today" toggle. Default ON. When on, the
-    // SVG viewBox is cropped to today → chart-end so the conversation is
-    // about runway and projected finish dates, not history. The y-axis
-    // tick-label group (and the rotated axis title) are translated
-    // rightward to stay adjacent to the cropped left edge of the visible
-    // plot. The historical-actual line and start-date label fall outside
-    // the viewBox automatically; nothing else has to be hidden explicitly.
-    const card = document.getElementById('hero-burndown');
-    if (!card) return;
-    const cb = card.querySelector('#burndown-view-forward');
-    if (!cb) return;
-    const KEY = 'burndown_view_forward_{{ project.id }}';
+    // ── View-from-today toggle ──────────────────────────────────────
+    // Crops the SVG viewBox to today → chart-end and shifts the y-axis
+    // labels to sit next to the cropped left edge. The historical-actual
+    // line and start-date label fall outside the viewBox automatically.
+    const VIEW_KEY = 'burndown_view_forward_{{ project.id }}';
+    const viewBtn = card.querySelector('[data-burndown-toggle="view-forward"]');
     const svg = card.querySelector('svg');
     const yLabels = svg && svg.querySelector('.y-axis-labels');
     const yTitle = svg && svg.querySelector('.y-axis-title');
@@ -1388,28 +1428,27 @@ function toggleStarted(projectId, featureId, btn) {
     const todayX = parseFloat(card.dataset.todayX);
     const chartW = parseFloat(card.dataset.chartW);
     const chartH = parseFloat(card.dataset.chartH);
-    // Y-axis title rotates around its original (x, y); preserve that pivot
-    // so the rotation stays correct when we add a translate.
+    // Y-axis title rotates around its original (x, y); preserve that
+    // pivot so rotation stays correct when we add a translate.
     const titleCx = yTitle ? parseFloat(yTitle.getAttribute('x')) : 14;
     const titleCy = yTitle ? parseFloat(yTitle.getAttribute('y')) : chartH / 2;
     // Reserve enough left padding inside the cropped viewBox for the
     // y-axis label gutter (matches ML=60 in the original layout).
     const Y_GUTTER = 60;
 
-    const saved = localStorage.getItem(KEY);
-    if (saved === '0') cb.checked = false;
+    let viewForward = true;
+    try { if (localStorage.getItem(VIEW_KEY) === '0') viewForward = false; } catch (e) {}
 
-    function apply() {
-        const forward = cb.checked;
-        card.setAttribute('data-burndown-view', forward ? 'forward' : 'full');
+    function applyView() {
+        if (viewBtn) viewBtn.setAttribute('aria-checked', viewForward ? 'true' : 'false');
+        card.setAttribute('data-burndown-view', viewForward ? 'forward' : 'full');
         if (!svg) return;
-        if (forward && todayX > Y_GUTTER) {
+        if (viewForward && todayX > Y_GUTTER) {
             const newLeft = todayX - Y_GUTTER;
             svg.setAttribute('viewBox', `${newLeft} 0 ${chartW - newLeft} ${chartH}`);
-            const tx = newLeft;
-            if (yLabels) yLabels.setAttribute('transform', `translate(${tx}, 0)`);
+            if (yLabels) yLabels.setAttribute('transform', `translate(${newLeft}, 0)`);
             if (yTitle) yTitle.setAttribute('transform',
-                `translate(${tx}, 0) rotate(-90 ${titleCx} ${titleCy})`);
+                `translate(${newLeft}, 0) rotate(-90 ${titleCx} ${titleCy})`);
             if (histLegend) histLegend.style.display = 'none';
         } else {
             svg.setAttribute('viewBox', `0 0 ${chartW} ${chartH}`);
@@ -1418,30 +1457,61 @@ function toggleStarted(projectId, featureId, btn) {
             if (histLegend) histLegend.style.display = '';
         }
     }
-    apply();
-    cb.addEventListener('change', () => {
-        apply();
-        try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) {}
-    });
-})();
 
-(function() {
-    // Budget Burndown hero card → modal. Same dialog pattern as the
-    // other hero cards. Clicks inside the toggle labels (View from
-    // today / Include open-risk projection) pass through to the
-    // checkboxes and don't open the modal.
-    const card = document.getElementById('hero-burndown');
-    const modal = document.getElementById('burndown-modal');
-    if (!card || !modal) return;
+    // ── Lever-decomposition toggle ──────────────────────────────────
+    // Hides the +pace and +ratio markers + their legend entries. The
+    // headline scope and +inefficiency markers are unaffected.
+    const LEVER_KEY = 'burndown_show_lever_{{ project.id }}';
+    const leverBtn = card.querySelector('[data-burndown-toggle="lever-decomposition"]');
+    let showLevers = true;
+    try { if (localStorage.getItem(LEVER_KEY) === '0') showLevers = false; } catch (e) {}
+
+    function applyLevers() {
+        if (leverBtn) leverBtn.setAttribute('aria-checked', showLevers ? 'true' : 'false');
+        card.querySelectorAll('.lever-projection, .lever-projection-legend').forEach(el => {
+            el.style.display = showLevers ? '' : 'none';
+        });
+    }
+
+    applyView();
+    applyLevers();
+
+    // Pill-toggle click handlers — stop propagation so the card-click
+    // (which opens the modal) doesn't fire.
+    if (viewBtn) {
+        viewBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            viewForward = !viewForward;
+            applyView();
+            try { localStorage.setItem(VIEW_KEY, viewForward ? '1' : '0'); } catch (e) {}
+        });
+        viewBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); viewBtn.click(); }
+        });
+    }
+    if (leverBtn) {
+        leverBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showLevers = !showLevers;
+            applyLevers();
+            try { localStorage.setItem(LEVER_KEY, showLevers ? '1' : '0'); } catch (e) {}
+        });
+        leverBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); leverBtn.click(); }
+        });
+    }
+
+    // ── Card → modal ────────────────────────────────────────────────
+    if (!modal) return;
     function open() {
         if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
     }
     card.addEventListener('click', (e) => {
-        if (e.target.closest('label, input')) return;
+        if (e.target.closest('[data-burndown-toggle]')) return;
         open();
     });
     card.addEventListener('keydown', (e) => {
-        if (e.target.closest('label, input')) return;
+        if (e.target.closest('[data-burndown-toggle]')) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
     modal.addEventListener('click', (e) => {

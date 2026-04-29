@@ -714,17 +714,31 @@ def agile_burndown_chart_data(
 
     X-axis: calendar dates from project start through the latest projection.
 
-    Three "scope-finish" projections, each at increasing pessimism:
-      * planned-cost  : remaining_dollars / daily_burn business days from now.
-                        Assumes future spend converts to features at planned
-                        rates with no inefficiency.
-      * inefficiency  : applies the historical unrealised-spend bleed factor
-                        (= 1 / (1 − unrealised_spend / actual_spend)) so the
-                        same fraction of future spend is assumed to vanish
-                        into work-in-flight, rework, etc.
-      * risk-included : adds open_risk_dollars / daily_burn additional days
-                        on top of the inefficiency-adjusted estimate. The
-                        worst-case "if everything that could go wrong does".
+    Four "scope-finish" projections — designed to decompose the levers
+    that move the finish date so a status meeting can diagnose which
+    one is hurting:
+      * planned-cost : best case. remaining_dollars / daily_burn business
+                       days from now. Assumes pace AND productivity match
+                       plan exactly.
+      * inefficiency : applies the historical unrealised-spend bleed factor
+                       (= 1 / (1 − unrealised_spend / actual_spend)) so the
+                       same unexplained-spend fraction is assumed forward.
+                       Realised-risk drag is NOT included — see +ratio for
+                       that.
+      * pace         : "what if pace is the only issue?" — productivity at
+                       planned rates, but burn at the actual cumulative
+                       pace so far (actual_spend / bd_elapsed). Encodes
+                       the spend-delta. If this is later than scope, pace
+                       is part of the diagnosis (team availability, etc.).
+      * ratio        : "what if productivity is the only issue?" — burn
+                       at full-team planned pace, but feature delivery at
+                       the historical feature-vs-non-feature ratio
+                       (earned_value / actual_spend). Includes both
+                       unexplained drag AND realised-risk patterns —
+                       i.e. assumes new non-feature work, including
+                       newly-opening risks, keeps emerging at the same
+                       rate. If this is later than +inefficiency, the
+                       extra is the realised-risk-pattern component.
 
     Returns None if the project doesn't have enough data (no team size,
     no start/as-of dates) — callers should hide the chart in that case.
@@ -770,18 +784,67 @@ def agile_burndown_chart_data(
         inefficiency_factor = 1.0
 
     inefficiency_days = planned_cost_days * inefficiency_factor
-    risk_days = inefficiency_days + (open_risk / daily_burn if daily_burn > 0 else 0.0)
+
+    # Business days elapsed so far — used by the lever-decomposition
+    # projections below and by the historical actual-line shaping further
+    # down.
+    bd_elapsed = business_days_between(start, as_of)
+
+    # Lever decomposition — two single-lever projections that let a
+    # status meeting see which axis is moving the finish date:
+    #
+    #   +pace  : finish date if PACE is the only issue (productivity at
+    #            plan). Burn rate = actual cumulative pace so far. If
+    #            this is later than the planned-cost finish, pace is
+    #            part of the story (team under-staffed, sick leave,
+    #            partial weeks, etc.). If equal, pace is on plan.
+    #
+    #   +ratio : finish date if PRODUCTIVITY is the only issue (pace at
+    #            plan). Bleed factor = 1 / feature_efficiency, where
+    #            feature_efficiency = earned_value / actual_spend. This
+    #            includes BOTH the unexplained-spend drag (which
+    #            +inefficiency also counts) AND the realised-risk-
+    #            pattern drag (which +inefficiency excludes). Comparing
+    #            +ratio against +inefficiency exposes the realised-risk
+    #            contribution to forward drag.
+    #
+    # Both fall back to planned_cost_days when the inputs are degenerate
+    # (no elapsed time, no earned value, no remaining work) so a marker
+    # still renders sensibly. Both are capped at 10× the planned-cost
+    # estimate to prevent extreme early-project values from blowing the
+    # chart out.
+
+    actual_daily_pace = (actual_spend / bd_elapsed) if bd_elapsed > 0 else daily_burn
+
+    if bd_elapsed > 0 and actual_spend > 0 and remaining_dollars_value > 0:
+        pace_days = remaining_dollars_value / actual_daily_pace
+        pace_days = min(pace_days, planned_cost_days * 10)
+    else:
+        pace_days = planned_cost_days
+
+    if actual_spend > 0 and earned_value > 0 and remaining_dollars_value > 0:
+        feature_efficiency = earned_value / actual_spend
+        ratio_days = planned_cost_days / feature_efficiency
+        ratio_days = min(ratio_days, planned_cost_days * 10)
+    else:
+        feature_efficiency = 1.0
+        ratio_days = planned_cost_days
+
+    # Non-feature share of historical spend — used in tooltips and the
+    # modal. Bounded to [0, 100] for safety.
+    non_feature_ratio_pct = max(0.0, min(100.0, ((actual_spend - earned_value) / actual_spend * 100) if actual_spend > 0 else 0.0))
 
     # Convert projection durations to calendar dates
     planned_cost_finish = add_business_days(as_of, planned_cost_days) if planned_cost_days > 0 else as_of
     inefficiency_finish = add_business_days(as_of, inefficiency_days) if inefficiency_days > 0 else as_of
-    risk_finish = add_business_days(as_of, risk_days) if risk_days > 0 else as_of
+    pace_finish = add_business_days(as_of, pace_days) if pace_days > 0 else as_of
+    ratio_finish = add_business_days(as_of, ratio_days) if ratio_days > 0 else as_of
 
     # Where the projection line hits zero (budget exhausted at full-team burn)
     budget_exhaustion = add_business_days(as_of, today_days)
 
     # X-axis range: from start through the last meaningful date
-    candidates = [end, planned_cost_finish, inefficiency_finish, risk_finish, budget_exhaustion]
+    candidates = [end, planned_cost_finish, inefficiency_finish, pace_finish, ratio_finish, budget_exhaustion]
     chart_end = max([d for d in candidates if d is not None], default=as_of)
     # Add a small padding so markers near the right edge aren't clipped
     chart_end_padded = chart_end + timedelta(days=7)
@@ -816,7 +879,6 @@ def agile_burndown_chart_data(
     # spend-delta from informal time off shows up as overall slope rather
     # than per-week jaggedness. Falls back to a flat line when there's no
     # capacity history or when the modelled total is zero.
-    bd_elapsed = business_days_between(start, as_of)
     consumed_days = initial_days - today_days
     historical_caps = capacity_periods or []
     week_burns: dict[date, float] = {}
@@ -879,13 +941,18 @@ def agile_burndown_chart_data(
         "today_days": today_days,
         "planned_cost_finish": planned_cost_finish,
         "inefficiency_finish": inefficiency_finish,
-        "risk_finish": risk_finish,
+        "pace_finish": pace_finish,
+        "ratio_finish": ratio_finish,
         "budget_exhaustion": budget_exhaustion,
         "planned_cost_days": planned_cost_days,
         "inefficiency_days": inefficiency_days,
-        "risk_days_total": risk_days,
+        "pace_days": pace_days,
+        "ratio_days": ratio_days,
         "inefficiency_factor": inefficiency_factor,
         "unrealised_ratio_pct": unrealised_ratio * 100,
+        "non_feature_ratio_pct": non_feature_ratio_pct,
+        "feature_efficiency_pct": feature_efficiency * 100,
+        "actual_daily_pace": actual_daily_pace,
         "open_risk_days": (open_risk / daily_burn) if daily_burn > 0 else 0.0,
         "remaining_dollars": remaining_dollars_value,
         "open_risk": open_risk,
@@ -900,7 +967,8 @@ def agile_burndown_chart_data(
         "x_end": _days_offset(end),
         "x_planned_cost_finish": _days_offset(planned_cost_finish),
         "x_inefficiency_finish": _days_offset(inefficiency_finish),
-        "x_risk_finish": _days_offset(risk_finish),
+        "x_pace_finish": _days_offset(pace_finish),
+        "x_ratio_finish": _days_offset(ratio_finish),
         "x_budget_exhaustion": _days_offset(budget_exhaustion),
         # Stepped polyline points: each is (calendar_offset_days,
         # days_remaining). Flat across weekends, descend on weekdays —

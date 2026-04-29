@@ -73,16 +73,34 @@ Realised and open risks behave differently and must not be conflated:
 | State | Already absorbed | Potential, not yet landed |
 | Reflected in spend? | Yes (part of `actual_spend`) | No |
 | Reduces accessible? | Yes, indirectly via spend | No, but flags exposure |
-| Forward demand against runway? | **No** — already gone | **Yes** — could land |
+| Forward demand (single-question, deterministic) | **No** — already gone | **Yes** — could land |
+| Forward demand (trend extrapolation) | **Yes — as a *pattern*** | **Implicit** — assumed to keep emerging |
 | Visualisation | Solid red block (right) | Striped warning overlay |
 
-**Forward-demand calculations (e.g. "is the budget enough to finish") use
-`features + open_risks` only.** Adding realised risks would double-count —
-they've already eaten into the runway via spend.
+**Two different "forward demand" framings; pick the right one for the
+question being asked.**
 
-When realised risks are referenced in sub-rows or modals, frame them as
-*context about past spend* ("↳ realised-risk share of past spend: 17.2d"),
-never as a fresh deduction line.
+* **Deterministic forward demand** (e.g. budget-days-remaining "exposed
+  to open risks", overall-completion modal "after open-risk exposure,
+  is there headroom?"): use `features + open_risks` only. Adding
+  realised risks would double-count — they've already eaten into the
+  runway via spend.
+
+* **Trend forward demand** (e.g. burndown chart's `+ratio` finish):
+  extrapolate the *historical pattern* of spend forward. The
+  feature-vs-non-feature ratio is computed from `actual_spend` (which
+  includes realised risk impact), and the same share of future spend
+  is assumed to go on non-feature work. This implicitly accounts for
+  new risks opening over time without summing currently-known open
+  risks. Realised-risk *dollars* are not added — only the *ratio they
+  imply* is projected forward. The companion `+pace` finish does the
+  same for spend pace (actual cumulative burn per business day vs
+  full-team), so a meeting can diagnose whether pace, productivity,
+  or both are pushing the finish date out.
+
+When realised risks are referenced in sub-rows or modals (e.g.
+"realised-risk share of past spend: 17.2d"), frame them as *context
+about past spend*, never as a fresh deterministic deduction line.
 
 ---
 
