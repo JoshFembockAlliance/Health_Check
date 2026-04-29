@@ -13,35 +13,25 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 ## Enhancements to Existing
 
 ### Agile Project Dashboard Items
-- [ ] **Budget Burndown - Open Risk Projection** 
-I'd like to rework open risk projection. Currently, it uses open risks but actually, the truth of risks is that new ones open periodically. A better way to factor in risks going forward is to use both the spend delta and the ratio of spend that to features to determine a projected case for if money continues to be spent on things other than feature development at the current rate.  
-
-
-### Fixed Price Project Dashboard Items
-- [ ] **Burndown chart for fixed-price projects - projections** 
-The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
-
-- [ ] **Burndown chart for fixed-price projects - Toggles** 
-Switch from using checkboxes to the same style of pill toggle as Overall Completion uses.
-
 - [ ] **Net Accessible Budget Modal - Unrealised Spend**
 The modal lists a few items that unrealised spend could go toward but doesn't provide a solid metric for if it's a healthy amount of value to have in-flight at the time of the review. Because an agile sprint typically only includes enough items to finish them out during a single sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. More than that is unhealthy and should be discussed and accounted for. 
 
-### Settings
-- [x] **Page Layout and symbols restructure** 
-Move the visual settings lower down in the page below overheads as those are not frequently adjusted 
+### Fixed Price Project Dashboard Items - ignore for now
+- [ ] **Burndown chart for fixed-price projects - projections** 
+The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
 
+### Settings
 - [ ] **Project Symbols** 
 Remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. Add a few that are tech-industry relevant, evoking finances, industry, etc. 
 
 ### Features, Requirements & Deliverables
+- [ ] Ability to mark a Requirement as "expanded scope". A boolean value that defaults to negaive. Use the pill-shaped toggle rather than a checkbox. 
 
 ### Decision Register
 
 ### Capacity
 
 ### Inter-Project Navbar
-- [x] The side panel when collapsed does not show the project icons properly, only when expanded.
 
 ### General
 ### Demo Projects
