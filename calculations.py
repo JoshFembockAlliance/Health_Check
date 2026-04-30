@@ -1049,8 +1049,43 @@ def agile_burndown_chart_data(
     pace_finish = add_business_days(as_of, pace_days) if pace_days > 0 else as_of
     ratio_finish = add_business_days(as_of, ratio_days) if ratio_days > 0 else as_of
 
-    # Where the projection line hits zero (budget exhausted at full-team burn)
-    budget_exhaustion = add_business_days(as_of, today_days)
+    # Build per-week dollar burn for the projection walk.  Include all
+    # capacity periods (past, current, and future) so the current week's
+    # planned rate applies to its remaining days.  Overhead roles are excluded
+    # — their cost is already netted out of accessible_budget upstream.
+    proj_week_burns: dict[date, float] = {}
+    for cp in (capacity_periods or []):
+        if cp.get("role_category") == "overhead":
+            continue
+        monday = cp.get("week_monday")
+        if monday is None:
+            continue
+        proj_week_burns[monday] = proj_week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
+
+    # Projection line: from today onward, burning at the capacity-planned rate
+    # for each week.  Weeks with no capacity override burn at 1.0 budget-day
+    # per business day (the full-team reference rate).  Weeks with overrides
+    # burn faster or slower in proportion: burn_fraction = week_dollar_burn /
+    # daily_burn.  budget_exhaustion is the calendar date when remaining hits 0.
+    # Offsets are calendar days from project start, inlined here because
+    # _days_offset is defined later (after chart_end is known).
+    projection_points: list[tuple[int, float]] = [((as_of - start).days, today_days)]
+    remaining = today_days
+    current_proj = as_of
+    budget_exhaustion = as_of
+    for _ in range(3650):  # safety cap: max 10 years forward
+        if remaining <= 0:
+            break
+        current_proj += timedelta(days=1)
+        if current_proj.weekday() < 5:  # business day
+            monday = get_week_monday(current_proj)
+            if monday in proj_week_burns and daily_burn > 0:
+                burn_fraction = proj_week_burns[monday] / daily_burn
+            else:
+                burn_fraction = 1.0
+            remaining = max(0.0, remaining - burn_fraction)
+        projection_points.append(((current_proj - start).days, remaining))
+        budget_exhaustion = current_proj
 
     # X-axis range: from start through the last meaningful date
     candidates = [end, planned_cost_finish, inefficiency_finish, pace_finish, ratio_finish, budget_exhaustion]
@@ -1137,12 +1172,6 @@ def agile_burndown_chart_data(
         bd_to_end = business_days_between(start, end)
         plan_burn_per_bd = (initial_days / bd_to_end) if bd_to_end > 0 else 0.0
         plan_points = _stepped_polyline(0, _days_offset(end), initial_days, plan_burn_per_bd)
-
-    # Projection line: from today onward at full-team burn (1 budget day
-    # per business day), continues until budget hits zero (budget_exhaustion).
-    projection_points = _stepped_polyline(
-        _days_offset(as_of), _days_offset(budget_exhaustion), today_days, 1.0
-    )
 
     # Optional overhead-team baseline: a faint diagonal showing the linear
     return {

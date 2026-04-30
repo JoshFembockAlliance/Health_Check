@@ -19,6 +19,7 @@ from calculations import (
     capacity_plan_summary,
     capacity_budget_summary,
     projected_overhead_team_dollars,
+    agile_burndown_chart_data,
 )
 
 
@@ -1018,3 +1019,107 @@ class TestCapacityBudgetSummaryExcludesOverhead:
             default_team_size=5,
         )
         assert result["budget_days"] == pytest.approx(10.0)
+
+
+# ── agile_burndown_chart_data — capacity-aware projection ──────────────────
+
+def _minimal_project(start="2025-01-06", as_of="2025-04-28", team_size=10):
+    return {
+        "start_date": start,
+        "as_of_date": as_of,
+        "end_date": "2025-12-31",
+        "team_size": team_size,
+        "default_role_id": None,
+        "overhead_team_size": 0,
+        "default_overhead_role_id": None,
+        "initial_budget": 500_000.0,
+        "health_on_track_pct": 100.0,
+        "health_at_risk_pct": 80.0,
+    }
+
+
+def _minimal_summary(daily_burn=10_000.0, accessible=200_000.0, total=500_000.0):
+    return {
+        "daily_burn": daily_burn,
+        "accessible_budget": accessible,
+        "total_budget": total,
+        "overhead_dollars": 50_000.0,
+        "actual_spend": 250_000.0,
+        "allocated_dollars": 300_000.0,
+        "overall_completion": 60.0,
+        "realised_risk_dollars": 0.0,
+        "remaining_dollars": 100_000.0,
+        "open_risk_dollars": 0.0,
+    }
+
+
+class TestAgileBurndownCapacityProjection:
+    def test_no_capacity_periods_uses_default_slope(self):
+        # No overrides → projection should terminate at accessible / daily_burn
+        # business days, same as the old constant-slope behaviour.
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=10_000.0, accessible=50_000.0)
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        # accessible=50k, daily_burn=10k → 5 budget-days → 5 business days forward
+        from calculations import add_business_days
+        from datetime import date
+        expected_exhaustion = add_business_days(date(2025, 4, 28), 5)
+        assert result["budget_exhaustion"] == expected_exhaustion
+
+    def test_low_future_capacity_extends_budget_exhaustion(self):
+        # Future week with team_size=1 (vs default 10) → burns at 10% rate →
+        # budget lasts much longer than the constant-slope version.
+        project = _minimal_project(team_size=10)
+        summary = _minimal_summary(daily_burn=10_000.0, accessible=50_000.0)
+        # Capacity period covers the next week (Mon 2025-04-28 onward)
+        low_cap = [
+            {
+                "week_monday": date(2025, 4, 28),
+                "team_size": 1,
+                "day_rate": 1_000.0,  # 1 person × $1k = $1k/day vs $10k default
+                "role_category": "delivery",
+            }
+        ]
+        result = agile_burndown_chart_data(project, summary, capacity_periods=low_cap)
+        assert result is not None
+        from calculations import add_business_days
+        baseline_exhaustion = add_business_days(date(2025, 4, 28), 5)
+        # Low capacity → budget lasts longer than the default 5-day runway
+        assert result["budget_exhaustion"] > baseline_exhaustion
+
+    def test_high_future_capacity_shortens_budget_exhaustion(self):
+        # Future week with team_size=50 (vs default 10) → burns 5× faster →
+        # budget exhausted sooner than constant-slope version.
+        project = _minimal_project(team_size=10)
+        summary = _minimal_summary(daily_burn=10_000.0, accessible=50_000.0)
+        high_cap = [
+            {
+                "week_monday": date(2025, 4, 28),
+                "team_size": 50,
+                "day_rate": 1_000.0,  # 50 × $1k = $50k/day vs $10k default
+                "role_category": "delivery",
+            }
+        ]
+        result = agile_burndown_chart_data(project, summary, capacity_periods=high_cap)
+        assert result is not None
+        from calculations import add_business_days
+        baseline_exhaustion = add_business_days(date(2025, 4, 28), 5)
+        assert result["budget_exhaustion"] < baseline_exhaustion
+
+    def test_overhead_capacity_excluded_from_projection(self):
+        # Overhead-role capacity periods must not affect the projection slope.
+        project = _minimal_project(team_size=10)
+        summary = _minimal_summary(daily_burn=10_000.0, accessible=50_000.0)
+        overhead_cap = [
+            {
+                "week_monday": date(2025, 4, 28),
+                "team_size": 100,
+                "day_rate": 1_000.0,
+                "role_category": "overhead",
+            }
+        ]
+        result_overhead = agile_burndown_chart_data(project, summary, capacity_periods=overhead_cap)
+        result_none = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result_overhead is not None and result_none is not None
+        assert result_overhead["budget_exhaustion"] == result_none["budget_exhaustion"]
