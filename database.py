@@ -69,7 +69,7 @@ def init_db():
             "start_date": str,
             "as_of_date": str,
             "initial_budget": float,
-            "team_size": int,
+            "team_size": float,
             "actual_spend": float,
             "default_role_id": int,
             "health_on_track_pct": float,
@@ -94,6 +94,14 @@ def init_db():
         db["projects"].add_column("end_date", str, not_null_default="")
     if "project_type" not in existing_cols:
         db["projects"].add_column("project_type", str, not_null_default=PROJECT_TYPE_AGILE)
+    # Overhead-team defaults: parallel to team_size / default_role_id, but
+    # scoped to non-delivery (overhead-category) roles. Headcount × default
+    # overhead role rate is used to extrapolate projected overhead-team $
+    # for weeks past the planned capacity horizon. See DESIGN_RULES §1.
+    if "overhead_team_size" not in existing_cols:
+        db["projects"].add_column("overhead_team_size", int, not_null_default=0)
+    if "default_overhead_role_id" not in existing_cols:
+        db["projects"].add_column("default_overhead_role_id", int, not_null_default=0)
 
     # roles — named day-rate buckets. Now per-project so each engagement can
     # have its own rate card.
@@ -103,7 +111,15 @@ def init_db():
             "project_id": int,
             "name": str,
             "day_rate": float,
+            "category": str,
         }, pk="id", foreign_keys=[("project_id", "projects")])
+
+    # roles.category — 'delivery' (default) or 'overhead'. Overhead-category
+    # roles burn budget as pre-committed overhead instead of feature-delivery
+    # capacity (BAs, designers, SMEs, facilitators). See DESIGN_RULES §1.
+    role_cols = {col.name for col in db["roles"].columns}
+    if "category" not in role_cols:
+        db["roles"].add_column("category", str, not_null_default="delivery")
 
     # features → requirements → deliverables: three-tier work breakdown structure.
     if "features" not in db.table_names():
@@ -203,7 +219,7 @@ def init_db():
             "project_id": int,
             "week_start_date": str,
             "role_id": int,
-            "team_size": int,
+            "team_size": float,
         }, pk="id", foreign_keys=[("role_id", "roles"), ("project_id", "projects")])
 
     # PM Notes

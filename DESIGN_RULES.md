@@ -29,6 +29,23 @@ spend), so subtracting them again would double-count. See §3 for details.
 delivery. Showing them as "available days the team can fund" misleads PMs
 into promising deliverable runway that was never deliverable.
 
+**`overhead_dollars` decomposes into `fixed_overhead_dollars +
+overhead_team_dollars`.** Fixed overheads are manually-entered $ amounts in
+Settings → Overheads (PM retainer, tooling licences). Overhead team members
+are roles in Capacity / Settings flagged with `category='overhead'` (BAs,
+designers, SMEs, facilitators) — the projected total is derived from the
+capacity plan + project overhead defaults extrapolated to project end. Both
+share the same accessibility/feature-budget treatment (pre-committed,
+right-anchored on the bar). The split is purely for hero-card and modal
+clarity — toggling "Spend categories" on the Overall Completion bar
+splits the right-anchored overhead block into the two sub-blocks; merged,
+they read as a single overhead block. `daily_burn` is the *delivery-only*
+daily $ burn (the overhead team's full lifetime cost is already netted via
+`overhead_dollars`, so including their headcount in the runway denominator
+would double-count). The "happens over time" framing for overhead-team
+spend is a Burndown visualisation (faint dotted baseline) only — the
+accounting is up-front.
+
 `total_budget_days_remaining` and `budget_days_remaining` produce the same
 value under the current model. Keep both names available; the agile dashboard
 hero card label uses the `total_` form. Consolidate at a quieter time.

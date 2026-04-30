@@ -12,7 +12,7 @@
         <div class="page-title">{{ p.name }}</div>
         <div class="page-sub">
             {% if p.as_of_date %}As of {{ p.as_of_date }} · {% endif %}
-            {{ p.team_size }}-person team{% if s.elapsed_days %} · {{ s.elapsed_days }} business days elapsed{% endif %}
+            {{ '%g' % p.team_size }}-person team{% if s.elapsed_days %} · {{ s.elapsed_days }} business days elapsed{% endif %}
         </div>
     </div>
     <div class="page-actions">
@@ -75,9 +75,17 @@
             {# Pre-committed: overheads sit at the top — money that was never
                available for feature work in the first place. #}
             {% if s.overhead_dollars > 0 %}
-            <div class="row" title="Pre-committed to non-delivery costs (PM oversight, ceremonies, support). Reserved at project start; never available to redirect to features.">
+            <div class="row" title="Pre-committed to non-delivery costs (fixed overheads + overhead-team commitment). Reserved at project start; never available to redirect to features.">
                 <span class="lbl">Overheads <span class="muted tiny" style="font-size:10px;">(pre-committed)</span></span><span class="val">− {{ s.overhead_dollars | currency }}</span>
             </div>
+            {% if s.overhead_team_dollars > 0 and s.fixed_overhead_dollars > 0 %}
+            <div class="row" style="opacity:0.7;" title="Fixed-dollar overheads from Settings (PM retainer, tooling licences, etc.).">
+                <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Fixed overheads</span><span class="val tiny" style="font-size:11px;">{{ s.fixed_overhead_dollars | currency }}</span>
+            </div>
+            <div class="row" style="opacity:0.7;" title="Overhead team members (BAs, designers, SMEs, facilitators) — projected total cost over the project lifetime, derived from the capacity plan + overhead defaults. Burns linearly over time but treated as pre-committed for the dashboard math.">
+                <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Overhead team members</span><span class="val tiny" style="font-size:11px;">{{ s.overhead_team_dollars | currency }}</span>
+            </div>
+            {% endif %}
             {% endif %}
             {# Spent — total cash gone, with the three-way decomposition
                (feature delivery / realised risk / unexplained) as sub-rows
@@ -165,9 +173,27 @@
             <div class="target plan-marker" style="left: {{ wl_target_pct }}%"
                  title="On-track target — {{ s.feature_expected_burn_pct | pct }} of feature work should be delivered by now."></div>
             {% endif %}
+            {% set wl_fixed_overhead_pct = (s.fixed_overhead_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
+            {% set wl_overhead_team_pct = (s.overhead_team_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
+            {% set wl_overhead_team_realised_pct = (s.overhead_team_dollars_realised / wl_denom * 100) if wl_denom > 0 else 0 %}
+            {% set wl_overhead_team_remaining_pct = (s.overhead_team_dollars_remaining / wl_denom * 100) if wl_denom > 0 else 0 %}
+            {# Merged overhead view (when "Spend categories" toggle is OFF) — single block #}
             {% if wl_overhead_pct > 0 %}
-            <div class="bar-overhead" style="width: {{ wl_overhead_pct }}%; right: 0; left: auto;"
-                 title="Overheads — {{ s.overhead_dollars | currency }} pre-committed to non-feature work (PM oversight, ceremonies, support). Cannot be redirected to features."></div>
+            <div class="bar-overhead spend-merged" style="width: {{ wl_overhead_pct }}%; right: 0; left: auto;"
+                 title="Overheads — {{ s.overhead_dollars | currency }} pre-committed to non-feature work. Toggle 'Spend categories' to split into fixed overheads vs overhead team members."></div>
+            {% endif %}
+            {# Split overhead view (when "Spend categories" toggle is ON) — overhead team split into realised (to date) and remaining (projected), plus fixed overhead #}
+            {% if wl_overhead_team_remaining_pct > 0 %}
+            <div class="bar-overhead spend-detail" style="width: {{ wl_overhead_team_remaining_pct }}%; right: 0; left: auto; opacity:0.5;"
+                 title="Overhead team members (projected) — {{ s.overhead_team_dollars_remaining | currency }} projected from as-of date to project end."></div>
+            {% endif %}
+            {% if wl_overhead_team_realised_pct > 0 %}
+            <div class="bar-overhead spend-detail" style="width: {{ wl_overhead_team_realised_pct }}%; right: {{ wl_overhead_team_remaining_pct }}%; left: auto; opacity:0.75;"
+                 title="Overhead team members (to date) — {{ s.overhead_team_dollars_realised | currency }} accrued from project start to as-of date."></div>
+            {% endif %}
+            {% if wl_fixed_overhead_pct > 0 %}
+            <div class="bar-overhead spend-detail" style="width: {{ wl_fixed_overhead_pct }}%; right: {{ wl_overhead_team_pct }}%; left: auto;"
+                 title="Fixed overheads — {{ s.fixed_overhead_dollars | currency }} pre-committed to fixed non-delivery costs (PM retainer, tooling licences, etc.)."></div>
             {% endif %}
             {# Spend categories — segmented (when toggle ON) #}
             {% if wl_unrealised_pct > 0 %}
@@ -213,12 +239,20 @@
                     <strong>{{ earned_value | currency }}</strong>
                 </span>
                 {% if wl_overhead_pct > 0 %}
-                <span title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work."
+                <span class="spend-merged" title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work. Toggle 'Spend categories' to split fixed vs overhead-team."
                       style="display:inline-flex; align-items:center; gap:5px;">
                     <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
                     <span class="muted">Overheads</span>
                     <strong>{{ s.overhead_dollars | currency }}</strong>
                 </span>
+                {% if s.fixed_overhead_dollars > 0 %}
+                <span class="spend-detail" title="{{ s.fixed_overhead_dollars | currency }} fixed-dollar overheads."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
+                    <span class="muted">Fixed overheads</span>
+                    <strong>{{ s.fixed_overhead_dollars | currency }}</strong>
+                </span>
+                {% endif %}
                 {% endif %}
                 {% if wl_unrealised_pct == 0 and favourable_variance > 0 %}
                 <span title="Feature delivery ({{ earned_value | currency }}) plus realised risk impact ({{ s.realised_risk_dollars | currency }}) exceeds actual spend ({{ s.actual_spend | currency }}) — the team has produced more value-equivalent work than they've been paid for at planned rates. Favourable variance."
@@ -243,6 +277,22 @@
                     <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
                     <span class="pill-toggle-label">Spend categories</span>
                 </button>
+                {% if s.overhead_team_dollars_realised > 0 %}
+                <span class="spend-detail" title="{{ s.overhead_team_dollars_realised | currency }} overhead team spend accrued from project start to as-of date."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7); opacity:0.75;"></span>
+                    <span class="muted">Overhead team (to date)</span>
+                    <strong>{{ s.overhead_team_dollars_realised | currency }}</strong>
+                </span>
+                {% endif %}
+                {% if s.overhead_team_dollars_remaining > 0 %}
+                <span class="spend-detail" title="{{ s.overhead_team_dollars_remaining | currency }} overhead team spend projected from as-of date to project end."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7); opacity:0.5;"></span>
+                    <span class="muted">Overhead team (projected)</span>
+                    <strong>{{ s.overhead_team_dollars_remaining | currency }}</strong>
+                </span>
+                {% endif %}
                 {% if wl_unrealised_pct > 0 %}
                 <span class="spend-detail" title="Spend = feature delivery + realised risk + unrealised. {{ s.actual_spend | currency }} = {{ earned_value | currency }} + {{ s.realised_risk_dollars | currency }} + {{ unrealised_spend | currency }}. The unrealised portion is paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, non-feature work)."
                       style="display:inline-flex; align-items:center; gap:5px;">
@@ -334,7 +384,17 @@
             {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;" title="Working days from today to the project end date (Mon–Fri, weekends excluded). Apples-to-apples with the budget-days figure on the left.">of {{ days_to_end }} working days to end date</span>{% endif %}
         </div>
         <div class="sub-row">
-            <div class="row"><span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ p.team_size }} people</span></div>
+            <div class="row" title="Delivery-only daily burn. Overhead-team headcount is pre-committed as overhead and excluded from the runway denominator (its full $ has already been deducted from accessible budget upstream).">
+                <span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ '%g' % p.team_size }} people</span>
+            </div>
+            {% if s.overhead_team_dollars > 0 %}
+            <div class="row" style="opacity:0.7;" title="Delivery roles only — what feeds the runway calculation above.">
+                <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Delivery</span><span class="val tiny" style="font-size:11px;">{{ s.delivery_daily_burn | currency }}/day · {{ '%g' % s.delivery_team_size }} people</span>
+            </div>
+            <div class="row" style="opacity:0.7;" title="Overhead team members — context only. Their full lifetime cost is already pre-committed as overhead, so they don't reduce the day-count denominator.">
+                <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Overhead team</span><span class="val tiny" style="font-size:11px;">{{ s.overhead_daily_burn | currency }}/day · {{ s.overhead_team_headcount }} people</span>
+            </div>
+            {% endif %}
             {% set realised_risk_days = (s.realised_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
             {% set open_risk_days = (s.open_risk_dollars / s.daily_burn) if s.daily_burn else 0 %}
             {# Realised-risk days are already netted out via past spend, so the
@@ -464,7 +524,7 @@
             <text x="{{ end_x - 4 }}" y="{{ zero_y - 4 }}" font-size="10" fill="var(--muted)" text-anchor="end">plan</text>
             {% endif %}
 
-            {# Actual line (solid info colour) — stepped from start to today. #}
+{# Actual line (solid info colour) — stepped from start to today. #}
             <polyline points="{{ _polyline_points(b.actual_points) }}"
                       fill="none" stroke="var(--info)" stroke-width="2.5"/>
             <circle cx="{{ today_x }}" cy="{{ today_y }}" r="3.5" fill="var(--info)"/>
@@ -832,7 +892,11 @@
             {# Q1 — what's on the chart? #}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What is this chart showing?</span>
-                The Y axis is full-team budget days remaining (post-overhead — i.e. days the accessible budget can still fund the team for). The X axis is calendar dates from project start through the latest projected finish. Three lines tell the story: the dashed grey <em>plan</em> line is linear consumption from the start budget to zero on the project end date; the solid blue <em>actual</em> line is what's really been consumed up to today (shaped by per-week capacity history); the dashed dark <em>projection</em> line is full-team burn forward from today, ending when the budget runs out.
+                The Y axis is full-team budget days remaining (post-overhead — i.e. days the accessible budget can still fund the team for). The X axis is calendar dates from project start through the latest projected finish. Three lines tell the story: the dashed grey <em>plan</em> line is linear consumption from the start budget to zero on the project end date; the solid blue <em>actual</em> line is what's really been consumed up to today (shaped by per-week capacity history); the dashed dark <em>projection</em> line is delivery-team burn forward from today, ending when the budget runs out.
+                {% if burndown.overhead_team_dollars and burndown.overhead_team_dollars > 0 %}
+                A faint dotted line shows the linear consumption of the overhead-team commitment ({{ burndown.overhead_team_dollars | currency }}) from project start to project end — these dollars happen over time but are pre-committed for accessibility maths, so they don't shift the headline runway.
+                {% endif %}
+                The <strong>+pace</strong> and <strong>+ratio</strong> levers operate on delivery burn only; overhead-team burn is pre-committed and doesn't move with pace or productivity.
             </p>
 
             {# Q2 — where does the budget run out? #}
@@ -1012,6 +1076,9 @@
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What was reserved before any work started?</span>
                 <strong>{{ oh_n | currency }}</strong> ({{ (oh_n / tb_n * 100) | round(1) }}% of total budget) is allocated to overheads — PM oversight, ceremonies, support, and other non-delivery activities. This is pre-committed at project start and isn't available to redirect to features later, so it's the first deduction from the headline budget.
+                {% if s.overhead_team_dollars > 0 %}
+                That figure splits into <strong>{{ s.fixed_overhead_dollars | currency }}</strong> of fixed overheads (Settings) and <strong>{{ s.overhead_team_dollars | currency }}</strong> for overhead team members (BAs, designers, SMEs, facilitators) — derived from the capacity plan extrapolated to project end. Overhead-team time burns linearly through the project but is treated as pre-committed for accessibility and feature-delivery target maths because it was never expected to produce earned value.
+                {% endif %}
             </p>
             {% endif %}
 
@@ -1131,16 +1198,19 @@
             {# Q1 — runway #}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How many days can the budget fund?</span>
-                At the current burn rate of <strong>{{ s.daily_burn | currency }}/day</strong> for the
-                <strong>{{ p.team_size }}-person</strong> team,
+                At the delivery-team burn rate of <strong>{{ s.daily_burn | currency }}/day</strong> for the
+                <strong>{{ '%g' % p.team_size }}-person</strong> delivery team,
                 {% if s.overhead_dollars > 0 %}
                 the remaining budget of <strong>{{ s.current_budget | currency }}</strong> — after reserving
-                <strong>{{ s.overhead_dollars | currency }}</strong> for overheads that are committed regardless of burn rate — can fund
+                <strong>{{ s.overhead_dollars | currency }}</strong> for overheads that are committed regardless of burn rate{% if s.overhead_team_dollars > 0 %} (including <strong>{{ s.overhead_team_dollars | currency }}</strong> for overhead team members, who burn the budget over the project lifetime but never produce earned value){% endif %} — can fund
                 {% else %}
                 the remaining budget of <strong>{{ s.current_budget | currency }}</strong> can fund
                 {% endif %}
                 <strong style="color:{{ days_color }};">{{ runway_days | days }}d</strong>
                 of team-on-feature work.
+                {% if s.overhead_team_dollars > 0 %}
+                Overhead-team headcount is excluded from this denominator: their full lifetime cost has already been pre-committed as overhead, so adding them again would double-count and artificially shorten the runway.
+                {% endif %}
             </p>
 
             {# Q2 — vs end date #}
@@ -1271,7 +1341,7 @@
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Where has the budget been allocated?</span>
                 Of the <strong>{{ tb | currency }}</strong> total budget,
                 <strong>{{ s.allocated_dollars | currency }}</strong> ({{ (s.allocated_dollars / tb * 100) | round(1) }}%) is allocated to features,
-                <strong>{{ s.overhead_dollars | currency }}</strong> ({{ (s.overhead_dollars / tb * 100) | round(1) }}%) to overheads,
+                <strong>{{ s.overhead_dollars | currency }}</strong> ({{ (s.overhead_dollars / tb * 100) | round(1) }}%) to overheads{% if s.overhead_team_dollars > 0 %} (of which <strong>{{ s.overhead_team_dollars | currency }}</strong> is overhead team members and <strong>{{ s.fixed_overhead_dollars | currency }}</strong> is fixed overheads){% endif %},
                 <strong>{{ rv | currency }}</strong> ({{ (rv / tb * 100) | round(1) }}%) has been absorbed by realised risks,
                 and <strong>{{ s.unallocated_budget | currency }}</strong> ({{ (s.unallocated_budget / tb * 100) | round(1) }}%) is unallocated — free to direct to new scope, contingency, or risk absorption.
             </p>

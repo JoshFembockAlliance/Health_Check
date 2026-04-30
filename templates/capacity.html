@@ -11,28 +11,78 @@
     </div>
 </div>
 
+{% set delivery_roles = roles | selectattr('category', 'equalto', 'delivery') | list %}
+{% set overhead_roles = roles | selectattr('category', 'equalto', 'overhead') | list %}
+{# Roles seeded before the category column existed default to delivery; include those too. #}
+{% set delivery_roles = roles | rejectattr('category', 'equalto', 'overhead') | list %}
+
 <div class="card" style="margin-bottom:16px;">
     <div class="card-head">
         <h3>Defaults</h3>
     </div>
+    <p class="small muted" style="margin-top:0;">Used for any week without an explicit capacity entry. Delivery defaults cover feature work; overhead defaults extrapolate non-delivery roles (BAs, designers, SMEs, facilitators) over the project lifetime.</p>
     <form method="post" action="/p/{{ pid }}/capacity/defaults">
-        <div class="field-grid" style="grid-template-columns: 1fr 1fr auto;">
-            <label class="field">Default team size
-                <input type="number" name="team_size" value="{{ project.team_size }}" min="1" required>
-            </label>
-            <label class="field">Default role
-                <select name="default_role_id">
-                    {% for role in roles %}
-                    <option value="{{ role.id }}" {% if role.id == project.default_role_id %}selected{% endif %}>
-                        {{ role.name }} ({{ role.day_rate | currency }}/day)
-                    </option>
-                    {% endfor %}
-                </select>
-            </label>
-            <button type="submit" class="btn" style="align-self: end;">Save defaults</button>
-        </div>
+        <fieldset style="border:1px solid var(--border); border-radius:6px; padding:10px 14px; margin-bottom:12px;">
+            <legend class="small muted" style="padding:0 6px;">Default delivery team</legend>
+            <div class="field-grid" style="grid-template-columns: 1fr 1fr;">
+                <label class="field">Default team size
+                    <input type="number" name="team_size" value="{{ project.team_size }}" min="0" step="any" required>
+                </label>
+                <label class="field">Default role
+                    <select name="default_role_id">
+                        {% for role in delivery_roles %}
+                        <option value="{{ role.id }}" {% if role.id == project.default_role_id %}selected{% endif %}>
+                            {{ role.name }} ({{ role.day_rate | currency }}/day)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+        </fieldset>
+        <fieldset style="border:1px solid var(--border); border-radius:6px; padding:10px 14px; margin-bottom:12px;">
+            <legend class="small muted" style="padding:0 6px;">Default overhead team</legend>
+            <div class="field-grid" style="grid-template-columns: 1fr 1fr;">
+                <label class="field">Overhead headcount
+                    <input type="number" name="overhead_team_size" value="{{ project.overhead_team_size or 0 }}" min="0" step="any">
+                </label>
+                <label class="field">Default overhead role
+                    <select name="default_overhead_role_id">
+                        <option value="0" {% if not project.default_overhead_role_id %}selected{% endif %}>— None —</option>
+                        {% for role in overhead_roles %}
+                        <option value="{{ role.id }}" {% if role.id == project.default_overhead_role_id %}selected{% endif %}>
+                            {{ role.name }} ({{ role.day_rate | currency }}/day)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            {% if not overhead_roles %}
+            <p class="small muted" style="margin:8px 0 0;">No overhead-category roles yet. Mark a role as <em>Overhead</em> in <a href="/p/{{ pid }}/settings#roles">Settings → Team &amp; Roles</a> to enable this.</p>
+            {% endif %}
+        </fieldset>
+        <button type="submit" class="btn">Save defaults</button>
     </form>
 </div>
+
+{% if overhead_team and overhead_team.total_dollars > 0 %}
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><h3>Projected overhead-team commitment</h3></div>
+    <p class="small muted" style="margin-top:0;">
+        Total <strong>{{ overhead_team.total_dollars | currency }}</strong> committed across the project lifetime
+        ({{ overhead_team.total_business_days }} business days). Treated as pre-committed overhead on the dashboard,
+        deducted from accessible &amp; feature budget. Realised so far:
+        <strong>{{ overhead_team.realised_dollars | currency }}</strong>;
+        remaining: <strong>{{ overhead_team.remaining_dollars | currency }}</strong>.
+    </p>
+    {% if overhead_team.by_role %}
+    <ul class="muted small" style="margin:0; padding-left:18px;">
+        {% for role_id, oht in overhead_team.by_role.items() %}
+        <li>{{ oht.name }} — {{ oht.headcount }} × {{ oht.day_rate | currency }}/day → {{ oht.dollars | currency }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</div>
+{% endif %}
 
 {% set total_weekly = 0 %}
 {% for wk, ps in weeks.items() %}{% for p in ps %}{% set total_weekly = total_weekly + p.team_size * p.day_rate * 5 %}{% endfor %}{% endfor %}
@@ -60,8 +110,13 @@
             {% for period in periods %}
             <tr>
                 <td>{% if loop.first %}<strong class="mono">{{ week_date }}</strong>{% endif %}</td>
-                <td>{{ period.role_name }}</td>
-                <td class="cell-num">{{ period.team_size }}</td>
+                <td>
+                    {{ period.role_name }}
+                    {% if period.role_category == 'overhead' %}
+                    <span class="badge badge-grey" style="font-size:10px;" title="Non-delivery role — burns budget as pre-committed overhead">Overhead</span>
+                    {% endif %}
+                </td>
+                <td class="cell-num">{{ '%g' % period.team_size }}</td>
                 <td class="cell-num">{{ period.day_rate | currency }}/day</td>
                 <td class="cell-num">{{ (period.team_size * period.day_rate * 5) | currency }}</td>
                 <td class="cell-actions">
@@ -94,12 +149,12 @@
                 <select name="role_id">
                     <option value="">Project default</option>
                     {% for role in roles %}
-                    <option value="{{ role.id }}">{{ role.name }} ({{ role.day_rate | currency }}/day)</option>
+                    <option value="{{ role.id }}">{{ role.name }} — {{ 'Overhead' if role.category == 'overhead' else 'Delivery' }} ({{ role.day_rate | currency }}/day)</option>
                     {% endfor %}
                 </select>
             </label>
             <label class="field">Number of people
-                <input type="number" name="team_size" value="1" min="0" max="100">
+                <input type="number" name="team_size" value="1" min="0" max="100" step="any">
             </label>
             <button type="submit" class="btn btn-primary" style="align-self: end;">+ Add</button>
         </div>

@@ -146,15 +146,22 @@
             <div class="card-head">
                 <h3>Team &amp; Roles</h3>
             </div>
+            <p class="small muted" style="margin-top:0;">Delivery roles burn capacity for feature delivery. Overhead roles (BAs, designers, SMEs, facilitators) burn budget but are not expected to produce earned value — their projected $ is treated like fixed overhead on the dashboard.</p>
             {% if roles %}
             <div class="table-scroll">
             <table class="data-table">
-                <thead><tr><th>Role</th><th class="right">Day Rate</th><th></th></tr></thead>
+                <thead><tr><th>Role</th><th>Category</th><th class="right">Day Rate</th><th></th></tr></thead>
                 <tbody>
                     {% for role in roles %}
                     <tr>
                         <form method="post" action="/p/{{ pid }}/settings/roles/{{ role.id }}/update">
                             <td><input type="text" name="name" value="{{ role.name }}" required></td>
+                            <td>
+                                <select name="category">
+                                    <option value="delivery" {% if (role.category or 'delivery') == 'delivery' %}selected{% endif %}>Delivery</option>
+                                    <option value="overhead" {% if role.category == 'overhead' %}selected{% endif %}>Overhead</option>
+                                </select>
+                            </td>
                             <td class="cell-num"><input type="number" name="day_rate" value="{{ role.day_rate }}" step="0.01" min="0" required style="width:100px; text-align:right;"></td>
                             <td class="cell-actions">
                                 <button type="submit" class="btn btn-sm">Save</button>
@@ -170,8 +177,14 @@
             {% endif %}
             <details style="margin-top:10px;">
                 <summary class="btn btn-sm" style="display:inline-block;">+ Add role</summary>
-                <form method="post" action="/p/{{ pid }}/settings/roles/add" style="margin-top:12px; display:grid; grid-template-columns: 2fr 1fr auto; gap:10px; align-items:end;">
+                <form method="post" action="/p/{{ pid }}/settings/roles/add" style="margin-top:12px; display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:10px; align-items:end;">
                     <label class="field">Role name<input type="text" name="name" placeholder="e.g., Senior Developer" required></label>
+                    <label class="field">Category
+                        <select name="category">
+                            <option value="delivery" selected>Delivery</option>
+                            <option value="overhead">Overhead</option>
+                        </select>
+                    </label>
                     <label class="field">Day rate ($)<input type="number" name="day_rate" placeholder="1435" step="0.01" min="0" required></label>
                     <button type="submit" class="btn btn-primary">+ Add role</button>
                 </form>
@@ -181,8 +194,8 @@
         {# ── Overheads card ── #}
         <div class="card" id="overheads">
             <div class="card-head"><h3>Overheads</h3></div>
-            <p class="small muted" style="margin-top:0;">Fixed dollar costs that don't directly deliver features but draw from the same budget (e.g., PM retainer, tooling licences). Deducted from the accessible budget.</p>
-            {% if overheads %}
+            <p class="small muted" style="margin-top:0;">Fixed dollar costs that don't directly deliver features but draw from the same budget (e.g., PM retainer, tooling licences). Deducted from the accessible budget. Roles flagged as <em>overhead</em> appear here too as a read-only summary of capacity-driven commitment.</p>
+            {% if overheads or (overhead_team and overhead_team.by_role) %}
             <div class="table-scroll">
             <table class="data-table">
                 <thead><tr><th>Name</th><th>Description</th><th class="right">Amount</th><th></th></tr></thead>
@@ -201,10 +214,22 @@
                         </form>
                     </tr>
                     {% endfor %}
+                    {% if overhead_team and overhead_team.by_role %}
+                    {% for role_id, oht in overhead_team.by_role.items() %}
+                    <tr style="opacity: 0.85; background: var(--surface-2, transparent);">
+                        <td><strong>{{ oht.name }}</strong> <span class="badge badge-grey" style="font-size: 10px;">overhead team</span></td>
+                        <td class="muted small">{{ oht.headcount }} × {{ oht.day_rate | currency }}/day — managed in Capacity</td>
+                        <td class="cell-num">{{ oht.dollars | currency }}</td>
+                        <td class="cell-actions">
+                            <a href="/p/{{ pid }}/capacity" class="btn btn-sm">Managed in Capacity →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
                 </tbody>
             </table>
             </div>
-            {% else %}
+            {% elif not (overhead_team and overhead_team.by_role) %}
             <p class="muted small" style="margin:0;">No overheads yet.</p>
             {% endif %}
             <details style="margin-top:10px;">

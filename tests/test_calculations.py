@@ -18,6 +18,7 @@ from calculations import (
     capacity_days_remaining,
     capacity_plan_summary,
     capacity_budget_summary,
+    projected_overhead_team_dollars,
 )
 
 
@@ -843,3 +844,177 @@ class TestFixedPriceProjectSummary:
         features = [_feat(1, 10, 100), _feat(2, 30, 0)]  # 10/40 = 25%
         result = fixed_price_project_summary(self._project(), features, [], default_day_rate=1_000.0)
         assert result["overall_completion"] == pytest.approx(25.0)
+
+
+
+# ── Overhead-team projection ───────────────────────────────────────────────
+
+class TestProjectedOverheadTeamDollars:
+    def _project(self, start="2024-01-15", end="2024-02-12",
+                 as_of="2024-01-22", overhead_team_size=0,
+                 default_overhead_role_id=0):
+        return {
+            "start_date": start,
+            "end_date": end,
+            "as_of_date": as_of,
+            "overhead_team_size": overhead_team_size,
+            "default_overhead_role_id": default_overhead_role_id,
+        }
+
+    def _delivery_role(self, id=1, rate=1000.0):
+        return {"id": id, "name": "Dev", "day_rate": rate, "category": "delivery"}
+
+    def _overhead_role(self, id=2, rate=800.0, name="BA"):
+        return {"id": id, "name": name, "day_rate": rate, "category": "overhead"}
+
+    def test_zero_when_no_dates(self):
+        proj = self._project(start="", end="")
+        result = projected_overhead_team_dollars(proj, [], [self._overhead_role()])
+        assert result["total_dollars"] == 0.0
+
+    def test_zero_when_no_overhead_role(self):
+        proj = self._project(overhead_team_size=2, default_overhead_role_id=0)
+        result = projected_overhead_team_dollars(proj, [], [self._delivery_role()])
+        assert result["total_dollars"] == 0.0
+
+    def test_extrapolates_from_defaults(self):
+        # 2024-01-15 (Mon) to 2024-02-12 (Mon) exclusive = 4 weeks × 5 = 20 bd
+        # 1 person × $800/day × 20 days = $16k
+        proj = self._project(overhead_team_size=1, default_overhead_role_id=2)
+        result = projected_overhead_team_dollars(proj, [], [self._overhead_role()])
+        assert result["total_dollars"] == pytest.approx(16_000.0)
+        assert result["total_business_days"] == 20
+
+    def test_capacity_period_overrides_default(self):
+        # Same window: week of 2024-01-15 has 3 BAs at $800 instead of 1
+        # week 1 (5 bd): 3 × 800 = $12k; weeks 2-4 (15 bd): 1 × 800 = $12k → $24k
+        proj = self._project(overhead_team_size=1, default_overhead_role_id=2)
+        cps = [{
+            "week_monday": date(2024, 1, 15),
+            "role_id": 2, "role_name": "BA", "role_category": "overhead",
+            "team_size": 3, "day_rate": 800.0,
+        }]
+        result = projected_overhead_team_dollars(proj, cps, [self._overhead_role()])
+        assert result["total_dollars"] == pytest.approx(24_000.0)
+
+    def test_delivery_periods_ignored(self):
+        # A delivery-category capacity row must NOT contribute to overhead total
+        proj = self._project(overhead_team_size=0, default_overhead_role_id=0)
+        cps = [{
+            "week_monday": date(2024, 1, 15),
+            "role_id": 1, "role_name": "Dev", "role_category": "delivery",
+            "team_size": 5, "day_rate": 1000.0,
+        }]
+        result = projected_overhead_team_dollars(proj, cps, [self._delivery_role()])
+        assert result["total_dollars"] == 0.0
+
+    def test_realised_dollars_at_as_of(self):
+        # 4-week project, as_of one week in → realised should be ~25%
+        proj = self._project(start="2024-01-15", end="2024-02-12",
+                             as_of="2024-01-22",
+                             overhead_team_size=1, default_overhead_role_id=2)
+        result = projected_overhead_team_dollars(proj, [], [self._overhead_role()])
+        # 5 bd elapsed of 20 bd total = 25%
+        assert result["realised_dollars"] == pytest.approx(result["total_dollars"] * 0.25)
+        assert result["remaining_dollars"] == pytest.approx(result["total_dollars"] * 0.75)
+
+
+# ── Agile project summary with overhead-team integration ───────────────────
+
+class TestAgileSummaryWithOverheadTeam:
+    def _make_project(self, budget=200_000, team_size=2, spend=0,
+                      start="2024-01-15", as_of="2024-01-22"):
+        return {
+            "initial_budget": budget,
+            "team_size": team_size,
+            "actual_spend": spend,
+            "start_date": start,
+            "as_of_date": as_of,
+        }
+
+    def test_overhead_team_reduces_accessible_budget(self):
+        # Like fixed overheads, overhead-team total deducts from accessible.
+        proj = self._make_project(budget=200_000, team_size=1, spend=0)
+        oht = {
+            "total_dollars": 30_000.0, "realised_dollars": 0.0,
+            "remaining_dollars": 30_000.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+        }
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0,
+            fixed_overhead_dollars=10_000.0, overhead_team=oht,
+        )
+        # Combined overhead = $40k. Accessible = $200k − $40k = $160k.
+        assert result["overhead_dollars"] == 40_000.0
+        assert result["fixed_overhead_dollars"] == 10_000.0
+        assert result["overhead_team_dollars"] == 30_000.0
+        assert result["accessible_budget"] == 160_000.0
+
+    def test_daily_burn_excludes_overhead_team(self):
+        # daily_burn must reflect delivery headcount only, even when an
+        # overhead team has its own daily burn — the overhead lifetime $ is
+        # already pre-committed and including its headcount in the runway
+        # denominator would double-count.
+        proj = self._make_project(budget=200_000, team_size=2, spend=0,
+                                  start="2024-01-15", as_of="2024-01-15")
+        oht = {
+            "total_dollars": 0.0, "realised_dollars": 0.0,
+            "remaining_dollars": 0.0, "daily_burn": 800.0,
+            "headcount": 1, "by_role": {},
+        }
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
+        )
+        # 2 delivery × $1000 = $2000/day; overhead's $800 is informational only
+        assert result["daily_burn"] == 2_000.0
+        assert result["delivery_daily_burn"] == 2_000.0
+        assert result["overhead_daily_burn"] == 800.0
+
+    def test_total_budget_days_uses_delivery_burn(self):
+        # $100k accessible / $1k delivery burn = 100 days (not 50 if overhead
+        # had been double-counted into the burn)
+        proj = self._make_project(budget=100_000, team_size=1, spend=0,
+                                  start="2024-01-15", as_of="2024-01-15")
+        oht = {
+            "total_dollars": 0.0, "realised_dollars": 0.0,
+            "remaining_dollars": 0.0, "daily_burn": 1_000.0,
+            "headcount": 1, "by_role": {},
+        }
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
+        )
+        assert result["total_budget_days_remaining"] == pytest.approx(100.0)
+
+    def test_legacy_callsite_still_works(self):
+        # When fixed_overhead_dollars / overhead_team are not supplied, the
+        # legacy meaning of `overhead_dollars` (single combined number) is
+        # preserved so old call sites (and old tests) keep passing.
+        proj = self._make_project(budget=100_000, team_size=1, spend=0)
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_dollars=20_000.0,
+        )
+        assert result["accessible_budget"] == 80_000.0
+        assert result["overhead_dollars"] == 20_000.0
+        assert result["overhead_team_dollars"] == 0.0
+
+
+# ── capacity_budget_summary excludes overhead capacity ─────────────────────
+
+class TestCapacityBudgetSummaryExcludesOverhead:
+    def test_overhead_capacity_does_not_drain_runway(self):
+        # 5 delivery × $1000 = $5k/day; overhead capacity present but
+        # excluded → $50k / $5k = 10 budget days.
+        cps = [
+            {"week_monday": date(2024, 1, 15), "team_size": 5,
+             "day_rate": 1000.0, "role_category": "delivery"},
+            {"week_monday": date(2024, 1, 15), "team_size": 2,
+             "day_rate": 800.0, "role_category": "overhead"},
+        ]
+        result = capacity_budget_summary(
+            remaining_budget=50_000.0,
+            as_of_date=date(2024, 1, 15),
+            capacity_periods=cps,
+            default_daily_burn=5_000.0,
+            default_team_size=5,
+        )
+        assert result["budget_days"] == pytest.approx(10.0)

@@ -1,5 +1,14 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
+
+
+# Role categories. Delivery roles are expected to produce earned value
+# (feature delivery). Overhead roles burn budget without producing earned
+# value — BAs, designers, SMEs, facilitators — and are treated like
+# pre-committed overhead by the dashboard math. See DESIGN_RULES §1.
+ROLE_CATEGORY_DELIVERY = "delivery"
+ROLE_CATEGORY_OVERHEAD = "overhead"
+VALID_ROLE_CATEGORIES = {ROLE_CATEGORY_DELIVERY, ROLE_CATEGORY_OVERHEAD}
 
 
 class Project(BaseModel):
@@ -10,9 +19,11 @@ class Project(BaseModel):
     as_of_date: str = ""
     end_date: str = ""
     initial_budget: float = 0.0
-    team_size: int = 1
+    team_size: float = 1.0
     actual_spend: float = 0.0
     default_role_id: int = 1
+    overhead_team_size: float = 0.0
+    default_overhead_role_id: int = 0
     health_on_track_pct: float = 100.0
     health_at_risk_pct: float = 80.0
     accent: str = "cyan"
@@ -26,6 +37,7 @@ class Role(BaseModel):
     project_id: int
     name: str
     day_rate: float
+    category: Literal["delivery", "overhead"] = "delivery"
 
 
 class BudgetAdjustment(BaseModel):

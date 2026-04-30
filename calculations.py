@@ -128,6 +128,165 @@ def feature_summary(feature: dict, requirements: list[dict]) -> dict:
     }
 
 
+def projected_overhead_team_dollars(
+    project: dict,
+    capacity_periods: list[dict],
+    roles: list[dict],
+) -> dict:
+    """Project total $ committed to overhead-category roles between project
+    start and end.
+
+    For each business day in [start, end):
+      * If any capacity_periods row covers that week with an overhead-category
+        role, sum (rate × headcount) across those rows for the day's burn.
+      * Otherwise fall back to the project's overhead defaults
+        (`overhead_team_size` × default_overhead_role.day_rate).
+
+    Returns a dict with:
+      total_dollars        — full lifetime overhead-team commitment
+      realised_dollars     — portion linearly accrued by as_of_date
+      remaining_dollars    — total − realised
+      daily_burn           — current overhead daily $ burn (as-of week)
+      headcount            — current overhead headcount (as-of week)
+      default_rate         — rate used for extrapolation past planned weeks
+      default_headcount    — headcount used for extrapolation
+      by_role              — {role_id: {name, dollars, headcount, day_rate}}
+      total_business_days  — count of business days in the project window
+
+    `capacity_periods` entries are expected to carry `week_monday` (date),
+    `role_id`, `role_category`, `team_size`, and `day_rate` — already
+    enriched by the route layer's join against roles.
+
+    `roles` is the full role list for the project (used to find the default
+    overhead role's rate when extrapolating).
+
+    Returns zeros for everything when start/end are missing or
+    end <= start — the dashboard hides the affected rows in that case.
+    """
+    start = parse_date(project.get("start_date"))
+    end = parse_date(project.get("end_date"))
+    as_of = parse_date(project.get("as_of_date"))
+
+    zero = {
+        "total_dollars": 0.0,
+        "realised_dollars": 0.0,
+        "remaining_dollars": 0.0,
+        "daily_burn": 0.0,
+        "headcount": 0,
+        "default_rate": 0.0,
+        "default_headcount": 0,
+        "by_role": {},
+        "total_business_days": 0,
+    }
+    if start is None or end is None or end <= start:
+        return zero
+
+    default_overhead_role_id = project.get("default_overhead_role_id") or 0
+    default_overhead_headcount = project.get("overhead_team_size") or 0
+    default_overhead_rate = 0.0
+    default_overhead_role_name = ""
+    for r in roles:
+        if r["id"] == default_overhead_role_id and r.get("category") == "overhead":
+            default_overhead_rate = r.get("day_rate", 0.0)
+            default_overhead_role_name = r.get("name", "")
+            break
+
+    # Build per-week overhead-only lookup: monday → list[(role_id, name, rate, headcount)].
+    overhead_weeks: dict[date, list[tuple[int, str, float, int]]] = defaultdict(list)
+    for cp in capacity_periods:
+        if cp.get("role_category") != "overhead":
+            continue
+        monday = cp.get("week_monday")
+        if monday is None:
+            continue
+        overhead_weeks[monday].append((
+            cp.get("role_id") or 0,
+            cp.get("role_name") or "Overhead",
+            cp.get("day_rate", 0.0),
+            cp.get("team_size", 0),
+        ))
+
+    by_role: dict[int, dict] = {}
+    total_dollars = 0.0
+    total_business_days = 0
+    realised_dollars = 0.0
+    current_burn = 0.0
+    current_headcount = 0
+
+    current = start
+    while current < end:
+        if current.weekday() < 5:
+            total_business_days += 1
+            monday = get_week_monday(current)
+            entries = overhead_weeks.get(monday)
+            if entries:
+                day_dollars = 0.0
+                day_headcount = 0
+                for role_id, name, rate, headcount in entries:
+                    cost = rate * headcount
+                    day_dollars += cost
+                    day_headcount += headcount
+                    bucket = by_role.setdefault(role_id, {
+                        "role_id": role_id,
+                        "name": name,
+                        "day_rate": rate,
+                        "dollars": 0.0,
+                        "headcount": headcount,
+                        "source": "capacity",
+                    })
+                    bucket["dollars"] += cost
+                    # Track the most-recent observed headcount for the role
+                    bucket["headcount"] = headcount
+                    bucket["day_rate"] = rate
+            elif default_overhead_headcount > 0 and default_overhead_rate > 0 and default_overhead_role_id:
+                day_dollars = default_overhead_rate * default_overhead_headcount
+                day_headcount = default_overhead_headcount
+                bucket = by_role.setdefault(default_overhead_role_id, {
+                    "role_id": default_overhead_role_id,
+                    "name": default_overhead_role_name,
+                    "day_rate": default_overhead_rate,
+                    "dollars": 0.0,
+                    "headcount": default_overhead_headcount,
+                    "source": "default",
+                })
+                bucket["dollars"] += day_dollars
+            else:
+                day_dollars = 0.0
+                day_headcount = 0
+            total_dollars += day_dollars
+            if as_of and current < as_of:
+                realised_dollars += day_dollars
+            # The "current" burn is whatever applies to the as-of week
+            if as_of and get_week_monday(as_of) == monday:
+                current_burn = day_dollars
+                current_headcount = day_headcount
+            elif as_of and not entries and default_overhead_headcount > 0 and default_overhead_rate > 0:
+                # no period for as-of week — defaults apply
+                if get_week_monday(as_of) == monday:
+                    current_burn = default_overhead_rate * default_overhead_headcount
+                    current_headcount = default_overhead_headcount
+        current += timedelta(days=1)
+
+    # If no per-day match for as-of (e.g. as_of outside [start, end)), fall back
+    # to defaults so sub-rows still render meaningfully.
+    if current_burn == 0 and default_overhead_headcount > 0 and default_overhead_rate > 0:
+        current_burn = default_overhead_rate * default_overhead_headcount
+        current_headcount = default_overhead_headcount
+
+    realised_dollars = min(realised_dollars, total_dollars)
+    return {
+        "total_dollars": total_dollars,
+        "realised_dollars": realised_dollars,
+        "remaining_dollars": max(0.0, total_dollars - realised_dollars),
+        "daily_burn": current_burn,
+        "headcount": current_headcount,
+        "default_rate": default_overhead_rate,
+        "default_headcount": default_overhead_headcount,
+        "by_role": by_role,
+        "total_business_days": total_business_days,
+    }
+
+
 def agile_project_summary(
     project: dict,
     features: list[dict],
@@ -136,6 +295,8 @@ def agile_project_summary(
     realised_risk_dollars: float = 0.0,
     overhead_dollars: float = 0.0,
     open_risk_dollars: float = 0.0,
+    overhead_team: dict | None = None,
+    fixed_overhead_dollars: float | None = None,
 ) -> dict:
     """Compute all top-level project financial metrics.
 
@@ -174,6 +335,29 @@ def agile_project_summary(
     total_adj = sum(a["amount"] for a in adjustments)
     actual_spend = project["actual_spend"]
 
+    # Overhead-team commitment (BAs, designers, SMEs, facilitators) is a
+    # pre-committed projection derived from the capacity plan + project
+    # overhead defaults across [start, end). Treated like fixed overhead
+    # in the math (deducted from accessible/feature budget) but tracked
+    # separately so hero cards and modals can split fixed vs team.
+    if overhead_team is None:
+        overhead_team = {
+            "total_dollars": 0.0,
+            "realised_dollars": 0.0,
+            "remaining_dollars": 0.0,
+            "daily_burn": 0.0,
+            "headcount": 0,
+        }
+    overhead_team_dollars = overhead_team.get("total_dollars", 0.0)
+
+    # When callers pre-bundle fixed + overhead-team into `overhead_dollars`
+    # (legacy path), `fixed_overhead_dollars` is None and we infer it. New
+    # callers pass both explicitly. The combined headline `overhead_dollars`
+    # is what feeds accessible_budget / feature_budget downstream.
+    if fixed_overhead_dollars is None:
+        fixed_overhead_dollars = overhead_dollars
+    overhead_dollars = fixed_overhead_dollars + overhead_team_dollars
+
     # total_budget: the full pot assigned to the project — initial award plus
     # any adjustments/infusions. This is the "ceiling" used as the denominator
     # for burn % and as the base of the allocation identity.
@@ -186,18 +370,25 @@ def agile_project_summary(
     current_budget = total_budget - actual_spend
 
     # accessible_budget: current_budget minus money committed to overheads
-    # (non-delivery costs). Realised risks are NOT subtracted here — they
-    # represent team time already spent on risk handling, which is already
-    # reflected in actual_spend (and therefore in current_budget). Subtracting
-    # them again would double-count. Realised risks remain available as a
-    # categorisation of how spend was used (see dashboard breakdown).
+    # (non-delivery costs, both fixed and overhead-team). Realised risks are
+    # NOT subtracted here — they represent team time already spent on risk
+    # handling, which is already reflected in actual_spend (and therefore
+    # in current_budget). Subtracting them again would double-count.
+    # Realised risks remain available as a categorisation of how spend
+    # was used (see dashboard breakdown).
     accessible_budget = current_budget - overhead_dollars
 
     start = parse_date(project["start_date"])
     as_of = parse_date(project["as_of_date"])
     elapsed_days = business_days_between(start, as_of) if start and as_of else 0
 
-    daily_burn = project["team_size"] * default_day_rate
+    # Daily burn now means *delivery-only* daily $ burn. Overhead-team headcount
+    # has already been pre-committed as overhead and must not be double-counted
+    # in the runway denominator. Hero cards that want a sub-row context use
+    # `overhead_daily_burn` separately.
+    delivery_daily_burn = project["team_size"] * default_day_rate
+    overhead_daily_burn = overhead_team.get("daily_burn", 0.0)
+    daily_burn = delivery_daily_burn
     expected_spend = daily_burn * elapsed_days
 
     # Burn percentages use total_budget as the denominator: they answer
@@ -248,6 +439,15 @@ def agile_project_summary(
         "realised_risk_dollars": realised_risk_dollars,
         "open_risk_dollars": open_risk_dollars,
         "overhead_dollars": overhead_dollars,
+        "fixed_overhead_dollars": fixed_overhead_dollars,
+        "overhead_team_dollars": overhead_team_dollars,
+        "overhead_team_dollars_realised": overhead_team.get("realised_dollars", 0.0),
+        "overhead_team_dollars_remaining": overhead_team.get("remaining_dollars", 0.0),
+        "overhead_team_headcount": overhead_team.get("headcount", 0),
+        "overhead_team_by_role": overhead_team.get("by_role", {}),
+        "overhead_daily_burn": overhead_daily_burn,
+        "delivery_daily_burn": delivery_daily_burn,
+        "delivery_team_size": project["team_size"],
         "initial_budget": project["initial_budget"],
         "total_adjustments": total_adj,
         "elapsed_days": elapsed_days,
@@ -508,9 +708,13 @@ def capacity_days_remaining(
                       team_size (int). Multiple entries per week (one per role).
     Returns the number of business days the budget covers.
     """
-    # Build a lookup: week_monday → total daily burn for that week
+    # Build a lookup: week_monday → total daily burn for that week.
+    # Overhead-category roles excluded (pre-committed; see
+    # `capacity_budget_summary` for rationale).
     week_burns: dict[date, float] = {}
     for cp in capacity_periods:
+        if cp.get("role_category") == "overhead":
+            continue
         monday = cp["week_monday"]
         week_burns[monday] = week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
 
@@ -558,10 +762,15 @@ def capacity_budget_summary(
     Multiple entries per week are supported (one per role); their burn
     and headcount are summed within each week.
     """
-    # Build per-week lookups: burn rate and total headcount
+    # Build per-week lookups: burn rate and total headcount.
+    # Overhead-category roles are excluded — their cost is pre-committed
+    # as overhead and already netted out of remaining_budget upstream;
+    # including them here would double-count and shorten the runway.
     week_burns: dict[date, float] = {}
     week_sizes: dict[date, int] = {}
     for cp in capacity_periods:
+        if cp.get("role_category") == "overhead":
+            continue
         monday = cp["week_monday"]
         week_burns[monday] = week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
         week_sizes[monday] = week_sizes.get(monday, 0) + cp["team_size"]
@@ -881,6 +1090,10 @@ def agile_burndown_chart_data(
     # capacity history or when the modelled total is zero.
     consumed_days = initial_days - today_days
     historical_caps = capacity_periods or []
+    # Historical actual line: include both delivery + overhead capacity so
+    # the past curve's shape honours real total team availability. Forward
+    # projection paths above use delivery-only burn (overhead is
+    # pre-committed; see `capacity_budget_summary`).
     week_burns: dict[date, float] = {}
     for cp in historical_caps:
         monday = cp.get("week_monday")
@@ -931,6 +1144,7 @@ def agile_burndown_chart_data(
         _days_offset(as_of), _days_offset(budget_exhaustion), today_days, 1.0
     )
 
+    # Optional overhead-team baseline: a faint diagonal showing the linear
     return {
         # Raw data (dates and figures, for tooltips / sentence rendering)
         "start_date": start,

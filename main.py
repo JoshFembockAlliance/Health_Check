@@ -34,6 +34,7 @@ from calculations import (
     capacity_days_remaining,
     capacity_plan_summary,
     capacity_budget_summary,
+    projected_overhead_team_dollars,
     get_week_monday,
     parse_date,
     business_days_between,
@@ -141,10 +142,13 @@ def _roles_as_dicts(project_id: int):
     """Return roles as plain dicts — the template & role-rate lookups want this shape."""
     db = get_db()
     rows = list(db.execute(
-        "SELECT id, project_id, name, day_rate FROM roles WHERE project_id = ? ORDER BY id",
+        "SELECT id, project_id, name, day_rate, COALESCE(category, 'delivery') FROM roles WHERE project_id = ? ORDER BY id",
         [project_id],
     ).fetchall())
-    return [{"id": r[0], "project_id": r[1], "name": r[2], "day_rate": r[3]} for r in rows]
+    return [
+        {"id": r[0], "project_id": r[1], "name": r[2], "day_rate": r[3], "category": r[4]}
+        for r in rows
+    ]
 
 
 def build_feature_data(project_id: int, feature_id: Optional[int] = None):
@@ -418,7 +422,38 @@ def _agile_dashboard(request: Request, project: dict):
     ] if adj_rows and len(adj_rows[0]) == 4 else [dict(r) for r in db["budget_adjustments"].rows_where("project_id = ?", [project_id])]
     overhead_rows = list(db["overheads"].rows_where("project_id = ?", [project_id]))
     overheads = [dict(r) for r in overhead_rows]
-    overhead_total = sum(o["amount"] for o in overheads)
+    fixed_overhead_total = sum(o["amount"] for o in overheads)
+
+    # Build enriched capacity rows up-front so the projected overhead-team $
+    # can feed into the project summary (it folds into overhead_dollars and
+    # therefore accessible_budget / feature_budget). Forward-projection
+    # callers below filter out overhead-category rows themselves.
+    cap_rows = list(db.execute(
+        "SELECT cp.id, cp.week_start_date, cp.role_id, cp.team_size, "
+        "COALESCE(r.name, 'Default') as role_name, "
+        "COALESCE(r.day_rate, ?) as day_rate, "
+        "COALESCE(r.category, 'delivery') as role_category "
+        "FROM capacity_periods cp "
+        "LEFT JOIN roles r ON cp.role_id = r.id "
+        "WHERE cp.project_id = ? "
+        "ORDER BY cp.week_start_date",
+        [default_rate, project_id]
+    ).fetchall())
+    enriched_capacity = [
+        {
+            "id": row[0],
+            "week_start_date": row[1],
+            "week_monday": parse_date(row[1]),
+            "role_id": row[2],
+            "team_size": row[3],
+            "role_name": row[4],
+            "day_rate": row[5],
+            "role_category": row[6],
+        }
+        for row in cap_rows
+    ]
+    overhead_team = projected_overhead_team_dollars(project, enriched_capacity, roles)
+    overhead_total = fixed_overhead_total + overhead_team["total_dollars"]
 
     risk_rows = db.execute(
         "SELECT status, impact_days, realised_percentage FROM risks WHERE project_id = ?",
@@ -439,7 +474,9 @@ def _agile_dashboard(request: Request, project: dict):
     summary = agile_project_summary(
         project, features, adjustments, default_rate,
         realised_risk_dollars=realised_risk_dollars,
-        overhead_dollars=overhead_total,
+        overhead_dollars=fixed_overhead_total,
+        fixed_overhead_dollars=fixed_overhead_total,
+        overhead_team=overhead_team,
         open_risk_dollars=open_risk_dollars,
     )
 
@@ -501,32 +538,10 @@ def _agile_dashboard(request: Request, project: dict):
 
     as_of = parse_date(project.get("as_of_date", ""))
     end_dt = parse_date(project.get("end_date", ""))
-    cap_rows = list(db.execute(
-        "SELECT cp.id, cp.week_start_date, cp.role_id, cp.team_size, "
-        "COALESCE(r.name, 'Default') as role_name, "
-        "COALESCE(r.day_rate, ?) as day_rate "
-        "FROM capacity_periods cp "
-        "LEFT JOIN roles r ON cp.role_id = r.id "
-        "WHERE cp.project_id = ? "
-        "ORDER BY cp.week_start_date",
-        [default_rate, project_id]
-    ).fetchall())
-    enriched_capacity = [
-        {
-            "id": row[0],
-            "week_start_date": row[1],
-            "week_monday": parse_date(row[1]),
-            "role_id": row[2],
-            "team_size": row[3],
-            "role_name": row[4],
-            "day_rate": row[5],
-        }
-        for row in cap_rows
-    ]
     cap_summary = capacity_plan_summary(
         as_of or _date.today(),
         end_dt,
-        enriched_capacity,
+        [c for c in enriched_capacity if c.get("role_category") != "overhead"],
         project.get("team_size", 1),
         summary["daily_burn"],
     )
@@ -840,6 +855,28 @@ def settings_page(request: Request, project_id: int):
     overheads = [dict(o) for o in db["overheads"].rows_where(
         "project_id = ?", [project_id], order_by="sort_order, id"
     )]
+
+    # Overhead-team derived rows: read-only entries that surface the
+    # capacity-driven overhead commitment alongside fixed overheads.
+    cap_rows = list(db.execute(
+        "SELECT cp.id, cp.week_start_date, cp.role_id, cp.team_size, "
+        "COALESCE(r.name, 'Default') as role_name, "
+        "COALESCE(r.day_rate, 0) as day_rate, "
+        "COALESCE(r.category, 'delivery') as role_category "
+        "FROM capacity_periods cp "
+        "LEFT JOIN roles r ON cp.role_id = r.id "
+        "WHERE cp.project_id = ? ORDER BY cp.week_start_date",
+        [project_id],
+    ).fetchall())
+    enriched_capacity = [
+        {
+            "id": row[0], "week_start_date": row[1], "week_monday": parse_date(row[1]),
+            "role_id": row[2], "team_size": row[3], "role_name": row[4],
+            "day_rate": row[5], "role_category": row[6],
+        }
+        for row in cap_rows
+    ]
+    overhead_team = projected_overhead_team_dollars(project, enriched_capacity, roles)
     ctx = {
         "request": request,
         "active": "settings",
@@ -847,6 +884,7 @@ def settings_page(request: Request, project_id: int):
         "project": project,
         "roles": roles,
         "adjustments": adjustments,
+        "overhead_team": overhead_team,
         "overheads": overheads,
     }
     ctx.update(shell_context(project_id))
@@ -904,17 +942,41 @@ def update_visual(
     return RedirectResponse(f"/p/{project_id}/settings#visual", status_code=303)
 
 
+def _normalise_role_category(category: Optional[str]) -> str:
+    return "overhead" if (category or "").strip().lower() == "overhead" else "delivery"
+
+
 @app.post("/p/{project_id}/settings/roles/add")
-def add_role(project_id: int, name: str = Form(...), day_rate: float = Form(0)):
+def add_role(
+    project_id: int,
+    name: str = Form(...),
+    day_rate: float = Form(0),
+    category: Optional[str] = Form("delivery"),
+):
     db = get_db()
-    db["roles"].insert({"project_id": project_id, "name": name, "day_rate": day_rate})
+    db["roles"].insert({
+        "project_id": project_id,
+        "name": name,
+        "day_rate": day_rate,
+        "category": _normalise_role_category(category),
+    })
     return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
 @app.post("/p/{project_id}/settings/roles/{role_id}/update")
-def update_role(project_id: int, role_id: int, name: str = Form(...), day_rate: float = Form(0)):
+def update_role(
+    project_id: int,
+    role_id: int,
+    name: str = Form(...),
+    day_rate: float = Form(0),
+    category: Optional[str] = Form("delivery"),
+):
     db = get_db()
-    db["roles"].update(role_id, {"name": name, "day_rate": day_rate})
+    db["roles"].update(role_id, {
+        "name": name,
+        "day_rate": day_rate,
+        "category": _normalise_role_category(category),
+    })
     return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
 
 
@@ -1718,7 +1780,8 @@ def capacity_page(request: Request, project_id: int):
     rows = list(db.execute(
         "SELECT cp.id, cp.week_start_date, cp.role_id, cp.team_size, "
         "COALESCE(r.name, 'Default') as role_name, "
-        "COALESCE(r.day_rate, ?) as day_rate "
+        "COALESCE(r.day_rate, ?) as day_rate, "
+        "COALESCE(r.category, 'delivery') as role_category "
         "FROM capacity_periods cp "
         "LEFT JOIN roles r ON cp.role_id = r.id "
         "WHERE cp.project_id = ? "
@@ -1727,18 +1790,25 @@ def capacity_page(request: Request, project_id: int):
     ).fetchall())
 
     weeks: dict = {}
+    enriched_capacity = []
     for row in rows:
         wdate = row[1]
-        if wdate not in weeks:
-            weeks[wdate] = []
-        weeks[wdate].append({
+        period = {
             "id": row[0],
             "week_start_date": row[1],
+            "week_monday": parse_date(row[1]),
             "role_id": row[2],
             "team_size": row[3],
             "role_name": row[4],
             "day_rate": row[5],
-        })
+            "role_category": row[6],
+        }
+        if wdate not in weeks:
+            weeks[wdate] = []
+        weeks[wdate].append(period)
+        enriched_capacity.append(period)
+
+    overhead_team = projected_overhead_team_dollars(project, enriched_capacity, roles)
 
     ctx = {
         "request": request,
@@ -1747,6 +1817,7 @@ def capacity_page(request: Request, project_id: int):
         "project": project,
         "roles": roles,
         "weeks": weeks,
+        "overhead_team": overhead_team,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "capacity.html", ctx)
@@ -1757,7 +1828,7 @@ def add_capacity_period(
     project_id: int,
     week_start_date: str = Form(...),
     role_id: Optional[int] = Form(None),
-    team_size: int = Form(1),
+    team_size: float = Form(1.0),
 ):
     db = get_db()
     try:
@@ -1769,7 +1840,7 @@ def add_capacity_period(
         "project_id": project_id,
         "week_start_date": monday.isoformat(),
         "role_id": role_id,
-        "team_size": max(0, team_size),
+        "team_size": max(0.0, team_size),
     })
     return RedirectResponse(f"/p/{project_id}/capacity", status_code=303)
 
@@ -1784,13 +1855,17 @@ def delete_capacity_period(project_id: int, period_id: int):
 @app.post("/p/{project_id}/capacity/defaults")
 def update_capacity_defaults(
     project_id: int,
-    team_size: int = Form(1),
+    team_size: float = Form(1.0),
     default_role_id: int = Form(1),
+    overhead_team_size: float = Form(0.0),
+    default_overhead_role_id: Optional[int] = Form(None),
 ):
     db = get_db()
     db["projects"].update(project_id, {
-        "team_size": max(1, team_size),
+        "team_size": team_size,
         "default_role_id": default_role_id,
+        "overhead_team_size": max(0.0, overhead_team_size),
+        "default_overhead_role_id": default_overhead_role_id or 0,
     })
     return RedirectResponse(f"/p/{project_id}/capacity", status_code=303)
 
