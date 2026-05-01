@@ -25,7 +25,7 @@ The agile burndown answers "is there budget runway for remaining work?". The fix
 Remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. Add a few that are tech-industry relevant, evoking finances, industry, etc. 
 
 ### Features, Requirements & Deliverables
-- [ ] Ability to mark a Requirement as "expanded scope". A boolean value that defaults to negaive. Use the pill-shaped toggle rather than a checkbox. 
+- [x] Ability to mark a Requirement as "expanded scope". A boolean value that defaults to negaive. Use the pill-shaped toggle rather than a checkbox. 
 
 ### Decision Register
 
