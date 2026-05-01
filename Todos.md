@@ -21,7 +21,7 @@ The modal lists a few items that unrealised spend could go toward but doesn't pr
 The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
 
 ### Settings
-- [ ] **Project Symbols** 
+- [x] **Project Symbols** 
 Remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. Add a few that are tech-industry relevant, evoking finances, industry, etc. 
 
 ### Features, Requirements & Deliverables
