@@ -54,6 +54,7 @@ class Feature(BaseModel):
     name: str
     sort_order: int = 0
     started: int = 0
+    expanded_scope: int = 0
 
 
 class Requirement(BaseModel):
@@ -61,6 +62,7 @@ class Requirement(BaseModel):
     feature_id: int
     name: str
     sort_order: int = 0
+    expanded_scope: int = 0
 
 
 class Deliverable(BaseModel):
@@ -72,6 +74,7 @@ class Deliverable(BaseModel):
     priority: str = "Must Have"
     role_id: Optional[int] = None
     sort_order: int = 0
+    expanded_scope: int = 0
 
 
 class Risk(BaseModel):

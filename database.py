@@ -134,6 +134,8 @@ def init_db():
     feat_cols = {col.name for col in db["features"].columns}
     if "started" not in feat_cols:
         db["features"].add_column("started", int, not_null_default=0)
+    if "expanded_scope" not in feat_cols:
+        db["features"].add_column("expanded_scope", int, not_null_default=0)
 
     if "requirements" not in db.table_names():
         db["requirements"].create({
@@ -141,7 +143,12 @@ def init_db():
             "feature_id": int,
             "name": str,
             "sort_order": int,
+            "expanded_scope": int,
         }, pk="id", foreign_keys=[("feature_id", "features")])
+
+    req_cols = {col.name for col in db["requirements"].columns}
+    if "expanded_scope" not in req_cols:
+        db["requirements"].add_column("expanded_scope", int, not_null_default=0)
 
     if "deliverables" not in db.table_names():
         db["deliverables"].create({
@@ -153,7 +160,12 @@ def init_db():
             "priority": str,
             "role_id": int,
             "sort_order": int,
+            "expanded_scope": int,
         }, pk="id", foreign_keys=[("requirement_id", "requirements"), ("role_id", "roles")])
+
+    del_cols = {col.name for col in db["deliverables"].columns}
+    if "expanded_scope" not in del_cols:
+        db["deliverables"].add_column("expanded_scope", int, not_null_default=0)
 
     # budget_adjustments — one row per change event.
     if "budget_adjustments" not in db.table_names():

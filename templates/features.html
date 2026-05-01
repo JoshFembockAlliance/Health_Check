@@ -32,6 +32,7 @@
                 <th class="right">Completion</th>
                 <th class="right">Remaining (days)</th>
                 <th class="right">Remaining ($)</th>
+                <th class="center">Expanded scope</th>
                 <th></th>
             </tr>
         </thead>
@@ -44,6 +45,18 @@
                 <td class="cell-num">{{ f.weighted_completion | pct }}</td>
                 <td class="cell-num">{{ f.remaining_days | days }}</td>
                 <td class="cell-num">{{ f.remaining_dollars | currency }}</td>
+                <td class="center">
+                    <button type="button"
+                            class="pill-toggle pill-toggle-scope"
+                            role="switch"
+                            aria-checked="{{ 'true' if f.expanded_scope else 'false' }}"
+                            data-id="{{ f.id }}"
+                            data-type="feature"
+                            data-pid="{{ pid }}"
+                            aria-label="Expanded scope for {{ f.name }}">
+                        <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    </button>
+                </td>
                 <td class="cell-actions">
                     <form method="post" action="/p/{{ pid }}/features/{{ f.id }}/delete" style="margin:0; display:inline;">
                         <button type="submit" class="btn btn-danger-ghost btn-sm"
@@ -86,4 +99,20 @@
         </div>
     </form>
 </dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.pill-toggle-scope[data-type="feature"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const pid = btn.dataset.pid;
+        const id = btn.dataset.id;
+        fetch(`/api/p/${pid}/features/${id}/toggle-expanded-scope`, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                btn.setAttribute('aria-checked', data.expanded_scope ? 'true' : 'false');
+            });
+    });
+});
+</script>
 {% endblock %}

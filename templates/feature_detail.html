@@ -15,6 +15,17 @@
         </div>
     </div>
     <div class="page-actions">
+        <button type="button"
+                class="pill-toggle pill-toggle-scope"
+                role="switch"
+                aria-checked="{{ 'true' if feature.expanded_scope else 'false' }}"
+                data-id="{{ feature.id }}"
+                data-type="feature"
+                data-pid="{{ pid }}"
+                aria-label="Expanded scope">
+            <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+            <span class="pill-toggle-label">Expanded scope</span>
+        </button>
         <button class="btn btn-primary" onclick="document.getElementById('add-req-dialog').showModal()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
             Add requirement
@@ -63,6 +74,17 @@
                 {{ req.total_days | days }}d / {{ req.total_dollars | currency }}
                 · {{ req.weighted_completion | pct }} complete
             </span>
+            <button type="button"
+                    class="pill-toggle pill-toggle-scope"
+                    role="switch"
+                    aria-checked="{{ 'true' if req.expanded_scope else 'false' }}"
+                    data-id="{{ req.id }}"
+                    data-type="requirement"
+                    data-pid="{{ pid }}"
+                    aria-label="Expanded scope for {{ req.name }}">
+                <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                <span class="pill-toggle-label">Expanded scope</span>
+            </button>
             <form method="post" action="/p/{{ pid }}/requirements/{{ req.id }}/delete" style="margin:0;">
                 <button type="submit" class="btn btn-danger-ghost btn-sm"
                         onclick="event.preventDefault(); showConfirm('Delete requirement &quot;{{ req.name }}&quot; and all its deliverables?', this.closest('form'))"
@@ -84,6 +106,7 @@
                 <th class="right">% Done</th>
                 <th class="right">Remaining days</th>
                 <th class="right">Remaining $</th>
+                <th class="center">Exp. scope</th>
                 <th></th>
             </tr>
         </thead>
@@ -124,6 +147,19 @@
                                 onclick="event.preventDefault(); showConfirm('Delete deliverable &quot;{{ d.name }}&quot;?', this.closest('form'), '/p/{{ pid }}/deliverables/{{ d.id }}/delete')">✕</button>
                     </td>
                 </form>
+                <td class="center">
+                    <button type="button"
+                            class="pill-toggle pill-toggle-scope"
+                            role="switch"
+                            aria-checked="{{ 'true' if d.expanded_scope else 'false' }}"
+                            data-id="{{ d.id }}"
+                            data-type="deliverable"
+                            data-pid="{{ pid }}"
+                            data-req-id="{{ req.id }}"
+                            aria-label="Expanded scope for {{ d.name }}">
+                        <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    </button>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -134,6 +170,7 @@
                 <td class="cell-num">{{ req.weighted_completion | pct }}</td>
                 <td class="cell-num">{{ req.remaining_days | days }}</td>
                 <td class="cell-num">{{ req.remaining_dollars | currency }}</td>
+                <td></td>
                 <td></td>
             </tr>
         </tfoot>
@@ -304,6 +341,44 @@ function autoSave(tr) {
 document.querySelectorAll('tr[data-del-id]').forEach(tr => {
     tr.querySelectorAll('input').forEach(inp => { inp.addEventListener('blur', () => autoSave(tr)); });
     tr.querySelectorAll('select').forEach(sel => { sel.addEventListener('change', () => autoSave(tr)); });
+});
+
+// Expanded scope toggles
+function setToggle(btn, val) {
+    btn.setAttribute('aria-checked', val ? 'true' : 'false');
+}
+
+document.querySelectorAll('.pill-toggle-scope[data-type="feature"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        fetch(`/api/p/${PID}/features/${btn.dataset.id}/toggle-expanded-scope`, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                setToggle(btn, data.expanded_scope);
+                // Cascade visual update to all requirement and deliverable toggles on page
+                document.querySelectorAll('.pill-toggle-scope[data-type="requirement"]').forEach(r => setToggle(r, data.expanded_scope));
+                document.querySelectorAll('.pill-toggle-scope[data-type="deliverable"]').forEach(d => setToggle(d, data.expanded_scope));
+            });
+    });
+});
+
+document.querySelectorAll('.pill-toggle-scope[data-type="requirement"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        fetch(`/api/p/${PID}/requirements/${btn.dataset.id}/toggle-expanded-scope`, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                setToggle(btn, data.expanded_scope);
+                // Cascade visual update to deliverables within this requirement card
+                document.querySelectorAll(`.pill-toggle-scope[data-type="deliverable"][data-req-id="${btn.dataset.id}"]`).forEach(d => setToggle(d, data.expanded_scope));
+            });
+    });
+});
+
+document.querySelectorAll('.pill-toggle-scope[data-type="deliverable"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        fetch(`/api/p/${PID}/deliverables/${btn.dataset.id}/toggle-expanded-scope`, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => setToggle(btn, data.expanded_scope));
+    });
 });
 </script>
 {% endblock %}
