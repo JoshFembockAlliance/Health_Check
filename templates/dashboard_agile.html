@@ -1103,6 +1103,19 @@
                 and <strong>{{ uv_n | currency }}</strong> ({{ uv_pct | round(0) | int }}%) is unexplained — paid time that hasn't yet shown as feature delivery or as a categorised risk impact (work in flight, rework, exploration, or non-feature work).
                 The unexplained slice is the one to interrogate in the meeting: a high share usually means feature work is still in flight, or that time has gone on activities the project hasn't yet been able to attribute.
             </p>
+            {% if uv_n > 0 and s.daily_burn > 0 %}
+            {% set sprint_burn = s.daily_burn * 10 %}
+            {% set uv_sprint_ratio = uv_n / sprint_burn %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is the unexplained amount healthy?</span>
+                In an agile project, a healthy ceiling for in-flight unrealised spend is roughly one sprint of burn — work started in a sprint should close out within the same sprint. At the current burn rate, one sprint (10 working days) costs approximately <strong>{{ sprint_burn | currency }}</strong>.
+                {% if uv_sprint_ratio <= 1.0 %}
+                At <strong style="color:var(--good);">{{ uv_n | currency }}</strong> ({{ (uv_sprint_ratio * 100) | round(0) | int }}% of one sprint), the in-flight amount is within the healthy range — most work-in-progress should close out before the next sprint ends.
+                {% else %}
+                At <strong style="color:var(--warn);">{{ uv_n | currency }}</strong> ({{ uv_sprint_ratio | round(1) }}× one sprint's burn), the in-flight amount exceeds the healthy threshold. Possible causes: work spanning multiple sprints, items stalled mid-completion, or logged time not yet attributed to delivered features or categorised risks. Worth raising in the meeting.
+                {% endif %}
+            </p>
+            {% endif %}
             {% endif %}
 
             {# Q4 — pace of spend vs plan (spend delta) #}
