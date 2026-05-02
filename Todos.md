@@ -13,7 +13,7 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 ## Enhancements to Existing
 
 ### Agile Project Dashboard Items
-- [ ] **Net Accessible Budget Modal - Unrealised Spend**
+- [x] **Net Accessible Budget Modal - Unrealised Spend**
 The modal lists a few items that unrealised spend could go toward but doesn't provide a solid metric for if it's a healthy amount of value to have in-flight at the time of the review. Because an agile sprint typically only includes enough items to finish them out during a single sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. More than that is unhealthy and should be discussed and accounted for. 
 
 ### Fixed Price Project Dashboard Items - ignore for now
@@ -40,7 +40,7 @@ Create a demo project dev dataset that contains a few items for each project typ
 
 - [ ] Make sure test coverage is up-to-date and accounts for new features like the decision register, burndown chart projections, spend decomposition (`earned_value + realised_risk + unrealised_spend = actual_spend`), and the budget-model change in [DESIGN_RULES §1](DESIGN_RULES.md).
 - [ ] Ensure that project import and export are still robust and account for new features like decision register.
-- [ ] **Save-on-blur form-association sweep.** Standardise inline-edit forms across the codebase on the HTML5 `form="..."` association pattern — single `<form>` element per row with inputs in different cells referencing it by `id`. This avoids the stale-data bug we hit on milestones (where two separate forms held duplicated hidden inputs and editing one stole the other's stale state).
+- [x] **Save-on-blur form-association sweep.** Standardise inline-edit forms across the codebase on the HTML5 `form="..."` association pattern — single `<form>` element per row with inputs in different cells referencing it by `id`. This avoids the stale-data bug we hit on milestones (where two separate forms held duplicated hidden inputs and editing one stole the other's stale state).
   - **Reference pattern** (already migrated): `templates/milestones.html` lines 47-65. The `<form id="mil-{{ m.id }}">` sits outside the table cells; inputs in different `<td>` elements use `form="mil-{{ m.id }}"` to associate.
   - **Migrate**: `templates/feature_detail.html` deliverables autosave (~lines 278-307). The current `autoSave(tr)` function scans `tr.querySelectorAll('input')` and POSTs to `/api/p/${PID}/deliverables/${delId}/update` — works, but the row's HTML uses implicit forms and won't catch the same multi-form-stale-state class of bug if extended. Refactor to one `<form>` per deliverable row with the form-association pattern, then simplify `autoSave` to `new FormData(form)`.
   - **Leave as-is**: `templates/risks.html` inline-status (`data-action="inline-status"`) and inline-realised (`data-action="inline-realised"`) are single-field PATCH-style updates — the form-association pattern adds nothing for single-field cases. Only worth migrating if those grow to multi-field inline edits.

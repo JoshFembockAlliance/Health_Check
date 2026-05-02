@@ -112,41 +112,40 @@
         </thead>
         <tbody>
             {% for d in req.deliverables %}
+            <form id="del-{{ d.id }}" method="post" action="/p/{{ pid }}/deliverables/{{ d.id }}/update"></form>
             <tr data-del-id="{{ d.id }}">
-                <form method="post" action="/p/{{ pid }}/deliverables/{{ d.id }}/update">
-                    <td><input type="text" name="name" value="{{ d.name }}" aria-label="Deliverable name"></td>
-                    <td>
-                        <select name="priority" aria-label="Priority for {{ d.name }}"
-                                class="priority-select {% if d.priority == 'Must Have' %}priority-must{% elif d.priority == 'Should Have' %}priority-should{% else %}priority-could{% endif %}">
-                            <option value="Must Have" {% if d.priority == "Must Have" %}selected{% endif %}>Must</option>
-                            <option value="Should Have" {% if d.priority == "Should Have" %}selected{% endif %}>Should</option>
-                            <option value="Could Have" {% if d.priority == "Could Have" %}selected{% endif %}>Could</option>
-                        </select>
-                    </td>
-                    <td>
-                        <select name="role_id" aria-label="Role for {{ d.name }}">
-                            <option value="">Default</option>
-                            {% for r in roles %}
-                            <option value="{{ r.id }}" {% if d.role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </td>
-                    <td class="cell-num"><input type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0" aria-label="Budget days for {{ d.name }}" style="width:70px;"></td>
-                    <td class="cell-num">
-                        <div class="pct-cell">
-                            <div class="mini-bar"><div class="mini-fill {% if d.percent_complete == 100 %}fill-done{% endif %}" style="width: {{ d.percent_complete }}%"></div></div>
-                            <input type="number" name="percent_complete" value="{{ d.percent_complete }}" min="0" max="100" class="inline-percent" data-id="{{ d.id }}" aria-label="Percent complete for {{ d.name }}">
-                        </div>
-                    </td>
-                    <td class="cell-num">{{ d.remaining_days | days }}</td>
-                    <td class="cell-num">{{ d.remaining_dollars | currency }}</td>
-                    <td class="cell-actions">
-                        <button type="submit" class="btn btn-sm btn-icon" aria-label="Save deliverable {{ d.name }}" title="Save">✓</button>
-                        <button type="submit" formaction="/p/{{ pid }}/deliverables/{{ d.id }}/delete" class="btn btn-danger-ghost btn-sm btn-icon"
-                                aria-label="Delete deliverable {{ d.name }}" title="Delete"
-                                onclick="event.preventDefault(); showConfirm('Delete deliverable &quot;{{ d.name }}&quot;?', this.closest('form'), '/p/{{ pid }}/deliverables/{{ d.id }}/delete')">✕</button>
-                    </td>
-                </form>
+                <td><input form="del-{{ d.id }}" type="text" name="name" value="{{ d.name }}" aria-label="Deliverable name"></td>
+                <td>
+                    <select form="del-{{ d.id }}" name="priority" aria-label="Priority for {{ d.name }}"
+                            class="priority-select {% if d.priority == 'Must Have' %}priority-must{% elif d.priority == 'Should Have' %}priority-should{% else %}priority-could{% endif %}">
+                        <option value="Must Have" {% if d.priority == "Must Have" %}selected{% endif %}>Must</option>
+                        <option value="Should Have" {% if d.priority == "Should Have" %}selected{% endif %}>Should</option>
+                        <option value="Could Have" {% if d.priority == "Could Have" %}selected{% endif %}>Could</option>
+                    </select>
+                </td>
+                <td>
+                    <select form="del-{{ d.id }}" name="role_id" aria-label="Role for {{ d.name }}">
+                        <option value="">Default</option>
+                        {% for r in roles %}
+                        <option value="{{ r.id }}" {% if d.role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td class="cell-num"><input form="del-{{ d.id }}" type="number" name="budget_days" value="{{ d.budget_days }}" step="0.5" min="0" aria-label="Budget days for {{ d.name }}" style="width:70px;"></td>
+                <td class="cell-num">
+                    <div class="pct-cell">
+                        <div class="mini-bar"><div class="mini-fill {% if d.percent_complete == 100 %}fill-done{% endif %}" style="width: {{ d.percent_complete }}%"></div></div>
+                        <input form="del-{{ d.id }}" type="number" name="percent_complete" value="{{ d.percent_complete }}" min="0" max="100" class="inline-percent" data-id="{{ d.id }}" aria-label="Percent complete for {{ d.name }}">
+                    </div>
+                </td>
+                <td class="cell-num">{{ d.remaining_days | days }}</td>
+                <td class="cell-num">{{ d.remaining_dollars | currency }}</td>
+                <td class="cell-actions">
+                    <button form="del-{{ d.id }}" type="submit" class="btn btn-sm btn-icon" aria-label="Save deliverable {{ d.name }}" title="Save">✓</button>
+                    <button form="del-{{ d.id }}" type="submit" formaction="/p/{{ pid }}/deliverables/{{ d.id }}/delete" class="btn btn-danger-ghost btn-sm btn-icon"
+                            aria-label="Delete deliverable {{ d.name }}" title="Delete"
+                            onclick="event.preventDefault(); showConfirm('Delete deliverable &quot;{{ d.name }}&quot;?', this.form, '/p/{{ pid }}/deliverables/{{ d.id }}/delete')">✕</button>
+                </td>
                 <td class="center">
                     <button type="button"
                             class="pill-toggle pill-toggle-scope"
@@ -326,15 +325,12 @@ function autoSave(tr) {
             fill.classList.toggle('fill-done', clamped === 100);
         }
     }
-    const params = new URLSearchParams();
-    ['name', 'budget_days', 'percent_complete', 'priority', 'role_id'].forEach(fname => {
-        const el = tr.querySelector(`[name="${fname}"]`);
-        if (el) params.set(fname, el.value);
-    });
+    const form = document.getElementById(`del-${delId}`);
+    if (!form) return;
     fetch(`/api/p/${PID}/deliverables/${delId}/update`, {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: params.toString(),
+        body: new URLSearchParams(new FormData(form)).toString(),
     }).catch(() => {});
 }
 
