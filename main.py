@@ -171,7 +171,7 @@ def build_feature_data(project_id: int, feature_id: Optional[int] = None):
 
     enriched_features = []
     for f in features_rows:
-        fdict = {"id": f[0], "name": f[1], "sort_order": f[2], "started": f[3] if len(f) > 3 else 0, "expanded_scope": f[4] if len(f) > 4 else 0}
+        fdict = {"id": f[0], "name": f[1], "sort_order": f[2], "started": f[3], "expanded_scope": f[4]}
         reqs = list(db.execute(
             "SELECT id, feature_id, name, sort_order, COALESCE(expanded_scope,0) FROM requirements WHERE feature_id = ? ORDER BY sort_order, id",
             [fdict["id"]],
@@ -179,7 +179,7 @@ def build_feature_data(project_id: int, feature_id: Optional[int] = None):
 
         enriched_reqs = []
         for r in reqs:
-            rdict = {"id": r[0], "feature_id": r[1], "name": r[2], "sort_order": r[3], "expanded_scope": r[4] if len(r) > 4 else 0}
+            rdict = {"id": r[0], "feature_id": r[1], "name": r[2], "sort_order": r[3], "expanded_scope": r[4]}
             dels = list(db.execute(
                 "SELECT id, requirement_id, name, budget_days, percent_complete, priority, role_id, sort_order, COALESCE(expanded_scope,0) FROM deliverables WHERE requirement_id = ? ORDER BY sort_order, id",
                 [rdict["id"]],
@@ -190,7 +190,7 @@ def build_feature_data(project_id: int, feature_id: Optional[int] = None):
                     "id": d[0], "requirement_id": d[1], "name": d[2],
                     "budget_days": d[3], "percent_complete": d[4],
                     "priority": d[5], "role_id": d[6], "sort_order": d[7],
-                    "expanded_scope": d[8] if len(d) > 8 else 0,
+                    "expanded_scope": d[8],
                 }
                 rate = get_role_rate(ddict["role_id"], roles, default_role_rate)
                 enriched_dels.append(deliverable_summary(ddict, rate))

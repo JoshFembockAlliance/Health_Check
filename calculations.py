@@ -260,11 +260,6 @@ def projected_overhead_team_dollars(
             if as_of and get_week_monday(as_of) == monday:
                 current_burn = day_dollars
                 current_headcount = day_headcount
-            elif as_of and not entries and default_overhead_headcount > 0 and default_overhead_rate > 0:
-                # no period for as-of week — defaults apply
-                if get_week_monday(as_of) == monday:
-                    current_burn = default_overhead_rate * default_overhead_headcount
-                    current_headcount = default_overhead_headcount
         current += timedelta(days=1)
 
     # If no per-day match for as-of (e.g. as_of outside [start, end)), fall back
@@ -542,7 +537,7 @@ def milestones_summary(
 
         if not ms_invoices:
             status = "pending"
-        elif paid_amount >= m["value"] - 1e-6 and m["value"] > 0:
+        elif paid_amount >= m["value"] - 1e-6 and m["value"] > 0:  # float tolerance: sum of invoice amounts may not exactly equal milestone value
             status = "paid"
         else:
             status = "invoiced"
