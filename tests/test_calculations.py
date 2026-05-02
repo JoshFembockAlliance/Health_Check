@@ -3,6 +3,11 @@ from datetime import date, timedelta
 import pytest
 from calculations import (
     business_days_between,
+    parse_date,
+    add_business_days,
+    remaining_days,
+    budget_dollars,
+    remaining_dollars,
     effective_impact_days,
     unrealised_exposure_days,
     resolution_label,
@@ -1123,3 +1128,68 @@ class TestAgileBurndownCapacityProjection:
         result_none = agile_burndown_chart_data(project, summary, capacity_periods=[])
         assert result_overhead is not None and result_none is not None
         assert result_overhead["budget_exhaustion"] == result_none["budget_exhaustion"]
+
+
+# ── parse_date ─────────────────────────────────────────────────────────────
+
+class TestParseDate:
+    def test_valid_iso_date(self):
+        assert parse_date("2025-01-15") == date(2025, 1, 15)
+
+    def test_empty_string_returns_none(self):
+        assert parse_date("") is None
+
+    def test_none_returns_none(self):
+        assert parse_date(None) is None
+
+    def test_invalid_string_returns_none(self):
+        assert parse_date("not-a-date") is None
+
+    def test_wrong_format_returns_none(self):
+        assert parse_date("15/01/2025") is None
+
+
+# ── add_business_days ───────────────────────────────────────────────────────
+
+class TestAddBusinessDays:
+    def test_one_day_forward_from_monday(self):
+        assert add_business_days(date(2024, 1, 15), 1) == date(2024, 1, 16)  # Mon → Tue
+
+    def test_skips_weekend(self):
+        assert add_business_days(date(2024, 1, 19), 1) == date(2024, 1, 22)  # Fri → Mon
+
+    def test_zero_returns_start(self):
+        assert add_business_days(date(2024, 1, 15), 0) == date(2024, 1, 15)
+
+    def test_fractional_rounds_to_nearest(self):
+        # 0.4 rounds to 0 → same day; 0.6 rounds to 1 → next business day
+        assert add_business_days(date(2024, 1, 15), 0.4) == date(2024, 1, 15)
+        assert add_business_days(date(2024, 1, 15), 0.6) == date(2024, 1, 16)
+
+    def test_five_days_spans_one_week(self):
+        assert add_business_days(date(2024, 1, 15), 5) == date(2024, 1, 22)  # Mon → Mon
+
+
+# ── remaining_days / budget_dollars / remaining_dollars ────────────────────
+
+class TestBudgetMath:
+    def test_remaining_days_zero_complete(self):
+        assert remaining_days(10.0, 0) == 10.0
+
+    def test_remaining_days_half_complete(self):
+        assert remaining_days(10.0, 50) == 5.0
+
+    def test_remaining_days_fully_complete(self):
+        assert remaining_days(10.0, 100) == 0.0
+
+    def test_budget_dollars_basic(self):
+        assert budget_dollars(5.0, 1_000.0) == 5_000.0
+
+    def test_budget_dollars_zero_rate(self):
+        assert budget_dollars(10.0, 0.0) == 0.0
+
+    def test_remaining_dollars_half_done(self):
+        assert remaining_dollars(10.0, 50, 1_000.0) == 5_000.0
+
+    def test_remaining_dollars_fully_done(self):
+        assert remaining_dollars(10.0, 100, 1_000.0) == 0.0
