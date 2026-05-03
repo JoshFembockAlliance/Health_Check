@@ -488,3 +488,121 @@ def test_fixed_price_project_full_flow(page: Page):
         page.locator(f"form[action='/projects/{pid}/delete'] button").click()
         page.locator("#confirm-ok").click()
         page.wait_for_load_state("networkidle")
+
+
+# ── Decision Register ─────────────────────────────────────────────────────────
+
+def test_decisions_page_loads(page: Page):
+    """Decision Register page renders with title and stat cards."""
+    page.goto(f"{P1}/decisions")
+    expect(page.locator(".page-title", has_text="Decision Register")).to_be_visible()
+    expect(page.locator(".stat", has_text="Total").first).to_be_visible()
+
+
+def test_decisions_tab_in_top_nav(page: Page):
+    """Decisions tab is visible in the project top nav."""
+    page.goto(f"{P1}/decisions")
+    expect(page.locator(".top-nav a", has_text="Decisions").first).to_be_visible()
+
+
+def test_add_and_delete_decision(page: Page):
+    """Can add a decision via the add panel and delete it via the confirm dialog."""
+    page.goto(f"{P1}/decisions")
+    page.locator("#toggle-add-decision").click()
+    form = page.locator("form[action='/p/1/decisions/add']")
+    form.locator("input[name='name']").fill("E2E Test Decision")
+    form.locator("button[type='submit']").click()
+
+    expect(page.locator(".decision-card", has=page.locator("text=E2E Test Decision")).first).to_be_visible()
+
+    while page.locator(".decision-card", has=page.locator("text=E2E Test Decision")).count() > 0:
+        card = page.locator(".decision-card", has=page.locator("text=E2E Test Decision")).last
+        decision_id = card.get_attribute("data-decision-id")
+        card.locator(f"form[action='/p/1/decisions/{decision_id}/delete'] button").click()
+        page.locator("#confirm-ok").click()
+        page.wait_for_load_state("networkidle")
+
+    expect(page.locator(".decision-card", has=page.locator("text=E2E Test Decision"))).not_to_be_visible()
+
+
+def test_decision_type_filter(page: Page):
+    """Filter tabs narrow the decision list to the chosen type."""
+    page.goto(f"{P1}/decisions")
+    page.locator("#toggle-add-decision").click()
+    page.locator("form[action='/p/1/decisions/add'] input[name='name']").fill("E2E Pivot Decision")
+    # Ensure Pivot is selected (it's the default, but be explicit)
+    page.locator("form[action='/p/1/decisions/add'] select[name='decision_type']").select_option("Pivot")
+    page.locator("form[action='/p/1/decisions/add'] button[type='submit']").click()
+    expect(page.locator(".decision-card", has=page.locator("text=E2E Pivot Decision")).first).to_be_visible()
+
+    # Filter to Pivots — card must still be visible
+    page.locator(".pill-tabs button[value='pivot']").click()
+    page.wait_for_load_state("networkidle")
+    expect(page.locator(".decision-card", has=page.locator("text=E2E Pivot Decision")).first).to_be_visible()
+
+    # Filter to Scope — card must disappear
+    page.locator(".pill-tabs button[value='scope']").click()
+    page.wait_for_load_state("networkidle")
+    expect(page.locator(".decision-card", has=page.locator("text=E2E Pivot Decision"))).not_to_be_visible()
+
+    # Cleanup — go back to all and delete
+    page.goto(f"{P1}/decisions")
+    while page.locator(".decision-card", has=page.locator("text=E2E Pivot Decision")).count() > 0:
+        card = page.locator(".decision-card", has=page.locator("text=E2E Pivot Decision")).last
+        decision_id = card.get_attribute("data-decision-id")
+        card.locator(f"form[action='/p/1/decisions/{decision_id}/delete'] button").click()
+        page.locator("#confirm-ok").click()
+        page.wait_for_load_state("networkidle")
+
+
+# ── Expanded-scope toggle (feature detail) ───────────────────────────────────
+
+def test_expanded_scope_toggle_on_feature(page: Page):
+    """Expanded-scope pill toggle on a feature detail page toggles state and
+    propagates the aria-checked attribute."""
+    page.goto(f"{P1}/features")
+    # Add a temporary feature
+    page.locator(".page-actions button", has_text="Add feature").click()
+    dlg = page.locator("#add-feature-dialog")
+    expect(dlg).to_be_visible()
+    dlg.locator("input[name='name']").fill("E2E Scope Toggle Feature")
+    dlg.locator("button[type='submit']").click()
+    expect(page.locator("text=E2E Scope Toggle Feature").first).to_be_visible()
+
+    # Navigate to the feature detail page
+    feature_link = page.locator("a", has_text="E2E Scope Toggle Feature").first
+    feature_url = feature_link.get_attribute("href")
+    page.goto(f"{BASE}{feature_url}")
+
+    toggle = page.locator(".pill-toggle-scope[data-type='feature']")
+    expect(toggle).to_be_visible()
+    initial_state = toggle.get_attribute("aria-checked")
+
+    # Click to toggle
+    toggle.click()
+    page.wait_for_timeout(400)  # allow fetch to complete
+    new_state = toggle.get_attribute("aria-checked")
+    assert new_state != initial_state, f"Toggle state did not change: {new_state}"
+
+    # Toggle back
+    toggle.click()
+    page.wait_for_timeout(400)
+    restored_state = toggle.get_attribute("aria-checked")
+    assert restored_state == initial_state, f"Toggle did not restore: {restored_state}"
+
+    # Cleanup
+    page.goto(f"{P1}/features")
+    delete_form = page.locator(
+        "form[action*='/p/1/features/'][action*='/delete']",
+        has=page.locator(".."),
+    ).last
+    # Use JS delete as in the existing add_and_delete_feature test pattern
+    feature_id = feature_url.rstrip("/").split("/")[-1]
+    with page.expect_navigation():
+        page.evaluate(f"""() => {{
+            const f = document.createElement('form');
+            f.method = 'post';
+            f.action = '/p/1/features/{feature_id}/delete';
+            document.body.appendChild(f);
+            f.submit();
+        }}""")
