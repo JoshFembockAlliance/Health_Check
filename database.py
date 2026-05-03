@@ -14,7 +14,7 @@ import sqlite_utils
 import os
 from datetime import date as _date
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "health_check.db")
+DB_PATH = os.environ.get("HEALTH_CHECK_DB") or os.path.join(os.path.dirname(__file__), "health_check.db")
 
 # Tables that are scoped to a single project via a project_id column.
 PROJECT_SCOPED_TABLES = [

@@ -35,7 +35,7 @@ Remove the really basic symbols like triangle, dot, diamond and circle from symb
 
 ### General
 ### Demo Projects
-- [ ] **Demo Projects**
+- [x] **Demo Projects**
 Create a demo project dev dataset that contains a few items for each project type. The idea of this database is to keep it small and only change it infrequently for use in testing when new features are developed without impacting current projects during testing. If this is overly complex, make a note of why here and move on instead of picking it up. Ensure the note contains enough details tha the causes can be addressed to achieve the desired outcome some other way. 
 
 - [x] Make sure test coverage is up-to-date and accounts for new features like the decision register, burndown chart projections, spend decomposition (`earned_value + realised_risk + unrealised_spend = actual_spend`), and the budget-model change in [DESIGN_RULES §1](DESIGN_RULES.md).
