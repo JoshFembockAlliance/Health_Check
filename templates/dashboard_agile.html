@@ -47,6 +47,28 @@
 {% set favourable_variance = [earned_value + s.realised_risk_dollars - s.actual_spend, 0] | max %}
 {% set spend_delta_pct = (s.burn_delta / s.actual_spend * 100) if s.actual_spend > 0 else 0 %}
 
+{# Expanded-scope sub-totals — partitioned from the overall feature delivery
+   and plan-zone figures. Rolled up from deliverables so that requirement-
+   or deliverable-level tags are captured even when the parent feature is
+   not itself marked. expanded + normal always sum correctly because they
+   partition the same deliverable set. #}
+{% set _ns = namespace(exp_alloc=0, exp_earned=0, exp_remaining=0) %}
+{% for f in features %}
+  {% for req in f.requirements %}
+    {% for d in req.deliverables %}
+      {% if d.expanded_scope %}
+        {% set _ns.exp_alloc = _ns.exp_alloc + d.budget_dollars %}
+        {% set _ns.exp_earned = _ns.exp_earned + (d.budget_dollars - d.remaining_dollars) %}
+        {% set _ns.exp_remaining = _ns.exp_remaining + d.remaining_dollars %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+{% endfor %}
+{% set expanded_allocated_dollars = _ns.exp_alloc %}
+{% set expanded_earned_value = _ns.exp_earned %}
+{% set expanded_remaining_dollars = _ns.exp_remaining %}
+{% set has_expanded_scope = expanded_allocated_dollars > 0 %}
+
 <div class="hero-grid two-row">
     <div class="hero-card primary" id="hero-net-accessible" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="net-accessible-modal" title="Click for a sentence-form breakdown of how the budget is being used" style="grid-column: span 3; cursor:pointer;">
         <div class="label">Net Accessible Budget <span aria-hidden="true" style="opacity:0.65; margin-left:4px; font-weight:500;">›</span></div>
@@ -146,6 +168,10 @@
     {% set wl_open_pct = (s.open_risk_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
     {% set wl_accessible = s.accessible_budget %}
     {% set wl_accessible_pct = (wl_accessible / wl_denom * 100) if wl_denom > 0 else 0 %}
+    {# Expanded-scope bar sub-segment percentages.  Clamped to prevent
+       floating-point edge cases from pushing a sub-segment outside its parent. #}
+    {% set wl_exp_delivered_pct = ([expanded_earned_value / wl_denom * 100, wl_comp_fill_pct] | min) if wl_denom > 0 else 0 %}
+    {% set wl_exp_remaining_pct = ([expanded_remaining_dollars / wl_denom * 100, wl_feature_budget_pct - wl_comp_fill_pct] | min) if wl_denom > 0 else 0 %}
 
     <div class="hero-card" id="hero-overall-completion" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="overall-completion-modal" title="Click for a sentence-form breakdown of how the budget is being used" style="cursor:pointer; position:relative; grid-column: span 3;">
         <div class="label">Overall Completion <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></div>
@@ -172,6 +198,25 @@
             {% if wl_target_pct > 0 %}
             <div class="target plan-marker" style="left: {{ wl_target_pct }}%"
                  title="On-track target — {{ s.feature_expected_burn_pct | pct }} of feature work should be delivered by now."></div>
+            {% endif %}
+            {# Expanded-scope delivery stripe: rightmost portion of the green fill.
+               Diagonal hatching distinguishes expanded-scope delivered work from
+               normal-scope delivery without changing the total fill width.
+               spend-detail (not plan-marker) — it represents actual spend, so it
+               belongs to the Spend categories toggle. #}
+            {% if wl_exp_delivered_pct > 0 %}
+            <div class="fill-expanded spend-detail"
+                 style="left: {{ wl_comp_fill_pct - wl_exp_delivered_pct }}%; width: {{ wl_exp_delivered_pct }}%;"
+                 title="Expanded scope — delivered: {{ expanded_earned_value | currency }} of feature delivery is from expanded-scope work ({{ wl_exp_delivered_pct | round(1) }}% of total budget). This is a subset of the green fill above, not additional budget."></div>
+            {% endif %}
+            {# Expanded-scope undelivered budget: rightmost portion of the plan zone.
+               Sits immediately inside the right edge of the plan-zone tint before
+               the right-side overhead/spend blocks begin. Partitions the plan zone
+               — no budget double-counted. #}
+            {% if wl_exp_remaining_pct > 0 %}
+            <div class="feature-budget-bar-expanded plan-marker"
+                 style="left: {{ wl_feature_budget_pct - wl_exp_remaining_pct }}%; width: {{ wl_exp_remaining_pct }}%;"
+                 title="Expanded scope — undelivered: {{ expanded_remaining_dollars | currency }} remaining across expanded-scope features ({{ wl_exp_remaining_pct | round(1) }}% of total budget). Subset of the plan zone — not additional budget."></div>
             {% endif %}
             {% set wl_fixed_overhead_pct = (s.fixed_overhead_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
             {% set wl_overhead_team_pct = (s.overhead_team_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
@@ -216,21 +261,22 @@
         </div>
 
         {# ── Main bar legend, grouped by detail toggle.
-
-           Layout: one default row of items that always show (no toggle gates
-           them), then one row per toggle. Each toggle row leads with its
-           pill-shaped switch on the left, followed by the items that
-           appear/merge depending on its state. The CSS rules on
-           `.hero-card[data-detail-*]` still drive item visibility, so this
-           markup is a pure layout reshuffle from the previous flat row.
-
-           Renames vs prior version: "Earned value" → "Feature delivery";
-           "Spent (non-earned)" → "Spent (non-features)". The earned/unearned
-           dichotomy was misleading — realised risk is "earned" in the sense
-           the team was paid for it, it just didn't deliver a feature. #}
+           Layout:
+             • Default row — always visible headline items.
+             • Spend categories section — toggle button row, then grouped sub-rows:
+                 - Overhead group (fixed + team) on its own indented row
+                 - Scope breakdown (expanded vs normal delivery) on its own indented row
+                 - Ungrouped spend items (unrealised / realised / merged) last
+             • Plan markers row — feature budget zone + on-track target + expanded undelivered
+             • Risk overlay row
+           CSS rules on `.hero-card[data-detail-*]` drive item/row visibility.
+           Rows with `spend-detail` class hide entirely when spend toggle is off. #}
         <div class="bar-legend" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
 
-            {# Default row: items that show regardless of toggle state. #}
+            {# Default row — always visible. Shows headline items.
+               "Overheads" is the merged total; the breakdown moves to the overhead
+               sub-row inside the spend section. "Fixed overheads" detail item moves
+               there too, so the default row stays clean when spend categories is on. #}
             <div class="legend-row legend-row-default">
                 <span title="Feature delivery — {{ s.overall_completion | pct }} of allocated feature work delivered, worth {{ earned_value | currency }} at planned rates. This is the spend that has produced visible features."
                       style="display:inline-flex; align-items:center; gap:5px;">
@@ -239,20 +285,12 @@
                     <strong>{{ earned_value | currency }}</strong>
                 </span>
                 {% if wl_overhead_pct > 0 %}
-                <span class="spend-merged" title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work. Toggle 'Spend categories' to split fixed vs overhead-team."
+                <span class="spend-merged" title="{{ s.overhead_dollars | currency }} pre-committed to non-feature work. Toggle 'Spend categories' to see the breakdown."
                       style="display:inline-flex; align-items:center; gap:5px;">
                     <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
                     <span class="muted">Overheads</span>
                     <strong>{{ s.overhead_dollars | currency }}</strong>
                 </span>
-                {% if s.fixed_overhead_dollars > 0 %}
-                <span class="spend-detail" title="{{ s.fixed_overhead_dollars | currency }} fixed-dollar overheads."
-                      style="display:inline-flex; align-items:center; gap:5px;">
-                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
-                    <span class="muted">Fixed overheads</span>
-                    <strong>{{ s.fixed_overhead_dollars | currency }}</strong>
-                </span>
-                {% endif %}
                 {% endif %}
                 {% if wl_unrealised_pct == 0 and favourable_variance > 0 %}
                 <span title="Feature delivery ({{ earned_value | currency }}) plus realised risk impact ({{ s.realised_risk_dollars | currency }}) exceeds actual spend ({{ s.actual_spend | currency }}) — the team has produced more value-equivalent work than they've been paid for at planned rates. Favourable variance."
@@ -270,15 +308,36 @@
                 </span>
             </div>
 
-            {# Spend toggle row: pill switch + (split / merged) spend items. #}
+            {# ── Spend categories section ── #}
             <div class="legend-row">
                 <button type="button" class="pill-toggle" data-detail-toggle="spend" role="switch" aria-checked="true"
-                        title="Splits the right-side spend block into Realised risk and Unrealised spend. When off, they merge into a single 'Spent (non-features)' block.">
+                        title="Splits spend into sub-categories. When off, non-feature spend merges into a single 'Spent (non-features)' block.">
                     <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
                     <span class="pill-toggle-label">Spend categories</span>
                 </button>
+                {# Merged non-feature spend (spend OFF view) #}
+                {% if merged_pct > 0 %}
+                <span class="spend-merged" title="Combined view: {{ s.realised_risk_dollars | currency }} on realised risk handling + {{ unrealised_spend | currency }} of unrealised spend = {{ merged_amount | currency }} that's been paid but didn't produce visible features. Toggle 'Spend categories' to split this back into its parts."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
+                    <span class="muted">Spent (non-features)</span>
+                    <strong>{{ merged_amount | currency }}</strong>
+                </span>
+                {% endif %}
+            </div>
+            {# Overhead group row — fixed + overhead-team, together on one line (spend ON) #}
+            {% if s.overhead_dollars > 0 %}
+            <div class="legend-row spend-detail" style="padding-left:28px;">
+                {% if s.fixed_overhead_dollars > 0 %}
+                <span title="{{ s.fixed_overhead_dollars | currency }} fixed-dollar overheads (PM retainer, tooling licences, etc.)."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7);"></span>
+                    <span class="muted">Fixed overheads</span>
+                    <strong>{{ s.fixed_overhead_dollars | currency }}</strong>
+                </span>
+                {% endif %}
                 {% if s.overhead_team_dollars_realised > 0 %}
-                <span class="spend-detail" title="{{ s.overhead_team_dollars_realised | currency }} overhead team spend accrued from project start to as-of date."
+                <span title="{{ s.overhead_team_dollars_realised | currency }} overhead team spend accrued from project start to as-of date."
                       style="display:inline-flex; align-items:center; gap:5px;">
                     <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7); opacity:0.75;"></span>
                     <span class="muted">Overhead team (to date)</span>
@@ -286,13 +345,37 @@
                 </span>
                 {% endif %}
                 {% if s.overhead_team_dollars_remaining > 0 %}
-                <span class="spend-detail" title="{{ s.overhead_team_dollars_remaining | currency }} overhead team spend projected from as-of date to project end."
+                <span title="{{ s.overhead_team_dollars_remaining | currency }} overhead team spend projected from as-of date to project end."
                       style="display:inline-flex; align-items:center; gap:5px;">
                     <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7); opacity:0.5;"></span>
                     <span class="muted">Overhead team (projected)</span>
                     <strong>{{ s.overhead_team_dollars_remaining | currency }}</strong>
                 </span>
                 {% endif %}
+            </div>
+            {% endif %}
+            {# Scope breakdown row — expanded vs normal delivery on one line (spend ON, only if any expanded scope) #}
+            {% if has_expanded_scope %}
+            <div class="legend-row spend-detail" style="padding-left:28px;">
+                <span title="Expanded scope delivery — {{ expanded_earned_value | currency }} of feature delivery is from features tagged as expanded scope. Subset of the total feature delivery; not additional budget."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: {% if comp_fill == 'fill-good' %}var(--good){% elif comp_fill == 'fill-warn' %}var(--warn){% else %}var(--bad){% endif %}; background-image: repeating-linear-gradient(-45deg, transparent 0 3px, oklch(from var(--surface) l c h / 0.35) 3px 5px);"></span>
+                    <span class="muted">Expanded scope delivery</span>
+                    <strong>{{ expanded_earned_value | currency }}</strong>
+                </span>
+                <span title="Normal scope delivery — {{ (earned_value - expanded_earned_value) | currency }} of feature delivery is from normal-scope features."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: {% if comp_fill == 'fill-good' %}var(--good){% elif comp_fill == 'fill-warn' %}var(--warn){% else %}var(--bad){% endif %};"></span>
+                    <span class="muted">Normal scope delivery</span>
+                    <strong>{{ (earned_value - expanded_earned_value) | currency }}</strong>
+                </span>
+            </div>
+            {% endif %}
+            {# Ungrouped spend items — unrealised and realised risk (spend ON).
+               Row-level spend-detail so the row hides entirely when spend is OFF
+               (the merged item in the toggle row above covers the OFF state). #}
+            {% if merged_pct > 0 %}
+            <div class="legend-row spend-detail" style="padding-left:28px;">
                 {% if wl_unrealised_pct > 0 %}
                 <span class="spend-detail" title="Spend = feature delivery + realised risk + unrealised. {{ s.actual_spend | currency }} = {{ earned_value | currency }} + {{ s.realised_risk_dollars | currency }} + {{ unrealised_spend | currency }}. The unrealised portion is paid time not yet visible as features or categorised risk impact (work in flight, rework, exploration, non-feature work)."
                       style="display:inline-flex; align-items:center; gap:5px;">
@@ -309,20 +392,14 @@
                     <strong>{{ s.realised_risk_dollars | currency }}</strong>
                 </span>
                 {% endif %}
-                {% if merged_pct > 0 %}
-                <span class="spend-merged" title="Combined view: {{ s.realised_risk_dollars | currency }} on realised risk handling + {{ unrealised_spend | currency }} of unrealised spend = {{ merged_amount | currency }} that's been paid but didn't produce visible features. Toggle 'Spend categories' to split this back into its parts."
-                      style="display:inline-flex; align-items:center; gap:5px;">
-                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--muted) l c h / 0.45); border:1px solid oklch(from var(--muted) l c h / 0.7);"></span>
-                    <span class="muted">Spent (non-features)</span>
-                    <strong>{{ merged_amount | currency }}</strong>
-                </span>
-                {% endif %}
             </div>
+            {% endif %}
 
-            {# Plan markers row: pill switch + feature budget zone + on-track target. #}
+            {# Plan markers row: pill switch + feature budget zone + on-track target
+               + expanded-scope undelivered budget. #}
             <div class="legend-row">
                 <button type="button" class="pill-toggle" data-detail-toggle="plan" role="switch" aria-checked="true"
-                        title="Shows the feature-budget zone tint on the left and the on-track target line. When off, the left side shows just the delivered feature-delivery fill on a plain background.">
+                        title="Shows the feature-budget zone tint and on-track target. When off, the bar shows just the delivery fill on a plain background.">
                     <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
                     <span class="pill-toggle-label">Plan markers</span>
                 </button>
@@ -340,6 +417,14 @@
                     <span aria-hidden="true" style="width:2px; height:11px; background: var(--text-strong);"></span>
                     <span class="muted">On-track target</span>
                     <strong>{{ s.feature_expected_burn_pct | pct }}</strong>
+                </span>
+                {% endif %}
+                {% if has_expanded_scope and wl_exp_remaining_pct > 0 %}
+                <span class="plan-marker" title="Expanded scope budget (undelivered) — {{ expanded_remaining_dollars | currency }} remaining across features tagged as expanded scope. Subset of the plan zone; shown at its right edge on the bar."
+                      style="display:inline-flex; align-items:center; gap:5px;">
+                    <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.30); border:1px dashed oklch(from var(--info) l c h / 0.7);"></span>
+                    <span class="muted">Expanded scope (undelivered)</span>
+                    <strong>{{ expanded_remaining_dollars | currency }}</strong>
                 </span>
                 {% endif %}
             </div>

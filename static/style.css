@@ -668,6 +668,28 @@ input:focus, select:focus, textarea:focus {
   position: absolute; top: 0; bottom: 0;
   background: oklch(from var(--bad) l c h / 0.5);
 }
+/* Expanded-scope sub-segment within the feature delivery fill.
+   A diagonal stripe overlaid on the fill colour marks the portion of
+   delivered work that came from expanded-scope items. Controlled by
+   plan-marker toggle so it disappears with the rest of the plan context. */
+.progress .fill-expanded {
+  position: absolute; top: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 3px,
+    oklch(from var(--surface) l c h / 0.35) 3px 5px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+/* Expanded-scope undelivered budget within the plan zone.
+   Slightly more saturated than the base plan-zone tint to distinguish it. */
+.progress .feature-budget-bar-expanded {
+  position: absolute; top: 0; bottom: 0;
+  background: oklch(from var(--info) l c h / 0.30);
+  border-left: 1px dashed oklch(from var(--info) l c h / 0.7);
+  pointer-events: none;
+}
 /* "What's left" lens — overheads + actual spend are pre-committed budget
    that burns the bar down from the right alongside realised risks. */
 .progress .bar-overhead {
