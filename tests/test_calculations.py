@@ -1172,6 +1172,144 @@ class TestAddBusinessDays:
 
 # ── remaining_days / budget_dollars / remaining_dollars ────────────────────
 
+# ── agile_burndown_chart_data: projection finish dates ────────────────────────
+
+class TestBurndownProjectionFinishes:
+    """Tests for the four scope-finish projections returned by agile_burndown_chart_data."""
+
+    def test_returns_all_projection_keys(self):
+        project = _minimal_project()
+        summary = _minimal_summary()
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        for key in (
+            "planned_cost_finish", "inefficiency_finish", "pace_finish", "ratio_finish",
+            "planned_cost_days", "inefficiency_days", "pace_days", "ratio_days",
+            "inefficiency_factor", "unrealised_ratio_pct", "feature_efficiency_pct",
+            "non_feature_ratio_pct",
+        ):
+            assert key in result, f"missing key: {key}"
+
+    def test_planned_cost_days_equals_remaining_over_burn(self):
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=10_000.0)
+        # remaining_dollars=100k, daily_burn=10k → 10 days
+        assert summary["remaining_dollars"] == 100_000.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["planned_cost_days"] == pytest.approx(10.0)
+
+    def test_inefficiency_factor_greater_than_one_with_unrealised_spend(self):
+        # Default inputs: actual_spend=250k, earned=300k×0.60=180k, unrealised=70k
+        # unrealised_ratio = 70k/250k = 0.28 → factor = 1/0.72 ≈ 1.389
+        project = _minimal_project()
+        summary = _minimal_summary()
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["inefficiency_factor"] > 1.0
+        assert result["inefficiency_days"] > result["planned_cost_days"]
+        assert result["inefficiency_finish"] >= result["planned_cost_finish"]
+
+    def test_inefficiency_factor_clamps_to_one_when_earned_exceeds_spend(self):
+        # earned_value = 200k×0.80 = 160k > actual_spend=100k → unrealised clamped to 0
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["actual_spend"] = 100_000.0
+        summary["allocated_dollars"] = 200_000.0
+        summary["overall_completion"] = 80.0
+        summary["realised_risk_dollars"] = 0.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["inefficiency_factor"] == pytest.approx(1.0)
+        assert result["unrealised_ratio_pct"] == pytest.approx(0.0)
+
+    def test_pace_days_falls_back_to_planned_when_no_elapsed_time(self):
+        # start == as_of → bd_elapsed=0 → pace falls back to planned_cost_days
+        project = _minimal_project(start="2025-04-28", as_of="2025-04-28")
+        summary = _minimal_summary(daily_burn=10_000.0)
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["pace_days"] == pytest.approx(result["planned_cost_days"])
+
+    def test_pace_days_longer_when_actual_pace_below_plan(self):
+        # Default: actual_spend=250k elapsed ~80 bd → pace ≈ 3125/day << daily_burn=10k
+        # pace_days = remaining/pace = 100k/3125 ≈ 32 > planned 10 days
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=10_000.0)
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["pace_days"] > result["planned_cost_days"]
+        assert result["pace_finish"] > result["planned_cost_finish"]
+
+    def test_returns_none_when_daily_burn_is_zero(self):
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=0.0)
+        assert agile_burndown_chart_data(project, summary, capacity_periods=[]) is None
+
+    def test_returns_none_when_start_date_missing(self):
+        project = _minimal_project(start="")
+        summary = _minimal_summary()
+        assert agile_burndown_chart_data(project, summary, capacity_periods=[]) is None
+
+
+# ── spend decomposition identity ─────────────────────────────────────────────
+
+class TestSpendDecompositionIdentity:
+    """earned_value + realised_risk + unrealised_spend = actual_spend (DESIGN_RULES §2)."""
+
+    def test_decomposition_sums_to_actual_with_no_risk(self):
+        # actual=250k, earned=300k×0.60=180k, unrealised=70k, risk=0
+        # feature_efficiency_pct=72, unrealised_ratio_pct=28 → sum=100%
+        project = _minimal_project()
+        summary = _minimal_summary()
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        total_pct = result["feature_efficiency_pct"] + result["unrealised_ratio_pct"]
+        assert total_pct == pytest.approx(100.0, abs=0.01)
+
+    def test_decomposition_sums_to_actual_with_realised_risk(self):
+        # actual=300k, earned=300k×0.50=150k, risk=50k, unrealised=100k
+        # feature=50%, risk=16.67%, unrealised=33.33% → sum=100%
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["actual_spend"] = 300_000.0
+        summary["allocated_dollars"] = 300_000.0
+        summary["overall_completion"] = 50.0
+        summary["realised_risk_dollars"] = 50_000.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        realised_pct = summary["realised_risk_dollars"] / summary["actual_spend"] * 100
+        total_pct = result["feature_efficiency_pct"] + result["unrealised_ratio_pct"] + realised_pct
+        assert total_pct == pytest.approx(100.0, abs=0.01)
+
+    def test_favourable_variance_clamps_unrealised_to_zero(self):
+        # earned=200k×0.80=160k > actual=100k → unrealised_spend clamped to 0
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["actual_spend"] = 100_000.0
+        summary["allocated_dollars"] = 200_000.0
+        summary["overall_completion"] = 80.0
+        summary["realised_risk_dollars"] = 0.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["unrealised_ratio_pct"] == pytest.approx(0.0)
+
+    def test_feature_efficiency_pct_equals_earned_over_actual(self):
+        # Explicit: earned = 400k×0.50 = 200k, actual = 400k → efficiency = 50%
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["actual_spend"] = 400_000.0
+        summary["allocated_dollars"] = 400_000.0
+        summary["overall_completion"] = 50.0
+        summary["realised_risk_dollars"] = 0.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["feature_efficiency_pct"] == pytest.approx(50.0)
+        assert result["unrealised_ratio_pct"] == pytest.approx(50.0)
+
+
+# ── budget math (remaining_days, budget_dollars, remaining_dollars) ──────────
+
 class TestBudgetMath:
     def test_remaining_days_zero_complete(self):
         assert remaining_days(10.0, 0) == 10.0
