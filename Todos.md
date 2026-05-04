@@ -21,7 +21,7 @@ I have noticed that the E2E tests are leaving new risks behind after finishing, 
 
 
 ### Agile Project Dashboard Items
-- [ ] **Net Accessible Budget Modal - Unrealised Spend**
+- [x] **Net Accessible Budget Modal - Unrealised Spend**
 The modal lists a few items that unrealised spend could go toward but doesn't provide a solid metric for if it's a healthy amount of value to have in-flight at the time of the review. Because an agile sprint typically only includes enough items to finish them out during a single sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. More than that is unhealthy and should be discussed and accounted for. 
 
 ### Fixed Price Project Dashboard Items - ignore for now
@@ -29,7 +29,7 @@ The modal lists a few items that unrealised spend could go toward but doesn't pr
 The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
 
 ### Settings
-- [ ] **Project Symbols** 
+- [x] **Project Symbols** 
 Remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. Add a few that are tech-industry relevant, evoking finances, industry, etc. 
 
 ### Features, Requirements & Deliverables
