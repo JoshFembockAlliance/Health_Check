@@ -42,7 +42,7 @@ Three budget values, each with a single purpose.
 |---|---|---|
 | `total_budget` | `initial_budget + adjustments` | The full pot. Denominator for burn % and the base of allocation tilings. |
 | `liquid_budget` | `total_budget − actual_spend` | Q1: what's still in the account. |
-| `promisable_budget` | `liquid_budget − overhead_dollars` | Q2: what can still be committed to features without overdrawing reservations. |
+| `promisable_budget` | `liquid_budget − fixed_overhead_dollars − overhead_team.remaining_dollars` | Q2: what can still be committed to features without overdrawing reservations. |
 
 **Deprecated aliases** (still in returned summary dict for one release;
 remove after the dashboard sweep is complete):
@@ -53,6 +53,17 @@ remove after the dashboard sweep is complete):
 **Realised risks are not subtracted from `promisable_budget`.** They're a
 categorisation of `actual_spend` (team time on risk handling is logged as
 spend), so subtracting them again would double-count. See §3 for details.
+
+**Only the *unspent* portion of the overhead-team commitment is
+deducted.** Overhead-team time that has already been invoiced sits inside
+`actual_spend` (and therefore is already removed via `liquid_budget`).
+Subtracting the lifetime `overhead_team.total_dollars` would double-count
+the realised portion — shrinking `feature_runway_days` by
+`overhead_team.realised_dollars / delivery_daily_burn` business days and
+making the burndown projection finish earlier than it should. Same
+reasoning as realised risks. Fixed overheads are typically separately
+invoiced (not in `actual_spend`), so they continue to be deducted at
+face value.
 
 **Overheads are subtracted from `promisable_budget` and from
 `feature_runway_days`.** They are pre-committed to non-feature work
@@ -93,10 +104,12 @@ out of both numerator and denominator there.
 
 Note: this is **hybrid accrual**. Overhead-team burn shows up progressively
 in `expected_spend` and `total_runway_days` (so they compare to actual),
-but the full overhead-team projection is still reserved up-front in
-`promisable_budget` so feature runway isn't promised against money
-committed to non-billable roles. The lens toggle on the headline cards
-lets PMs view either side without changing the underlying math.
+and `promisable_budget` reserves the **remaining** overhead-team
+commitment so feature runway isn't promised against money committed to
+non-billable roles still to come. The realised portion is left out of
+the deduction because it has already left the account via `actual_spend`.
+The lens toggle on the headline cards lets PMs view either side without
+changing the underlying math.
 
 ### "Show unrealised overhead" toggle on the spend decomposition bar
 

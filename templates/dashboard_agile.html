@@ -109,16 +109,17 @@
         <div class="sub-row">
             {# Pre-committed: overheads sit at the top — money that was never
                available for feature work in the first place. #}
-            {% if s.overhead_dollars > 0 %}
-            <div class="row" title="Pre-committed to non-delivery costs (fixed overheads + overhead-team commitment). Reserved at project start; never available to redirect to features.">
-                <span class="lbl">Overheads <span class="muted tiny" style="font-size:10px;">(pre-committed)</span></span><span class="val">− {{ s.overhead_dollars | currency }}</span>
+            {% set overhead_deduction = s.fixed_overhead_dollars + s.overhead_team_dollars_remaining %}
+            {% if overhead_deduction > 0 %}
+            <div class="row" title="Pre-committed to non-delivery costs still to come (fixed overheads + unspent overhead-team commitment). Realised overhead-team time is already inside Spent to date, so only the remainder is reserved against Liquid here.">
+                <span class="lbl">Overheads <span class="muted tiny" style="font-size:10px;">(pre-committed)</span></span><span class="val">− {{ overhead_deduction | currency }}</span>
             </div>
-            {% if s.overhead_team_dollars > 0 and s.fixed_overhead_dollars > 0 %}
+            {% if s.overhead_team_dollars_remaining > 0 and s.fixed_overhead_dollars > 0 %}
             <div class="row" style="opacity:0.7;" title="Fixed-dollar overheads from Settings (PM retainer, tooling licences, etc.).">
                 <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Fixed overheads</span><span class="val tiny" style="font-size:11px;">{{ s.fixed_overhead_dollars | currency }}</span>
             </div>
-            <div class="row" style="opacity:0.7;" title="Overhead team members (BAs, designers, SMEs, facilitators) — projected total cost over the project lifetime, derived from the capacity plan + overhead defaults. Burns linearly over time but treated as pre-committed for the dashboard math.">
-                <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Overhead team members</span><span class="val tiny" style="font-size:11px;">{{ s.overhead_team_dollars | currency }}</span>
+            <div class="row" style="opacity:0.7;" title="Unspent portion of the overhead-team commitment (BAs, designers, SMEs, facilitators) — lifetime ${{ s.overhead_team_dollars | round(0) | int }} less ${{ (s.overhead_team_dollars - s.overhead_team_dollars_remaining) | round(0) | int }} already invoiced (sits inside Spent to date).">
+                <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Overhead team (remaining)</span><span class="val tiny" style="font-size:11px;">{{ s.overhead_team_dollars_remaining | currency }}</span>
             </div>
             {% endif %}
             {% endif %}

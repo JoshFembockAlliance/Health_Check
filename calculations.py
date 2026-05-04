@@ -349,6 +349,13 @@ def agile_project_summary(
             "headcount": 0,
         }
     overhead_team_dollars = overhead_team.get("total_dollars", 0.0)
+    # Only the *unspent* portion of the overhead-team commitment should
+    # reduce promisable_budget — the realised portion is already inside
+    # actual_spend (and therefore already removed via liquid_budget).
+    # Deducting the lifetime total would double-count realised overhead-team
+    # time and shrink feature_runway_days by overhead_team.realised_dollars
+    # / delivery_daily_burn. Same reasoning as realised risks (see below).
+    overhead_team_remaining = overhead_team.get("remaining_dollars", overhead_team_dollars)
 
     # When callers pre-bundle fixed + overhead-team into `overhead_dollars`
     # (legacy path), `fixed_overhead_dollars` is None and we infer it. New
@@ -380,7 +387,7 @@ def agile_project_summary(
     # how spend was used (see dashboard breakdown).
     # (Was previously named `accessible_budget`; old key kept as a
     # deprecated alias in the returned dict.)
-    promisable_budget = liquid_budget - overhead_dollars
+    promisable_budget = liquid_budget - fixed_overhead_dollars - overhead_team_remaining
 
     start = parse_date(project["start_date"])
     as_of = parse_date(project["as_of_date"])

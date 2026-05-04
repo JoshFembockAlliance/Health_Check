@@ -956,6 +956,51 @@ class TestAgileSummaryWithOverheadTeam:
         assert result["overhead_team_dollars"] == 30_000.0
         assert result["accessible_budget"] == 160_000.0
 
+    def test_promisable_budget_does_not_double_count_realised_overhead_team(self):
+        # Regression: past overhead-team spend is already inside actual_spend
+        # (whole-of-project invoicing). Deducting the *lifetime* overhead-team
+        # commitment from liquid_budget would remove that realised slice a
+        # second time, shrinking promisable_budget and the burndown today_days
+        # — the bug behind "burndown finishes far earlier than the end date".
+        # Check: project A (no spend yet, full overhead-team ahead) and project
+        # B (overhead-team half realised, with that realised amount inside
+        # actual_spend) should produce the SAME promisable_budget.
+        proj_a = self._make_project(budget=200_000, team_size=1, spend=0)
+        oht_a = {
+            "total_dollars": 30_000.0, "realised_dollars": 0.0,
+            "remaining_dollars": 30_000.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+        }
+        result_a = agile_project_summary(
+            proj_a, [], [], default_day_rate=1_000.0,
+            fixed_overhead_dollars=10_000.0, overhead_team=oht_a,
+        )
+
+        # Project B: $15k of overhead-team time has been invoiced (sits in
+        # actual_spend); $15k still ahead.
+        proj_b = self._make_project(budget=200_000, team_size=1, spend=15_000)
+        oht_b = {
+            "total_dollars": 30_000.0, "realised_dollars": 15_000.0,
+            "remaining_dollars": 15_000.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+        }
+        result_b = agile_project_summary(
+            proj_b, [], [], default_day_rate=1_000.0,
+            fixed_overhead_dollars=10_000.0, overhead_team=oht_b,
+        )
+
+        # liquid_budget differs (B has spend); promisable_budget must not.
+        assert result_a["liquid_budget"] == 200_000.0
+        assert result_b["liquid_budget"] == 185_000.0
+        assert result_a["promisable_budget"] == result_b["promisable_budget"]
+        # And both equal $200k − $10k fixed − $30k overhead-team-remaining-or-
+        # realised-via-spend = $160k.
+        assert result_a["promisable_budget"] == 160_000.0
+        # Allocation identity (lifetime overhead) is unchanged: both report
+        # the full $40k overhead block on hero cards / unallocated tilings.
+        assert result_a["overhead_dollars"] == 40_000.0
+        assert result_b["overhead_dollars"] == 40_000.0
+
     def test_daily_burn_excludes_overhead_team(self):
         # daily_burn (alias for delivery_daily_burn) reflects delivery
         # headcount only — feature-runway and burndown Y-axis math depend
