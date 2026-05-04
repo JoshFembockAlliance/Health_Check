@@ -691,7 +691,11 @@ input:focus, select:focus, textarea:focus {
   pointer-events: none;
 }
 /* "What's left" lens — overheads + actual spend are pre-committed budget
-   that burns the bar down from the right alongside realised risks. */
+   that burns the bar down from the right alongside realised risks.
+   --ohrem is set to 0 by default and updated via JS when the
+   "Show unrealised overhead" toggle is ON, so bar positions reflow
+   correctly when the projected overhead segment is hidden. */
+.progress { --ohrem: 0%; }
 .progress .bar-overhead {
   position: absolute; top: 0; bottom: 0;
   background: oklch(from var(--info) l c h / 0.5);

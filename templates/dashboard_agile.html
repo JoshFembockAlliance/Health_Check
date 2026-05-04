@@ -235,9 +235,15 @@
             {% set wl_overhead_team_pct = (s.overhead_team_dollars / wl_denom * 100) if wl_denom > 0 else 0 %}
             {% set wl_overhead_team_realised_pct = (s.overhead_team_dollars_realised / wl_denom * 100) if wl_denom > 0 else 0 %}
             {% set wl_overhead_team_remaining_pct = (s.overhead_team_dollars_remaining / wl_denom * 100) if wl_denom > 0 else 0 %}
-            {# Merged overhead view (when "Spend categories" toggle is OFF) — single block #}
+            {# wl_overhead_realised_pct: total overhead excluding the projected (unrealised) team portion.
+               Used by the CSS variable calc() expressions below so bar positions reflow correctly
+               when the "Show unrealised overhead" toggle is OFF (--ohrem resolves to 0%). #}
+            {% set wl_overhead_realised_pct = wl_overhead_pct - wl_overhead_team_remaining_pct %}
+            {# Merged overhead view (when "Spend categories" toggle is OFF) — single block.
+               Width uses calc() so it tracks the --ohrem CSS variable: when "Show unrealised overhead"
+               is OFF (--ohrem=0), the merged bar shrinks to cover only realised overhead. #}
             {% if wl_overhead_pct > 0 %}
-            <div class="bar-overhead spend-merged" style="width: {{ wl_overhead_pct }}%; right: 0; left: auto;"
+            <div class="bar-overhead spend-merged" style="width: calc({{ wl_overhead_realised_pct }}% + var(--ohrem)); right: 0; left: auto;"
                  title="Overheads — {{ s.overhead_dollars | currency }} pre-committed to non-feature work. Toggle 'Spend categories' to split into fixed overheads vs overhead team members."></div>
             {% endif %}
             {# Split overhead view (when "Spend categories" toggle is ON) — overhead team split into realised (to date) and remaining (projected), plus fixed overhead. The remaining/projected segment is gated by the "Show unrealised overhead" toggle (default off): hidden, the gap on the right of the bar maps to the Liquid lens of the budget headline; shown, it maps to the Promisable lens. #}
@@ -246,29 +252,30 @@
                  title="Overhead team members (projected) — {{ s.overhead_team_dollars_remaining | currency }} projected from as-of date to project end. Right-anchored to preserve the convention: this money is reserved against features even though it hasn't been invoiced yet."></div>
             {% endif %}
             {% if wl_overhead_team_realised_pct > 0 %}
-            <div class="bar-overhead spend-detail" style="width: {{ wl_overhead_team_realised_pct }}%; right: {{ wl_overhead_team_remaining_pct }}%; left: auto; opacity:0.75;"
+            <div class="bar-overhead spend-detail" style="width: {{ wl_overhead_team_realised_pct }}%; right: var(--ohrem); left: auto; opacity:0.75;"
                  title="Overhead team members (to date) — {{ s.overhead_team_dollars_realised | currency }} accrued from project start to as-of date."></div>
             {% endif %}
             {% if wl_fixed_overhead_pct > 0 %}
-            <div class="bar-overhead spend-detail" style="width: {{ wl_fixed_overhead_pct }}%; right: {{ wl_overhead_team_pct }}%; left: auto;"
+            <div class="bar-overhead spend-detail" style="width: {{ wl_fixed_overhead_pct }}%; right: calc({{ wl_overhead_team_realised_pct }}% + var(--ohrem)); left: auto;"
                  title="Fixed overheads — {{ s.fixed_overhead_dollars | currency }} pre-committed to fixed non-delivery costs (PM retainer, tooling licences, etc.)."></div>
             {% endif %}
-            {# Spend categories — segmented (when toggle ON) #}
+            {# Spend categories — segmented (when toggle ON).
+               right offsets include calc() so they track --ohrem and shift with the overhead blocks. #}
             {% if wl_unrealised_pct > 0 %}
-            <div class="bar-spent spend-detail" style="width: {{ wl_unrealised_pct }}%; right: {{ wl_overhead_pct }}%; left: auto;"
+            <div class="bar-spent spend-detail" style="width: {{ wl_unrealised_pct }}%; right: calc({{ wl_overhead_realised_pct }}% + var(--ohrem)); left: auto;"
                  title="Unrealised spend — {{ unrealised_spend | currency }} ({{ wl_unrealised_pct | round(1) }}% of total budget). Spend decomposes as: earned value {{ earned_value | currency }} + realised risk {{ s.realised_risk_dollars | currency }} + unrealised {{ unrealised_spend | currency }} = actual spend {{ s.actual_spend | currency }}. The unrealised portion is paid time that hasn't yet shown as feature delivery or as a categorised risk impact — work in flight, exploration, rework, or non-feature work."></div>
             {% endif %}
             {% if wl_realised_pct > 0 %}
-            <div class="risk-realised spend-detail" style="width: {{ wl_realised_pct }}%; right: {{ wl_overhead_pct + wl_unrealised_pct }}%; left: auto;"
+            <div class="risk-realised spend-detail" style="width: {{ wl_realised_pct }}%; right: calc({{ wl_overhead_realised_pct + wl_unrealised_pct }}% + var(--ohrem)); left: auto;"
                  title="Realised risks — {{ s.realised_risk_dollars | currency }} absorbed by risks that have landed. This is spend on risk handling rather than feature delivery."></div>
             {% endif %}
             {# Spend merged — single muted block (when toggle OFF) #}
             {% if merged_pct > 0 %}
-            <div class="bar-spent spend-merged" style="width: {{ merged_pct }}%; right: {{ wl_overhead_pct }}%; left: auto;"
+            <div class="bar-spent spend-merged" style="width: {{ merged_pct }}%; right: calc({{ wl_overhead_realised_pct }}% + var(--ohrem)); left: auto;"
                  title="Spent (non-features) — {{ merged_amount | currency }}. This combines {{ s.realised_risk_dollars | currency }} on realised risk handling with {{ unrealised_spend | currency }} of unrealised spend (work in flight, rework, exploration). The green fill on the left — feature delivery — is shown separately as the spend that produced features."></div>
             {% endif %}
             {% if wl_open_pct > 0 %}
-            <div class="risk-open risk-marker" style="width: {{ wl_open_pct }}%; right: {{ wl_committed_pct }}%; left: auto;"
+            <div class="risk-open risk-marker" style="width: {{ wl_open_pct }}%; right: calc({{ wl_committed_pct - wl_overhead_team_remaining_pct }}% + var(--ohrem)); left: auto;"
                  title="Open-risk exposure — {{ s.open_risk_dollars | currency }} of accessible budget at risk if open risks materialise."></div>
             {% endif %}
         </div>
@@ -338,6 +345,19 @@
                 </span>
                 {% endif %}
             </div>
+            {# Show unrealised overhead toggle — only shown inside "Spend categories" detail view
+               and only when there is a projected overhead portion to reveal. Sits in its own row
+               directly below Spend categories so it groups with the spend section controls rather
+               than appearing mid-legend between the overhead detail items. #}
+            {% if s.overhead_team_dollars_remaining > 0 %}
+            <div class="legend-row spend-detail" style="padding-left:28px;">
+                <button type="button" class="pill-toggle" data-detail-toggle="overhead-future" role="switch" aria-checked="false"
+                        title="Show the projected (not-yet-invoiced) overhead-team commitment. Hidden by default — when shown, the right-anchored bar reflects the Promisable budget; when hidden, the empty space on the right maps to the Liquid budget instead.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">Show unrealised overhead</span>
+                </button>
+            </div>
+            {% endif %}
             {# Overhead group row — fixed + overhead-team, together on one line (spend ON) #}
             {% if s.overhead_dollars > 0 %}
             <div class="legend-row spend-detail" style="padding-left:28px;">
@@ -364,13 +384,6 @@
                     <span class="muted">Overhead team (projected)</span>
                     <strong>{{ s.overhead_team_dollars_remaining | currency }}</strong>
                 </span>
-                {% endif %}
-                {% if s.overhead_team_dollars_remaining > 0 %}
-                <button type="button" class="pill-toggle" data-detail-toggle="overhead-future" role="switch" aria-checked="false"
-                        title="Show the projected (not-yet-invoiced) overhead-team commitment. Hidden by default — when shown, the right-anchored bar reflects the Promisable budget; when hidden, the empty space on the right maps to the Liquid budget instead.">
-                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
-                    <span class="pill-toggle-label">Show unrealised overhead</span>
-                </button>
                 {% endif %}
             </div>
             {% endif %}
@@ -1799,6 +1812,10 @@ function toggleStarted(projectId, featureId, btn) {
     // defaults to false because future commitment isn't realised spend —
     // surface it on demand for planning conversations, hide it for status.
     const DEFAULTS = { 'spend': true, 'plan': true, 'risk': true, 'overhead-future': false };
+    // Projected overhead team percentage used to reposition right-anchored bar segments
+    // when the overhead-future toggle is switched. See CSS --ohrem variable on .progress.
+    const OHREM_PCT = {{ wl_overhead_team_remaining_pct }};
+    const progressBar = card.querySelector('.progress-lg');
 
     let prefs = {};
     TOGGLES.forEach(t => prefs[t] = DEFAULTS[t]);
@@ -1817,6 +1834,9 @@ function toggleStarted(projectId, featureId, btn) {
             const btn = card.querySelector(`[data-detail-toggle="${t}"]`);
             if (btn) btn.setAttribute('aria-checked', prefs[t] ? 'true' : 'false');
         });
+        if (progressBar && OHREM_PCT > 0) {
+            progressBar.style.setProperty('--ohrem', (prefs['overhead-future'] ? OHREM_PCT : 0) + '%');
+        }
     }
     applyPrefs();
 

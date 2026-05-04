@@ -13,7 +13,7 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 ## Enhancements to Existing
 
 ### General
-- [ ] ** Show unrealised overhead UI cleanup**
+- [x] ** Show unrealised overhead UI cleanup**
 When not toggled on, metrics on the completion bar are still being pushed to the right, the fill-in simply isn't visible. Toggled off should be the same as not represented at all. Also, move the toggle for it to right under spend categories above the legend items so that it doesn't appear in between legend items and look cluttered. 
 
 - [ ] **E2E test review**
