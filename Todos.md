@@ -16,7 +16,7 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 - [x] ** Show unrealised overhead UI cleanup**
 When not toggled on, metrics on the completion bar are still being pushed to the right, the fill-in simply isn't visible. Toggled off should be the same as not represented at all. Also, move the toggle for it to right under spend categories above the legend items so that it doesn't appear in between legend items and look cluttered. 
 
-- [ ] **E2E test review**
+- [x] **E2E test review**
 I have noticed that the E2E tests are leaving new risks behind after finishing, make sure that the tests are self-contained and don't leave clutter behind. Using a specific project or specific testing-mode with a test-specific database for testing to avoid running tests in the in-use version of data would sidestep this risk but follow conventions to implement whatever the cleanest fix to the general problem may be. 
 
 
