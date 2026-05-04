@@ -12,6 +12,11 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 
 ## Enhancements to Existing
 
+### General
+- [ ] **E2E test review**
+I have noticed that the E2E tests are leaving new risks behind after finishing, make sure that the tests are self-contained and don't leave clutter behind. Using a specific project or specific testing-mode with a test-specific database for testing to avoid running tests in the in-use version of data would sidestep this risk but follow conventions to implement whatever the cleanest fix to the general problem may be. 
+
+
 ### Agile Project Dashboard Items
 - [ ] **Net Accessible Budget Modal - Unrealised Spend**
 The modal lists a few items that unrealised spend could go toward but doesn't provide a solid metric for if it's a healthy amount of value to have in-flight at the time of the review. Because an agile sprint typically only includes enough items to finish them out during a single sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. More than that is unhealthy and should be discussed and accounted for. 

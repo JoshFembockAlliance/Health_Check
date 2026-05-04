@@ -713,6 +713,11 @@ input:focus, select:focus, textarea:focus {
 .hero-card[data-detail-spend="0"] .spend-detail { display: none !important; }
 .hero-card[data-detail-plan="0"]  .plan-marker  { display: none !important; }
 .hero-card[data-detail-risk="0"]  .risk-marker  { display: none !important; }
+/* overhead-future controls visibility of the unrealised (projected) overhead
+   layer. Default off — the right-anchored bar gap then represents the Liquid
+   budget view (cash before reservations). On — the gap shrinks to Promisable
+   (cash after reservations). Mirrors the lens toggle on the Budget hero card. */
+.hero-card[data-detail-overhead-future="0"] .overhead-unrealised { display: none !important; }
 
 /* Inconsistent-data soft warning — surfaced on the Net Accessible Budget
    card when realised-risk impact exceeds actual spend (see DESIGN_RULES §1).
@@ -812,6 +817,33 @@ input:focus, select:focus, textarea:focus {
 .pill-toggle-label {
     font-weight: 600;
     letter-spacing: 0.02em;
+}
+
+/* Hero card lens toggles (Budget: Promisable/Liquid, Runway: Feature/Total).
+   The card's data-lens attribute drives which value/label is visible; the
+   matching button is highlighted via aria-pressed. Buttons inherit the
+   card's font color so they stay readable on any background (the Budget
+   card is .primary with reversed colors, Runway is the default surface). */
+.lens-toggle [data-lens-set] {
+    transition: background-color 120ms ease, color 120ms ease;
+    opacity: 0.6;
+}
+.lens-toggle [data-lens-set][aria-pressed="true"] {
+    background: oklch(from currentColor l c h / 0.15) !important;
+    opacity: 1;
+}
+.lens-toggle [data-lens-set]:hover {
+    opacity: 1;
+}
+.hero-card[data-lens="promisable"] [data-lens-label="liquid"],
+.hero-card[data-lens="promisable"] [data-lens-value="liquid"],
+.hero-card[data-lens="liquid"] [data-lens-label="promisable"],
+.hero-card[data-lens="liquid"] [data-lens-value="promisable"],
+.hero-card[data-lens="feature"] [data-lens-label="total"],
+.hero-card[data-lens="feature"] [data-lens-value="total"],
+.hero-card[data-lens="total"] [data-lens-label="feature"],
+.hero-card[data-lens="total"] [data-lens-value="feature"] {
+    display: none;
 }
 
 /* Expanded-scope variant — amber track when active. */

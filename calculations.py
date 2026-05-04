@@ -300,32 +300,37 @@ def agile_project_summary(
     of actual_spend (the team time on realised risks IS part of logged
     spend), not as an additional deduction. Used by the dashboard to split
     spend into earned-value vs realised-risk vs unrealised-spend buckets.
-    Does NOT independently reduce accessible_budget — that subtraction
-    would double-count the spend already deducted via current_budget.
+    Does NOT independently reduce promisable_budget — that subtraction
+    would double-count the spend already deducted via liquid_budget.
 
     open_risk_dollars: dollars of unrealised exposure from open risks —
     impact_days × (1 - realised%) × day_rate, summed. Reported on the
     summary so the dashboard can surface "at risk" next to unallocated
-    budget. Does NOT reduce accessible_budget (open risks haven't landed
+    budget. Does NOT reduce promisable_budget (open risks haven't landed
     yet and may still be mitigated), but flags the unallocated value as
     unsafe to fully allocate.
 
     overhead_dollars: sum of project overheads (PM salary, licences, etc.).
     These are committed non-delivery costs that reduce the budget pool
-    available for feature work — so they reduce both accessible_budget
-    (flowing through to Budget Days Remaining and Capacity Remaining) and
-    unallocated_budget (so features/overheads/realised_risks/unallocated
-    tile to total_budget).
+    available for feature work — so they reduce both promisable_budget
+    (flowing through to feature_runway_days) and unallocated_budget (so
+    features/overheads/realised_risks/unallocated tile to total_budget).
 
-    Budget vocabulary — three distinct values, each with a single purpose:
+    Budget vocabulary — three values, each answering one question. See
+    DESIGN_RULES.md §1 "Questions the dashboard answers" for the full
+    framework.
       * total_budget       = initial_budget + adjustments. The full pot
                              assigned to the project. Denominator for burn %.
-      * current_budget     = total_budget − actual_spend. What remains to be
-                             spent. "We can't spend what we've already spent."
-      * accessible_budget  = current_budget − overhead. What's still
-                             available for feature delivery (overheads are
-                             pre-committed; realised risks are already
-                             netted out via actual_spend).
+      * liquid_budget      = total_budget − actual_spend. Q1: what's left
+                             in the account.
+      * promisable_budget  = liquid_budget − overhead_dollars. Q2: what
+                             can still be committed to features without
+                             overdrawing reservations.
+
+    Deprecated aliases (kept in returned dict for one release):
+      * current_budget     → liquid_budget
+      * accessible_budget  → promisable_budget
+      * budget_days_remaining / total_budget_days_remaining → feature_runway_days
     """
     total_adj = sum(a["amount"] for a in adjustments)
     actual_spend = project["actual_spend"]
@@ -348,7 +353,7 @@ def agile_project_summary(
     # When callers pre-bundle fixed + overhead-team into `overhead_dollars`
     # (legacy path), `fixed_overhead_dollars` is None and we infer it. New
     # callers pass both explicitly. The combined headline `overhead_dollars`
-    # is what feeds accessible_budget / feature_budget downstream.
+    # is what feeds promisable_budget / feature_budget downstream.
     if fixed_overhead_dollars is None:
         fixed_overhead_dollars = overhead_dollars
     overhead_dollars = fixed_overhead_dollars + overhead_team_dollars
@@ -358,43 +363,61 @@ def agile_project_summary(
     # for burn % and as the base of the allocation identity.
     total_budget = project["initial_budget"] + total_adj
 
-    # current_budget: what is still liquid. Dollars that have already been
-    # invoiced are gone — they can't be spent again — so we subtract them
-    # from the pot. Every downstream "what can we still do?" figure flows
-    # from here.
-    current_budget = total_budget - actual_spend
+    # liquid_budget: what is still in the account. Dollars that have already
+    # been invoiced are gone — they can't be spent again — so we subtract them
+    # from the pot. Answers Q1: "How much money is left in the account?"
+    # (Was previously named `current_budget`; old key kept as a deprecated
+    # alias in the returned dict.)
+    liquid_budget = total_budget - actual_spend
 
-    # accessible_budget: current_budget minus money committed to overheads
-    # (non-delivery costs, both fixed and overhead-team). Realised risks are
-    # NOT subtracted here — they represent team time already spent on risk
-    # handling, which is already reflected in actual_spend (and therefore
-    # in current_budget). Subtracting them again would double-count.
-    # Realised risks remain available as a categorisation of how spend
-    # was used (see dashboard breakdown).
-    accessible_budget = current_budget - overhead_dollars
+    # promisable_budget: liquid_budget minus money committed to overheads
+    # (non-delivery costs, both fixed and overhead-team). Answers Q2: "What
+    # can I still commit to features without overdrawing reservations?"
+    # Realised risks are NOT subtracted — they represent team time already
+    # spent on risk handling, which is already reflected in actual_spend
+    # (and therefore in liquid_budget). Subtracting them again would
+    # double-count. Realised risks remain available as a categorisation of
+    # how spend was used (see dashboard breakdown).
+    # (Was previously named `accessible_budget`; old key kept as a
+    # deprecated alias in the returned dict.)
+    promisable_budget = liquid_budget - overhead_dollars
 
     start = parse_date(project["start_date"])
     as_of = parse_date(project["as_of_date"])
     elapsed_days = business_days_between(start, as_of) if start and as_of else 0
 
-    # Daily burn now means *delivery-only* daily $ burn. Overhead-team headcount
-    # has already been pre-committed as overhead and must not be double-counted
-    # in the runway denominator. Hero cards that want a sub-row context use
-    # `overhead_daily_burn` separately.
+    # Two daily-burn rates, used for two different questions:
+    #   delivery_daily_burn → "how many days of FEATURE work can we still fund?"
+    #     (used for feature_runway_days, burndown Y-axis, feature targets)
+    #   total_daily_burn    → "at this combined rate, how does our invoiced
+    #     spend compare to plan?" and "when does the project literally run
+    #     out of money?" (used for expected_spend / burn-% deltas against
+    #     actual_spend, and for total_runway_days).
+    # Flat formula for overhead burn mirrors delivery (default_rate ×
+    # default_headcount × elapsed) — see DESIGN_RULES §1.
     delivery_daily_burn = project["team_size"] * default_day_rate
-    overhead_daily_burn = overhead_team.get("daily_burn", 0.0)
-    daily_burn = delivery_daily_burn
-    expected_spend = daily_burn * elapsed_days
+    overhead_daily_burn = (
+        overhead_team.get("default_rate", 0.0)
+        * overhead_team.get("default_headcount", 0)
+    )
+    total_daily_burn = delivery_daily_burn + overhead_daily_burn
+    daily_burn = delivery_daily_burn  # alias — feature-runway semantic preserved
+    expected_spend = total_daily_burn * elapsed_days
 
     # Burn percentages use total_budget as the denominator: they answer
     # "what fraction of the full project pot has been / should have been
     # spent by now?" — a stable reference that doesn't shift as spend lands.
+    # Both expected and actual are whole-of-project (delivery + overhead) so
+    # the comparison is apples-to-apples.
     expected_burn_pct = (expected_spend / total_budget * 100) if total_budget else 0
     current_burn_pct = (actual_spend / total_budget * 100) if total_budget else 0
-    # Feature completion comparisons exclude overhead — it never contributes
-    # to feature delivery, so including it would understate the target.
+    # Feature completion target uses delivery-only spend against the
+    # feature budget (overhead excluded from both). This is the "are
+    # features pacing on plan?" lens, not the "is total invoicing on
+    # plan?" lens above.
     feature_budget = total_budget - overhead_dollars
-    feature_expected_burn_pct = (expected_spend / feature_budget * 100) if feature_budget > 0 else 0
+    feature_expected_spend = delivery_daily_burn * elapsed_days
+    feature_expected_burn_pct = (feature_expected_spend / feature_budget * 100) if feature_budget > 0 else 0
     burn_delta = actual_spend - expected_spend
 
     allocated_days = sum(f["total_days"] for f in features)
@@ -412,25 +435,31 @@ def agile_project_summary(
     # Unallocated budget tiles cleanly with the other planning buckets:
     # total_budget = features + overheads + realised_risks + unallocated.
     # This is an allocation view (what is the pot earmarked for?), not a
-    # liquidity view, so it sits against total_budget, not current_budget.
+    # liquidity view, so it sits against total_budget, not liquid_budget.
     unallocated_budget = total_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
 
-    # budget_days_remaining: full-team days available for team-on-feature
-    # work — accessible_budget converted to days at the team burn rate.
-    # Overheads are reserved off the top (cannot be redirected); realised
-    # risks are already netted out via actual_spend → current_budget.
-    budget_days_remaining = accessible_budget / daily_burn if daily_burn else 0
-
-    # total_budget_days_remaining: identical to budget_days_remaining under
-    # the current model (both flow from accessible_budget). Kept as a
-    # separate name because the agile dashboard hero card uses this label
-    # specifically; consolidate at a quieter time.
-    total_budget_days_remaining = budget_days_remaining
+    # Two runway figures, one per forecast question:
+    #   feature_runway_days → Q4b: "How many days of feature work can we
+    #     still fund without raiding reservations?" Promisable budget at
+    #     the delivery-only rate.
+    #   total_runway_days   → Q4a: "When does the project literally run
+    #     out of money?" Liquid budget at the combined burn rate. Captures
+    #     the wider perspective — overhead-team time is also spending the
+    #     budget down, even if it's already been reserved against features.
+    feature_runway_days = promisable_budget / delivery_daily_burn if delivery_daily_burn else 0
+    total_runway_days = liquid_budget / total_daily_burn if total_daily_burn else 0
 
     return {
         "total_budget": total_budget,
-        "current_budget": current_budget,
-        "accessible_budget": accessible_budget,
+        # Canonical names
+        "liquid_budget": liquid_budget,
+        "promisable_budget": promisable_budget,
+        "feature_runway_days": feature_runway_days,
+        "total_runway_days": total_runway_days,
+        # Deprecated aliases — preserved for one release so any partials or
+        # external readers we missed don't break. Remove after sweep.
+        "current_budget": liquid_budget,
+        "accessible_budget": promisable_budget,
         "realised_risk_dollars": realised_risk_dollars,
         "open_risk_dollars": open_risk_dollars,
         "overhead_dollars": overhead_dollars,
@@ -442,12 +471,14 @@ def agile_project_summary(
         "overhead_team_by_role": overhead_team.get("by_role", {}),
         "overhead_daily_burn": overhead_daily_burn,
         "delivery_daily_burn": delivery_daily_burn,
+        "total_daily_burn": total_daily_burn,
         "delivery_team_size": project["team_size"],
         "initial_budget": project["initial_budget"],
         "total_adjustments": total_adj,
         "elapsed_days": elapsed_days,
         "daily_burn": daily_burn,
         "expected_spend": expected_spend,
+        "feature_expected_spend": feature_expected_spend,
         "expected_burn_pct": expected_burn_pct,
         "feature_expected_burn_pct": feature_expected_burn_pct,
         "actual_spend": actual_spend,
@@ -459,8 +490,8 @@ def agile_project_summary(
         "remaining_dollars": total_remaining_dollars,
         "overall_completion": overall_completion,
         "unallocated_budget": unallocated_budget,
-        "budget_days_remaining": budget_days_remaining,
-        "total_budget_days_remaining": total_budget_days_remaining,
+        "budget_days_remaining": feature_runway_days,
+        "total_budget_days_remaining": feature_runway_days,
     }
 
 
@@ -955,7 +986,9 @@ def agile_burndown_chart_data(
     if daily_burn <= 0 or start is None or as_of is None:
         return None
 
-    accessible = summary["accessible_budget"]
+    # Tolerant of legacy `accessible_budget` key in case caller built the
+    # summary dict by hand (e.g. tests).
+    accessible = summary.get("promisable_budget", summary.get("accessible_budget", 0))
     total_budget = summary["total_budget"]
     overhead = summary["overhead_dollars"]
     actual_spend = summary["actual_spend"]
@@ -1047,7 +1080,7 @@ def agile_burndown_chart_data(
     # Build per-week dollar burn for the projection walk.  Include all
     # capacity periods (past, current, and future) so the current week's
     # planned rate applies to its remaining days.  Overhead roles are excluded
-    # — their cost is already netted out of accessible_budget upstream.
+    # — their cost is already netted out of promisable_budget upstream.
     proj_week_burns: dict[date, float] = {}
     for cp in (capacity_periods or []):
         if cp.get("role_category") == "overhead":

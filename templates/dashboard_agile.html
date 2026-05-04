@@ -70,9 +70,22 @@
 {% set has_expanded_scope = expanded_allocated_dollars > 0 %}
 
 <div class="hero-grid two-row">
-    <div class="hero-card primary" id="hero-net-accessible" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="net-accessible-modal" title="Click for a sentence-form breakdown of how the budget is being used" style="grid-column: span 3; cursor:pointer;">
-        <div class="label">Net Accessible Budget <span aria-hidden="true" style="opacity:0.65; margin-left:4px; font-weight:500;">›</span></div>
-        <div class="value">{{ s.accessible_budget | currency }}</div>
+    <div class="hero-card primary" id="hero-net-accessible" data-lens="promisable" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="net-accessible-modal" title="Click for a sentence-form breakdown of how the budget is being used" style="grid-column: span 3; cursor:pointer;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <div class="label">
+                Budget &mdash;
+                <span data-lens-label="promisable" title="Promisable: what you can still commit to features without overdrawing reserved overheads. Conservative — the planning lens.">Promisable</span><span data-lens-label="liquid" title="Liquid: what's still in the account before any reservations. Honest — the cash-in-account lens.">Liquid</span>
+                <span aria-hidden="true" style="opacity:0.65; margin-left:4px; font-weight:500;">›</span>
+            </div>
+            <div class="lens-toggle" role="group" aria-label="Budget lens" style="display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border); border-radius:6px; font-size:10px; font-weight:600;">
+                <button type="button" data-lens-set="promisable" aria-pressed="true" title="Show what you can still commit (after overhead reservations)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Promisable</button>
+                <button type="button" data-lens-set="liquid" aria-pressed="false" title="Show what's in the account (before overhead reservations)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Liquid</button>
+            </div>
+        </div>
+        <div class="value">
+            <span data-lens-value="promisable">{{ s.promisable_budget | currency }}</span>
+            <span data-lens-value="liquid">{{ s.liquid_budget | currency }}</span>
+        </div>
         {% if s.remaining_dollars > 0 %}
         {% set delivery_buffer = s.accessible_budget - s.remaining_dollars %}
         {% if delivery_buffer < 0 %}
@@ -227,10 +240,10 @@
             <div class="bar-overhead spend-merged" style="width: {{ wl_overhead_pct }}%; right: 0; left: auto;"
                  title="Overheads — {{ s.overhead_dollars | currency }} pre-committed to non-feature work. Toggle 'Spend categories' to split into fixed overheads vs overhead team members."></div>
             {% endif %}
-            {# Split overhead view (when "Spend categories" toggle is ON) — overhead team split into realised (to date) and remaining (projected), plus fixed overhead #}
+            {# Split overhead view (when "Spend categories" toggle is ON) — overhead team split into realised (to date) and remaining (projected), plus fixed overhead. The remaining/projected segment is gated by the "Show unrealised overhead" toggle (default off): hidden, the gap on the right of the bar maps to the Liquid lens of the budget headline; shown, it maps to the Promisable lens. #}
             {% if wl_overhead_team_remaining_pct > 0 %}
-            <div class="bar-overhead spend-detail" style="width: {{ wl_overhead_team_remaining_pct }}%; right: 0; left: auto; opacity:0.5;"
-                 title="Overhead team members (projected) — {{ s.overhead_team_dollars_remaining | currency }} projected from as-of date to project end."></div>
+            <div class="bar-overhead spend-detail overhead-unrealised" style="width: {{ wl_overhead_team_remaining_pct }}%; right: 0; left: auto; opacity:0.5;"
+                 title="Overhead team members (projected) — {{ s.overhead_team_dollars_remaining | currency }} projected from as-of date to project end. Right-anchored to preserve the convention: this money is reserved against features even though it hasn't been invoiced yet."></div>
             {% endif %}
             {% if wl_overhead_team_realised_pct > 0 %}
             <div class="bar-overhead spend-detail" style="width: {{ wl_overhead_team_realised_pct }}%; right: {{ wl_overhead_team_remaining_pct }}%; left: auto; opacity:0.75;"
@@ -345,12 +358,19 @@
                 </span>
                 {% endif %}
                 {% if s.overhead_team_dollars_remaining > 0 %}
-                <span title="{{ s.overhead_team_dollars_remaining | currency }} overhead team spend projected from as-of date to project end."
+                <span class="overhead-unrealised" title="{{ s.overhead_team_dollars_remaining | currency }} overhead team spend projected from as-of date to project end. Hidden by default — toggle 'Show unrealised overhead' to reveal."
                       style="display:inline-flex; align-items:center; gap:5px;">
                     <span aria-hidden="true" style="width:10px; height:10px; border-radius:2px; background: oklch(from var(--info) l c h / 0.5); border:1px solid oklch(from var(--info) l c h / 0.7); opacity:0.5;"></span>
                     <span class="muted">Overhead team (projected)</span>
                     <strong>{{ s.overhead_team_dollars_remaining | currency }}</strong>
                 </span>
+                {% endif %}
+                {% if s.overhead_team_dollars_remaining > 0 %}
+                <button type="button" class="pill-toggle" data-detail-toggle="overhead-future" role="switch" aria-checked="false"
+                        title="Show the projected (not-yet-invoiced) overhead-team commitment. Hidden by default — when shown, the right-anchored bar reflects the Promisable budget; when hidden, the empty space on the right maps to the Liquid budget instead.">
+                    <span class="pill-toggle-track" aria-hidden="true"><span class="pill-toggle-thumb"></span></span>
+                    <span class="pill-toggle-label">Show unrealised overhead</span>
+                </button>
                 {% endif %}
             </div>
             {% endif %}
@@ -462,11 +482,21 @@
         </div>
     </div>
 
-    <div class="hero-card" id="hero-budget-days" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="budget-days-modal" title="Click for a sentence-form breakdown" style="cursor:pointer; position:relative; grid-column: span 2;">
-        <div class="label">Full-Team Budget Days Remaining <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span></div>
+    <div class="hero-card" id="hero-budget-days" data-lens="feature" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="budget-days-modal" title="Click for a sentence-form breakdown" style="cursor:pointer; position:relative; grid-column: span 2;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <div class="label">
+                Runway &mdash;
+                <span data-lens-label="feature" title="Feature work runway: how many days of feature work the team can still fund. Uses promisable budget at the delivery-only burn rate.">Feature work</span><span data-lens-label="total" title="Total budget runway: when the project literally runs out of money. Uses liquid budget at the combined (delivery + overhead) burn rate.">Total budget</span>
+                <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span>
+            </div>
+            <div class="lens-toggle" role="group" aria-label="Runway lens" style="display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border); border-radius:6px; font-size:10px; font-weight:600;">
+                <button type="button" data-lens-set="feature" aria-pressed="true" title="Days of feature work fundable (delivery burn against promisable budget)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Feature</button>
+                <button type="button" data-lens-set="total" aria-pressed="false" title="Days until the money literally runs out (combined burn against liquid budget)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Total</button>
+            </div>
+        </div>
         <div class="value" style="color: {{ days_color }}">
-            {{- s.total_budget_days_remaining | days -}}
-            {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;" title="Working days from today to the project end date (Mon–Fri, weekends excluded). Apples-to-apples with the budget-days figure on the left.">of {{ days_to_end }} working days to end date</span>{% endif %}
+            <span data-lens-value="feature">{{- s.feature_runway_days | days -}}</span><span data-lens-value="total">{{- s.total_runway_days | days -}}</span>
+            {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;" title="Working days from today to the project end date (Mon–Fri, weekends excluded). Apples-to-apples with the runway figure on the left.">of {{ days_to_end }} working days to end date</span>{% endif %}
         </div>
         <div class="sub-row">
             <div class="row" title="Delivery-only daily burn. Overhead-team headcount is pre-committed as overhead and excluded from the runway denominator (its full $ has already been deducted from accessible budget upstream).">
@@ -1128,7 +1158,7 @@
 <dialog id="net-accessible-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Net Accessible Budget — Detail</strong>
+            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget — Detail</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('net-accessible-modal').close()">✕</button>
         </div>
 
@@ -1138,11 +1168,11 @@
 
         <div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
 
-            {# Q1 — what is "accessible"? #}
+            {# Q1 — Promisable lens (default headline) #}
             <p style="margin:0;">
-                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How much is left to play with?</span>
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How much can I still commit to features? (Promisable)</span>
                 Of the <strong>{{ tb_n | currency }}</strong> total budget,
-                <strong style="color:var(--text-strong);">{{ ab_n | currency }}</strong> is accessible — what's left after subtracting overheads ({{ oh_n | currency }}) and money already spent ({{ as_n | currency }}).
+                <strong style="color:var(--text-strong);">{{ s.promisable_budget | currency }}</strong> is promisable — what's left after subtracting overheads ({{ oh_n | currency }}) and money already spent ({{ as_n | currency }}). This is the conservative planning lens: it reserves the full overhead-team commitment up-front so feature scope isn't promised against money already earmarked for non-billable roles.
                 {% if rd_n > 0 %}
                 {% set delivery_buffer_n = ab_n - rd_n %}
                 Remaining feature work needs <strong>{{ rd_n | currency }}</strong> to complete, leaving
@@ -1152,8 +1182,14 @@
                 a <strong style="color:var(--bad);">{{ (delivery_buffer_n * -1) | currency }} shortfall</strong> against the work still to deliver.
                 {% endif %}
                 {% else %}
-                All allocated feature work is complete — the entire accessible budget is free for new scope, contingency, or absorption of open risks.
+                All allocated feature work is complete — the entire promisable budget is free for new scope, contingency, or absorption of open risks.
                 {% endif %}
+            </p>
+
+            {# Q1b — Liquid lens (alternative headline) #}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How much is in the account right now? (Liquid)</span>
+                <strong style="color:var(--text-strong);">{{ s.liquid_budget | currency }}</strong> is liquid — total budget minus what's been invoiced. This is the cash-in-account lens: it does <em>not</em> deduct future overhead-team commitment, so it's larger than the promisable figure by the unrealised overhead of <strong>{{ s.overhead_team_dollars_remaining | currency }}</strong>{% if s.fixed_overhead_dollars > 0 %} plus fixed overheads still ahead of us{% endif %}. Use this lens when the question is "what's our financial reality right now?" rather than "what can I still safely promise?". Toggle the lens chip on the headline card to switch.
             </p>
 
             {# Q2 — overheads (pre-committed) #}
@@ -1207,7 +1243,7 @@
             {% if as_n > 0 %}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How does spend pace compare to plan?</span>
-                Expected spend by now is <strong>{{ s.expected_spend | currency }}</strong> ({{ s.elapsed_days }} business days × full-team daily burn). Actual is <strong>{{ as_n | currency }}</strong>, a delta of
+                Expected spend by now is <strong>{{ s.expected_spend | currency }}</strong> ({{ s.elapsed_days }} business days × <strong>{{ s.total_daily_burn | currency }}/day</strong> combined burn — <strong>{{ s.delivery_daily_burn | currency }}/day</strong> delivery {% if s.overhead_daily_burn > 0 %}+ <strong>{{ s.overhead_daily_burn | currency }}/day</strong> overhead-team{% endif %}). Actual is <strong>{{ as_n | currency }}</strong>, a delta of
                 {% if s.burn_delta > 0 %}
                 <strong style="color:var(--bad);">+{{ s.burn_delta | currency }}</strong> — over-burning by <strong>{{ '%+.1f' % spend_delta_pct }}%</strong> of actual spend.
                 {% elif s.burn_delta < 0 %}
@@ -1283,7 +1319,7 @@
 <dialog id="budget-days-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget Days Remaining — Detail</strong>
+            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Runway — Detail</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('budget-days-modal').close()">✕</button>
         </div>
 
@@ -1293,23 +1329,31 @@
 
         <div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
 
-            {# Q1 — runway #}
+            {# Q1 — Feature-work runway (default headline) #}
             <p style="margin:0;">
-                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How many days can the budget fund?</span>
-                At the delivery-team burn rate of <strong>{{ s.daily_burn | currency }}/day</strong> for the
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How many days of feature work can we still fund? (Feature)</span>
+                At the delivery-team burn rate of <strong>{{ s.delivery_daily_burn | currency }}/day</strong> for the
                 <strong>{{ '%g' % p.team_size }}-person</strong> delivery team,
                 {% if s.overhead_dollars > 0 %}
-                the remaining budget of <strong>{{ s.current_budget | currency }}</strong> — after reserving
-                <strong>{{ s.overhead_dollars | currency }}</strong> for overheads that are committed regardless of burn rate{% if s.overhead_team_dollars > 0 %} (including <strong>{{ s.overhead_team_dollars | currency }}</strong> for overhead team members, who burn the budget over the project lifetime but never produce earned value){% endif %} — can fund
+                the promisable budget of <strong>{{ s.promisable_budget | currency }}</strong> — what's left after reserving
+                <strong>{{ s.overhead_dollars | currency }}</strong> for overheads{% if s.overhead_team_dollars > 0 %} (including <strong>{{ s.overhead_team_dollars | currency }}</strong> for overhead team members, who burn the budget over the project lifetime but never produce earned value){% endif %} — funds
                 {% else %}
-                the remaining budget of <strong>{{ s.current_budget | currency }}</strong> can fund
+                the promisable budget of <strong>{{ s.promisable_budget | currency }}</strong> funds
                 {% endif %}
-                <strong style="color:{{ days_color }};">{{ runway_days | days }}d</strong>
+                <strong style="color:{{ days_color }};">{{ s.feature_runway_days | days }}d</strong>
                 of team-on-feature work.
-                {% if s.overhead_team_dollars > 0 %}
-                Overhead-team headcount is excluded from this denominator: their full lifetime cost has already been pre-committed as overhead, so adding them again would double-count and artificially shorten the runway.
-                {% endif %}
             </p>
+
+            {# Q1b — Total-budget runway (alternative headline, includes overhead burn) #}
+            {% if s.total_runway_days != s.feature_runway_days %}
+            <p style="margin:0;">
+                <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">When does the project literally run out of money? (Total)</span>
+                At the combined burn rate of <strong>{{ s.total_daily_burn | currency }}/day</strong>
+                ({{ s.delivery_daily_burn | currency }} delivery + {{ s.overhead_daily_burn | currency }} overhead-team), the liquid budget of <strong>{{ s.liquid_budget | currency }}</strong> lasts
+                <strong>{{ s.total_runway_days | days }}d</strong>.
+                This differs from the feature-work answer above because feature runway divides promisable budget by delivery-only burn (it asks "how long can features keep moving?"); total runway divides liquid budget by everything burning (it asks "when's the account empty?"). Toggle the lens chip on the headline card to switch.
+            </p>
+            {% endif %}
 
             {# Q2 — vs end date #}
             <p style="margin:0;">
@@ -1562,8 +1606,12 @@ function toggleStarted(projectId, featureId, btn) {
     function open() {
         if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
     }
-    card.addEventListener('click', open);
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-lens-set]')) return;
+        open();
+    });
     card.addEventListener('keydown', (e) => {
+        if (e.target.closest('[data-lens-set]')) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
     modal.addEventListener('click', (e) => {
@@ -1698,8 +1746,12 @@ function toggleStarted(projectId, featureId, btn) {
     function open() {
         if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
     }
-    card.addEventListener('click', () => open());
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-lens-set]')) return;
+        open();
+    });
     card.addEventListener('keydown', (e) => {
+        if (e.target.closest('[data-lens-set]')) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
     modal.addEventListener('click', (e) => {
@@ -1742,10 +1794,14 @@ function toggleStarted(projectId, featureId, btn) {
     const card = document.getElementById('hero-overall-completion');
     if (!card) return;
     const KEY = 'overall_completion_detail_{{ project.id }}';
-    const TOGGLES = ['spend', 'plan', 'risk'];
+    const TOGGLES = ['spend', 'plan', 'risk', 'overhead-future'];
+    // Most toggles default to true (rich detail visible). overhead-future
+    // defaults to false because future commitment isn't realised spend —
+    // surface it on demand for planning conversations, hide it for status.
+    const DEFAULTS = { 'spend': true, 'plan': true, 'risk': true, 'overhead-future': false };
 
     let prefs = {};
-    TOGGLES.forEach(t => prefs[t] = true);
+    TOGGLES.forEach(t => prefs[t] = DEFAULTS[t]);
     try {
         const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
         if (saved && typeof saved === 'object') {
@@ -1778,6 +1834,41 @@ function toggleStarted(projectId, featureId, btn) {
                 e.stopPropagation();
                 btn.click();
             }
+        });
+    });
+})();
+
+(function() {
+    // Lens toggles for Budget and Runway hero cards. Each card has
+    // multiple data-lens-value / data-lens-label children; the active
+    // lens (data-lens attribute on the card) controls which one is
+    // visible via CSS. Per-project preference, persisted to localStorage.
+    const cards = [
+        { id: 'hero-net-accessible', key: 'budget_lens_{{ project.id }}', defaultLens: 'promisable' },
+        { id: 'hero-budget-days', key: 'runway_lens_{{ project.id }}', defaultLens: 'feature' },
+    ];
+    cards.forEach(({ id, key, defaultLens }) => {
+        const card = document.getElementById(id);
+        if (!card) return;
+        let lens = defaultLens;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) lens = saved;
+        } catch (e) {}
+        function apply() {
+            card.setAttribute('data-lens', lens);
+            card.querySelectorAll('[data-lens-set]').forEach(btn => {
+                btn.setAttribute('aria-pressed', btn.getAttribute('data-lens-set') === lens ? 'true' : 'false');
+            });
+        }
+        apply();
+        card.querySelectorAll('[data-lens-set]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                lens = btn.getAttribute('data-lens-set');
+                apply();
+                try { localStorage.setItem(key, lens); } catch (e) {}
+            });
         });
     });
 })();

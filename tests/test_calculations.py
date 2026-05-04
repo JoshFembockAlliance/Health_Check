@@ -957,24 +957,47 @@ class TestAgileSummaryWithOverheadTeam:
         assert result["accessible_budget"] == 160_000.0
 
     def test_daily_burn_excludes_overhead_team(self):
-        # daily_burn must reflect delivery headcount only, even when an
-        # overhead team has its own daily burn — the overhead lifetime $ is
-        # already pre-committed and including its headcount in the runway
-        # denominator would double-count.
+        # daily_burn (alias for delivery_daily_burn) reflects delivery
+        # headcount only — feature-runway and burndown Y-axis math depend
+        # on this. overhead_daily_burn is reported separately (used by
+        # total_daily_burn for the expected-spend comparison).
         proj = self._make_project(budget=200_000, team_size=2, spend=0,
                                   start="2024-01-15", as_of="2024-01-15")
         oht = {
             "total_dollars": 0.0, "realised_dollars": 0.0,
-            "remaining_dollars": 0.0, "daily_burn": 800.0,
-            "headcount": 1, "by_role": {},
+            "remaining_dollars": 0.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+            "default_rate": 800.0, "default_headcount": 1,
         }
         result = agile_project_summary(
             proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
         )
-        # 2 delivery × $1000 = $2000/day; overhead's $800 is informational only
+        # 2 delivery × $1000 = $2000/day delivery; 1 × $800 = $800/day overhead
         assert result["daily_burn"] == 2_000.0
         assert result["delivery_daily_burn"] == 2_000.0
         assert result["overhead_daily_burn"] == 800.0
+        assert result["total_daily_burn"] == 2_800.0
+
+    def test_expected_spend_includes_overhead(self):
+        # Under hybrid accrual: expected_spend uses total (delivery +
+        # overhead) daily burn so it's comparable to actual_spend, which
+        # is whole-of-project invoicing.
+        # 5 bd elapsed (Jan 15 Mon → Jan 22 Mon): 2 delivery × $1k +
+        # 1 overhead × $800 = $2800/day × 5 = $14_000.
+        proj = self._make_project(budget=200_000, team_size=2, spend=0,
+                                  start="2024-01-15", as_of="2024-01-22")
+        oht = {
+            "total_dollars": 0.0, "realised_dollars": 0.0,
+            "remaining_dollars": 0.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+            "default_rate": 800.0, "default_headcount": 1,
+        }
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
+        )
+        assert result["expected_spend"] == pytest.approx(14_000.0)
+        # Feature-pacing target stays delivery-only ($2k × 5 = $10k)
+        assert result["feature_expected_spend"] == pytest.approx(10_000.0)
 
     def test_total_budget_days_uses_delivery_burn(self):
         # $100k accessible / $1k delivery burn = 100 days (not 50 if overhead
@@ -1002,6 +1025,115 @@ class TestAgileSummaryWithOverheadTeam:
         assert result["accessible_budget"] == 80_000.0
         assert result["overhead_dollars"] == 20_000.0
         assert result["overhead_team_dollars"] == 0.0
+
+
+# ── Question-per-metric framework: canonical names + new total_runway ──────
+
+class TestBudgetVocabularyRenames:
+    def _make(self, **overrides):
+        base = {
+            "initial_budget": 200_000.0,
+            "team_size": 2,
+            "actual_spend": 50_000.0,
+            "start_date": "2024-01-15",
+            "as_of_date": "2024-01-15",
+        }
+        base.update(overrides)
+        return base
+
+    def test_liquid_budget_replaces_current_budget(self):
+        # liquid_budget = total − actual_spend; old `current_budget` key
+        # remains as alias.
+        proj = self._make()
+        result = agile_project_summary(proj, [], [], default_day_rate=1_000.0)
+        assert result["liquid_budget"] == 150_000.0
+        assert result["current_budget"] == 150_000.0  # deprecated alias
+
+    def test_promisable_budget_replaces_accessible_budget(self):
+        # promisable_budget = liquid − overhead reservations; alias preserved.
+        proj = self._make()
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_dollars=30_000.0,
+        )
+        assert result["promisable_budget"] == 120_000.0
+        assert result["accessible_budget"] == 120_000.0  # deprecated alias
+
+    def test_feature_runway_days_replaces_total_budget_days_remaining(self):
+        # feature_runway_days = promisable / delivery_daily_burn
+        proj = self._make()
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_dollars=30_000.0,
+        )
+        # promisable = 120_000; delivery_burn = 2_000 → 60 days
+        assert result["feature_runway_days"] == pytest.approx(60.0)
+        # Both deprecated aliases point to the same value
+        assert result["budget_days_remaining"] == pytest.approx(60.0)
+        assert result["total_budget_days_remaining"] == pytest.approx(60.0)
+
+
+class TestTotalRunwayDays:
+    def _make(self, **overrides):
+        base = {
+            "initial_budget": 200_000.0,
+            "team_size": 2,
+            "actual_spend": 50_000.0,
+            "start_date": "2024-01-15",
+            "as_of_date": "2024-01-15",
+        }
+        base.update(overrides)
+        return base
+
+    def test_total_runway_uses_liquid_budget_and_combined_burn(self):
+        # liquid = $150k; combined burn = 2×$1k delivery + 1×$800 overhead
+        # = $2,800/day → 53.57 days
+        proj = self._make()
+        oht = {
+            "total_dollars": 0.0, "realised_dollars": 0.0,
+            "remaining_dollars": 0.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+            "default_rate": 800.0, "default_headcount": 1,
+        }
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
+        )
+        assert result["total_runway_days"] == pytest.approx(150_000.0 / 2_800.0)
+
+    def test_total_runway_equals_feature_runway_when_no_overhead(self):
+        # With no overhead reservations and no overhead-team headcount,
+        # total_runway should differ from feature_runway only because
+        # liquid > promisable when overhead_dollars > 0. With both at zero
+        # they'd match if delivery burn == total burn (no overhead team).
+        proj = self._make()
+        result = agile_project_summary(proj, [], [], default_day_rate=1_000.0)
+        # liquid = promisable = 150k; delivery_burn = total_burn = 2k
+        assert result["total_runway_days"] == pytest.approx(result["feature_runway_days"])
+
+    def test_total_runway_can_differ_from_feature_runway(self):
+        # The two runway figures answer different questions and can land
+        # on different values. liquid=$150k, overhead_dollars=$10k,
+        # overhead_burn=$200/day → total_runway = 150k / 2.2k = 68.18d,
+        # feature_runway = 140k / 2k = 70d. They diverge whenever the
+        # overhead ratio differs between liquidity and burn.
+        proj = self._make()
+        oht = {
+            "total_dollars": 10_000.0, "realised_dollars": 0.0,
+            "remaining_dollars": 10_000.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+            "default_rate": 200.0, "default_headcount": 1,
+        }
+        result = agile_project_summary(
+            proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
+        )
+        assert result["total_runway_days"] == pytest.approx(150_000.0 / 2_200.0)
+        assert result["feature_runway_days"] == pytest.approx(140_000.0 / 2_000.0)
+        assert result["total_runway_days"] != result["feature_runway_days"]
+
+    def test_total_runway_zero_when_burn_zero(self):
+        # Zero team size → zero burn → 0 runway, no division by zero.
+        proj = self._make(team_size=0)
+        result = agile_project_summary(proj, [], [], default_day_rate=1_000.0)
+        assert result["total_runway_days"] == 0
+        assert result["feature_runway_days"] == 0
 
 
 # ── capacity_budget_summary excludes overhead capacity ─────────────────────

@@ -10,21 +10,52 @@ visualisations — and update this file when the rules change.
 
 ## 1. Budget vocabulary
 
-Three values, each with a single purpose. Don't invent a fourth without a
-reason to.
+### Questions the dashboard answers
+
+Every metric exists to answer a single, named question. When a metric tries
+to answer two, you get the kind of structural discrepancy that motivated
+the rename pass — `accessible_budget` was conflating "what's in the
+account" with "what I can still commit," and the comparison vs invoiced
+spend looked off whichever lens the reader assumed.
+
+| # | Question | Lens | Canonical metric |
+|---|---|---|---|
+| Q1 | "How much money is left in the account?" | Liquidity | `liquid_budget` |
+| Q2 | "What can I still commit to features without overdrawing reservations?" | Capacity to commit | `promisable_budget` |
+| Q3a | "Is total invoiced spend tracking the planned pace?" | Pace variance | `expected_spend` vs `actual_spend` |
+| Q3b | "Are features pacing on plan?" | Feature pace | `feature_expected_spend` vs earned value |
+| Q4a | "When does the project literally run out of money?" | Total runway | `total_runway_days` |
+| Q4b | "How many days of feature work can we still fund?" | Feature runway | `feature_runway_days` |
+| Q5 | "Where did the spend actually go?" | Decomposition | earned_value / realised_risk / unrealised_spend |
+| Q6 | "What forward exposure could erode the buffer?" | Risk | `open_risk_dollars` |
+
+The headline Budget and Runway hero cards expose lens toggles (Q1↔Q2 and
+Q4a↔Q4b) so a PM can switch view for the conversation they're in without
+the labels lying. Default lens = Promisable / Feature work (the conservative
+planning view).
+
+### Canonical names
+
+Three budget values, each with a single purpose.
 
 | Name | Formula | Means |
 |---|---|---|
 | `total_budget` | `initial_budget + adjustments` | The full pot. Denominator for burn % and the base of allocation tilings. |
-| `current_budget` | `total_budget − actual_spend` | What's still liquid. "We can't spend what we've already spent." |
-| `accessible_budget` | `current_budget − overhead_dollars` | What's still available for feature delivery. |
+| `liquid_budget` | `total_budget − actual_spend` | Q1: what's still in the account. |
+| `promisable_budget` | `liquid_budget − overhead_dollars` | Q2: what can still be committed to features without overdrawing reservations. |
 
-**Realised risks are not subtracted from `accessible_budget`.** They're a
+**Deprecated aliases** (still in returned summary dict for one release;
+remove after the dashboard sweep is complete):
+- `current_budget` → `liquid_budget`
+- `accessible_budget` → `promisable_budget`
+- `budget_days_remaining` / `total_budget_days_remaining` → `feature_runway_days`
+
+**Realised risks are not subtracted from `promisable_budget`.** They're a
 categorisation of `actual_spend` (team time on risk handling is logged as
 spend), so subtracting them again would double-count. See §3 for details.
 
-**Overheads are subtracted from `accessible_budget` and from
-`total_budget_days_remaining`.** They are pre-committed to non-feature work
+**Overheads are subtracted from `promisable_budget` and from
+`feature_runway_days`.** They are pre-committed to non-feature work
 (PM oversight, ceremonies, support) and cannot be redirected to feature
 delivery. Showing them as "available days the team can fund" misleads PMs
 into promising deliverable runway that was never deliverable.
@@ -39,16 +70,49 @@ share the same accessibility/feature-budget treatment (pre-committed,
 right-anchored on the bar). The split is purely for hero-card and modal
 clarity — toggling "Spend categories" on the Overall Completion bar
 splits the right-anchored overhead block into the two sub-blocks; merged,
-they read as a single overhead block. `daily_burn` is the *delivery-only*
-daily $ burn (the overhead team's full lifetime cost is already netted via
-`overhead_dollars`, so including their headcount in the runway denominator
-would double-count). The "happens over time" framing for overhead-team
-spend is a Burndown visualisation (faint dotted baseline) only — the
-accounting is up-front.
+they read as a single overhead block.
 
-`total_budget_days_remaining` and `budget_days_remaining` produce the same
-value under the current model. Keep both names available; the agile dashboard
-hero card label uses the `total_` form. Consolidate at a quieter time.
+**Two daily-burn rates, two questions.**
+
+| Rate | Formula | Used for |
+|---|---|---|
+| `delivery_daily_burn` (alias `daily_burn`) | `team_size × default_day_rate` | Q4b feature runway: `feature_runway_days`, burndown Y-axis, "how many days of feature work can we still fund?" |
+| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team_size × default_overhead_rate` (flat, mirrors delivery formula) | Q3a `expected_spend` and Q4a `total_runway_days`: "is invoiced spend tracking the planned pace?" and "when does the project literally run out of money?" |
+
+`actual_spend` is whole-of-project invoicing — it naturally includes
+overhead-team time. So `expected_spend = total_daily_burn × elapsed_days`
+is the apples-to-apples comparator. Computing `expected_spend` from
+delivery-only burn (the previous behaviour) made the burn delta
+structurally non-comparable: actual always appeared inflated by exactly
+the overhead-team contribution, regardless of real performance.
+
+For feature-pacing comparisons (`feature_expected_burn_pct`, started-feature
+targets) use `feature_expected_spend = delivery_daily_burn × elapsed_days`
+against `feature_budget = total_budget − overhead_dollars`. Overhead is
+out of both numerator and denominator there.
+
+Note: this is **hybrid accrual**. Overhead-team burn shows up progressively
+in `expected_spend` and `total_runway_days` (so they compare to actual),
+but the full overhead-team projection is still reserved up-front in
+`promisable_budget` so feature runway isn't promised against money
+committed to non-billable roles. The lens toggle on the headline cards
+lets PMs view either side without changing the underlying math.
+
+### "Show unrealised overhead" toggle on the spend decomposition bar
+
+The Overall Completion bar's right-anchored layer represents money gone
+or pre-committed without delivery to show for it. The unrealised portion
+of the overhead-team commitment (future invoicing not yet landed) is
+hidden by default — toggle "Show unrealised overhead" to reveal it. With
+the toggle off, the gap on the right of the bar maps to the **Liquid**
+budget view; with it on, the gap shrinks to **Promisable**. This is the
+same lens distinction as the headline Budget card, projected onto the bar.
+
+Right-anchored = pre-committed / non-deliverable, regardless of whether
+realised or projected. Don't move overhead to the left timeline even when
+realised; the convention is "left = contributing toward the on-track
+feature delivery target, right = not." Realised overhead spent invoicing
+that didn't produce features still belongs on the right.
 
 ---
 
