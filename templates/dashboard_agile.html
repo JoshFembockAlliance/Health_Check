@@ -592,11 +592,11 @@
     {% set exhaustion_x = ML + (b.x_budget_exhaustion / tcd * PW) %}
     {# Build SVG polyline points strings from the stepped (offset, value) tuples. #}
     {% macro _polyline_points(pts) %}{% for p in pts %}{{ ML + (p[0] / tcd * PW) }},{{ MT + PH - (p[1] / ind * PH) }} {% endfor %}{% endmacro %}
-    {# Locate where the projection line is at a given marker's X. Returns
-       the (x, y) pixel position if the projection is still above zero,
-       else None — markers past budget exhaustion get no circle on the
-       (already-zero) line. #}
-    {% macro _project_y(x_pixel) %}{% set frac = (x_pixel - today_x) / (exhaustion_x - today_x) if exhaustion_x > today_x else 1 %}{{ today_y + (zero_y - today_y) * frac }}{% endmacro %}
+    {# Pixel Y for a marker's interpolated days-remaining value coming
+       from calculations.py (`y_planned_cost_finish`, etc). Returns None
+       when the marker is past budget exhaustion — caller skips the
+       circle in that case. #}
+    {% macro _marker_y(days_remaining) %}{% if days_remaining is not none and ind > 0 %}{{ (MT + PH) - (days_remaining / ind * PH) }}{% endif %}{% endmacro %}
     <div class="hero-card" id="hero-burndown" data-burndown-view="forward"
          data-today-x="{{ today_x }}" data-chart-w="{{ CHART_W }}" data-chart-h="{{ CHART_H }}"
          role="button" tabindex="0" aria-haspopup="dialog" aria-controls="burndown-modal"
@@ -618,7 +618,7 @@
             </div>
         </div>
         <div class="value" style="font-size:14px; font-weight:500; margin-top:2px;">
-            <strong>{{ b.today_days | days }}</strong> remaining at <strong>{{ b.daily_burn | currency }}/day</strong> · scope finish <strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong>
+            <strong>{{ b.today_days | days }}</strong> cash runway at <strong>{{ b.total_daily_burn | currency }}/day</strong> combined burn · scope finish <strong style="color:var(--good);">{{ b.planned_cost_finish.isoformat() }}</strong>
             {% if b.inefficiency_finish > b.planned_cost_finish %}<span class="muted"> → with inefficiency <strong style="color:var(--warn);">{{ b.inefficiency_finish.isoformat() }}</strong></span>{% endif %}
         </div>
 
@@ -679,21 +679,21 @@
             {% endif %}
 
             {# Planned-cost finish (green) — within budget by definition (planned_cost_days ≤ today_days when buffer is positive) #}
-            {% set py = _project_y(planned_x) | float %}
+            {% set py_raw = _marker_y(b.y_planned_cost_finish) | trim %}
             <line x1="{{ planned_x }}" x2="{{ planned_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
                   stroke="var(--good)" stroke-width="1.5"/>
-            {% if planned_x <= exhaustion_x %}
-            <circle cx="{{ planned_x }}" cy="{{ py }}" r="3.5" fill="var(--good)"/>
+            {% if py_raw %}
+            <circle cx="{{ planned_x }}" cy="{{ py_raw }}" r="3.5" fill="var(--good)"/>
             {% endif %}
-            <text x="{{ planned_x }}" y="{{ zero_y + 32 }}" font-size="10" fill="var(--good)" text-anchor="middle" font-weight="600"><title>Scope finish at planned cost — {{ b.planned_cost_finish.isoformat() }}.</title>scope</text>
+            <text x="{{ planned_x }}" y="{{ zero_y + 32 }}" font-size="10" fill="var(--good)" text-anchor="middle" font-weight="600"><title>Scope finish at planned cost — {{ b.planned_cost_finish.isoformat() }}. Date is delivery-team-only; the line shows total cash runway, so the circle is just where cash sits at that date.</title>scope</text>
 
             {# Inefficiency-adjusted finish (amber) — only if it differs from planned #}
             {% if inefficiency_x > planned_x %}
-            {% set iy = _project_y(inefficiency_x) | float %}
+            {% set iy_raw = _marker_y(b.y_inefficiency_finish) | trim %}
             <line x1="{{ inefficiency_x }}" x2="{{ inefficiency_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
                   stroke="var(--warn)" stroke-width="1.5"/>
-            {% if inefficiency_x <= exhaustion_x %}
-            <circle cx="{{ inefficiency_x }}" cy="{{ iy }}" r="3.5" fill="var(--warn)"/>
+            {% if iy_raw %}
+            <circle cx="{{ inefficiency_x }}" cy="{{ iy_raw }}" r="3.5" fill="var(--warn)"/>
             {% endif %}
             <text x="{{ inefficiency_x }}" y="{{ zero_y + 46 }}" font-size="10" fill="var(--warn)" text-anchor="middle" font-weight="600"><title>Inefficiency-adjusted scope finish — {{ b.inefficiency_finish.isoformat() }}.</title>+inefficiency</text>
             {% endif %}
@@ -709,11 +709,11 @@
                Coloured info-blue to echo the actual-line colour, since
                this projection is about burn behaviour. #}
             {% if pace_x > planned_x + 1 %}
-            {% set py_pace = _project_y(pace_x) | float %}
+            {% set py_pace = _marker_y(b.y_pace_finish) | trim %}
             <g class="lever-projection">
                 <line x1="{{ pace_x }}" x2="{{ pace_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
                       stroke="var(--info)" stroke-width="1.5" stroke-dasharray="3 2"/>
-                {% if pace_x <= exhaustion_x %}
+                {% if py_pace %}
                 <circle cx="{{ pace_x }}" cy="{{ py_pace }}" r="3" fill="var(--info)"/>
                 {% endif %}
                 <text x="{{ pace_x }}" y="{{ zero_y + 60 }}" font-size="10" fill="var(--info)" text-anchor="middle" font-weight="600"><title>+pace finish — {{ b.pace_finish.isoformat() }}. Where scope lands if PACE is the only issue: actual cumulative burn per business day ({{ b.actual_daily_pace | currency }}/day vs full-team {{ b.daily_burn | currency }}/day) but productivity at planned rates. If this is later than scope, pace is part of the diagnosis (team availability, sick leave, partial weeks).</title>+pace</text>
@@ -727,7 +727,7 @@
                budget exhaustion, the area between exhaustion and the
                ratio vertical is shaded as a "deficit" zone. #}
             {% if ratio_x > planned_x + 1 %}
-            {% set py_ratio = _project_y(ratio_x) | float %}
+            {% set py_ratio = _marker_y(b.y_ratio_finish) | trim %}
             <g class="lever-projection">
                 {% if ratio_x > exhaustion_x %}
                 <rect x="{{ exhaustion_x }}" y="{{ zero_y - 6 }}"
@@ -736,7 +736,7 @@
                 {% endif %}
                 <line x1="{{ ratio_x }}" x2="{{ ratio_x }}" y1="{{ MT }}" y2="{{ zero_y }}"
                       stroke="var(--bad)" stroke-width="1.5"/>
-                {% if ratio_x <= exhaustion_x %}
+                {% if py_ratio %}
                 <circle cx="{{ ratio_x }}" cy="{{ py_ratio }}" r="3.5" fill="var(--bad)"/>
                 {% endif %}
                 <text x="{{ ratio_x }}" y="{{ zero_y + 74 }}" font-size="10" fill="var(--bad)" text-anchor="middle" font-weight="600"><title>+ratio finish — {{ b.ratio_finish.isoformat() }}. Where scope lands if PRODUCTIVITY is the only issue: pace at plan but feature efficiency at the historical ratio ({{ b.feature_efficiency_pct | round(1) }}% feature, {{ b.non_feature_ratio_pct | round(1) }}% non-feature). Includes both unexplained drag and realised-risk-pattern drag — the gap between this and +inefficiency is the realised-risk component.</title>+ratio</text>
@@ -745,13 +745,13 @@
 
             {# Y-axis title — included in y-axis-labels group via JS so it
                travels with the tick labels when the view shifts. #}
-            <text class="y-axis-title" x="14" y="{{ MT + PH/2 }}" font-size="10" fill="var(--muted)" text-anchor="middle" transform="rotate(-90 14 {{ MT + PH/2 }})">full-team budget days</text>
+            <text class="y-axis-title" x="14" y="{{ MT + PH/2 }}" font-size="10" fill="var(--muted)" text-anchor="middle" transform="rotate(-90 14 {{ MT + PH/2 }})">cash runway (days)</text>
         </svg>
 
         <div class="bar-legend" style="display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:6px; font-size:11px; line-height:1.3;">
             <span style="display:inline-flex; align-items:center; gap:5px;" title="The plan line: linear consumption from start budget down to zero on the project end date. Steps: descends Mon–Fri, flat on weekends."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--muted);"></span><span class="muted">Plan</span></span>
-            <span class="historical-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Actual budget consumption from project start to today, valued post-overhead. Hidden in 'View from today' mode."><span aria-hidden="true" style="width:14px; height:2.5px; background:var(--info);"></span><span class="muted">Actual</span></span>
-            <span style="display:inline-flex; align-items:center; gap:5px;" title="Forward projection at full-team daily-burn rate, starting from today's runway and reaching zero when accessible budget runs out."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--text-strong); opacity:0.6;"></span><span class="muted">Projection</span></span>
+            <span class="historical-legend" style="display:inline-flex; align-items:center; gap:5px;" title="Actual cash burned from project start to today (delivery + overhead combined), shaped by per-week capacity history. Hidden in 'View from today' mode."><span aria-hidden="true" style="width:14px; height:2.5px; background:var(--info);"></span><span class="muted">Actual</span></span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" title="Forward projection of cash runway: liquid budget burning at the combined delivery + overhead rate from today, reaching zero when the account is empty."><span aria-hidden="true" style="width:14px; height:0; border-top:1.5px dashed var(--text-strong); opacity:0.6;"></span><span class="muted">Projection</span></span>
             {% if end_x is not none %}
             <span style="display:inline-flex; align-items:center; gap:5px;" title="Project end date — when the plan line reaches zero. Distinct from finish-by-cost markers below."><span aria-hidden="true" style="width:2px; height:11px; background:var(--muted); border-left:1px dashed var(--muted);"></span><span class="muted">End</span><strong>{{ b.end_date.isoformat() }}</strong></span>
             {% endif %}
@@ -993,6 +993,7 @@
 {% set b_today = burndown.today_days %}
 {% set b_initial = burndown.initial_days %}
 {% set b_burn = burndown.daily_burn %}
+{% set b_total_burn = burndown.total_daily_burn %}
 {% set b_exhaust = burndown.budget_exhaustion %}
 {% set b_planned = burndown.planned_cost_finish %}
 {% set b_inefficient = burndown.inefficiency_finish %}
@@ -1021,17 +1022,14 @@
             {# Q1 — what's on the chart? #}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What is this chart showing?</span>
-                The Y axis is full-team budget days remaining (post-overhead — i.e. days the accessible budget can still fund the team for). The X axis is calendar dates from project start through the latest projected finish. Three lines tell the story: the dashed grey <em>plan</em> line is linear consumption from the start budget to zero on the project end date; the solid blue <em>actual</em> line is what's really been consumed up to today (shaped by per-week capacity history); the dashed dark <em>projection</em> line is delivery-team burn forward from today, ending when the budget runs out.
-                {% if burndown.overhead_team_dollars and burndown.overhead_team_dollars > 0 %}
-                A faint dotted line shows the linear consumption of the overhead-team commitment ({{ burndown.overhead_team_dollars | currency }}) from project start to project end — these dollars happen over time but are pre-committed for accessibility maths, so they don't shift the headline runway.
-                {% endif %}
-                The <strong>+pace</strong> and <strong>+ratio</strong> levers operate on delivery burn only; overhead-team burn is pre-committed and doesn't move with pace or productivity.
+                The Y axis is <strong>cash runway in days</strong> — liquid budget expressed as days of combined delivery + overhead burn. The X axis is calendar dates from project start through the latest projected finish. Three lines tell the story: the dashed grey <em>plan</em> line is linear consumption from the starting budget to zero on the project end date; the solid blue <em>actual</em> line is what's really been spent up to today (shaped by per-week capacity history); the dashed dark <em>projection</em> line burns forward from today at the combined delivery + overhead rate, reaching zero when the account is empty.
+                The four scope-finish markers (scope / +inefficiency / +pace / +ratio) sit on top of the line as date verticals. Their <strong>dates</strong> are computed from delivery-team work alone against remaining feature scope — overhead doesn't move feature finish — but the circle on the line just shows where cash sits at that date so you can read both questions at once.
             </p>
 
             {# Q2 — where does the budget run out? #}
             <p style="margin:0;">
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">When does the budget run out at current pace?</span>
-                There are <strong style="color:{{ days_color }};">{{ b_today | days }}d</strong> of full-team runway left. At today's burn of <strong>{{ b_burn | currency }}/day</strong>, that runway exhausts on <strong>{{ b_exhaust.isoformat() }}</strong> — where the projection line meets the X axis. This is the floor: no more money to spend after that, regardless of what's left to deliver.
+                There are <strong style="color:{{ days_color }};">{{ b_today | days }}d</strong> of cash runway left. At today's combined burn of <strong>{{ b_total_burn | currency }}/day</strong> (delivery + overhead), the account empties on <strong>{{ b_exhaust.isoformat() }}</strong> — where the projection line meets the X axis. This is the cash floor: no more money to spend after that, regardless of what's left to deliver. Feature delivery alone burns at <strong>{{ b_burn | currency }}/day</strong>; overhead-team time accounts for the rest.
             </p>
 
             {# Q3 — when does scope finish? Best case + lever decomposition. #}
@@ -1815,7 +1813,9 @@ function toggleStarted(projectId, featureId, btn) {
     const DEFAULTS = { 'spend': true, 'plan': true, 'risk': true, 'overhead-future': false };
     // Projected overhead team percentage used to reposition right-anchored bar segments
     // when the overhead-future toggle is switched. See CSS --ohrem variable on .progress.
-    const OHREM_PCT = {{ wl_overhead_team_remaining_pct }};
+    // Computed inline (not from `wl_overhead_team_remaining_pct` set in the content
+    // block) because Jinja block-tag scopes don't share locals across blocks.
+    const OHREM_PCT = {{ (summary.overhead_team_dollars_remaining / summary.total_budget * 100) if summary.total_budget > 0 else 0 }};
     const progressBar = card.querySelector('.progress-lg');
 
     let prefs = {};

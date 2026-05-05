@@ -950,15 +950,21 @@ def agile_burndown_chart_data(
 ) -> dict | None:
     """Build data for the budget burndown chart on the agile dashboard.
 
-    Y-axis: full-team budget days (post-overhead). The headline runway —
-    days the team can fund feature delivery for, given current spend and
-    overhead reservation.
+    Y-axis: total-team budget days (cash runway). Liquid budget expressed
+    as days of combined delivery + overhead burn. Answers Q4a — "when do
+    we have no money left in the account?" Overhead-team cost contributes
+    to the slope (it spends the budget down too), and the starting value
+    is the full liquid budget, not the post-overhead promisable figure.
 
     X-axis: calendar dates from project start through the latest projection.
 
-    Four "scope-finish" projections — designed to decompose the levers
-    that move the finish date so a status meeting can diagnose which
-    one is hurting:
+    Four "scope-finish" projections sit on top of the cash-runway line as
+    date markers. They are computed at the **delivery-only** rate against
+    feature scope (overhead is reserved separately), then plotted as
+    verticals dropping onto the line at their date — so feature finish
+    answers Q3 ("when does scope land?") independent of the line, which
+    answers Q4a ("when does cash run out?"). The four levers decompose
+    what's moving the finish date:
       * planned-cost : best case. remaining_dollars / daily_burn business
                        days from now. Assumes pace AND productivity match
                        plan exactly.
@@ -989,16 +995,25 @@ def agile_burndown_chart_data(
     end = parse_date(project.get("end_date"))
     as_of = parse_date(project.get("as_of_date"))
 
-    daily_burn = summary.get("daily_burn", 0)
-    if daily_burn <= 0 or start is None or as_of is None:
+    # Two daily-burn rates feed this chart for two different questions.
+    # `total_daily_burn` (delivery + overhead) drives the line — it's the
+    # rate at which cash leaves the account. `delivery_daily_burn` drives
+    # the feature-finish markers — they care only about the team that
+    # actually moves feature scope. Tolerant of summaries that pre-date
+    # the split (fall back to legacy `daily_burn`).
+    delivery_daily_burn = summary.get("delivery_daily_burn", summary.get("daily_burn", 0))
+    total_daily_burn = summary.get("total_daily_burn", delivery_daily_burn)
+    if total_daily_burn <= 0 or delivery_daily_burn <= 0 or start is None or as_of is None:
         return None
 
-    # Tolerant of legacy `accessible_budget` key in case caller built the
-    # summary dict by hand (e.g. tests).
-    accessible = summary.get("promisable_budget", summary.get("accessible_budget", 0))
     total_budget = summary["total_budget"]
     overhead = summary["overhead_dollars"]
     actual_spend = summary["actual_spend"]
+    # liquid_budget: total minus invoiced spend — cash still in the
+    # account. The Y-axis works in days of `total_daily_burn` against
+    # this. Fall back to deriving it for callers (or tests) that built
+    # the summary by hand.
+    liquid_budget = summary.get("liquid_budget", total_budget - actual_spend)
     allocated = summary["allocated_dollars"]
     overall_completion = summary["overall_completion"]
     realised_risk = summary["realised_risk_dollars"]
@@ -1007,10 +1022,20 @@ def agile_burndown_chart_data(
     remaining_dollars_value = summary["remaining_dollars"]
     open_risk = summary["open_risk_dollars"]
 
-    # initial_days: days the post-overhead budget could fund at start
-    # today_days: days the post-overhead budget can still fund (= accessible / burn)
-    initial_days = max(0.0, (total_budget - overhead) / daily_burn)
-    today_days = max(0.0, accessible / daily_burn)
+    # initial_days: days of project funding at start (total_budget at
+    #   combined delivery + overhead burn).
+    # today_days: days of project funding remaining now (liquid at the
+    #   same combined rate). These are the cash-runway anchors of the
+    #   line.
+    initial_days = max(0.0, total_budget / total_daily_burn)
+    today_days = max(0.0, liquid_budget / total_daily_burn)
+
+    # Marker math (planned_cost / inefficiency / pace / ratio) operates
+    # on remaining feature scope at the delivery-only rate. Keeping it
+    # delivery-only is deliberate: feature finish is about the team that
+    # moves scope, not about overhead-team time which is reserved
+    # separately. The local alias keeps the existing formulas readable.
+    daily_burn = delivery_daily_burn
 
     # Scope-finish projections (business days from today)
     planned_cost_days = remaining_dollars_value / daily_burn if daily_burn > 0 else 0.0
@@ -1084,24 +1109,25 @@ def agile_burndown_chart_data(
     pace_finish = add_business_days(as_of, pace_days) if pace_days > 0 else as_of
     ratio_finish = add_business_days(as_of, ratio_days) if ratio_days > 0 else as_of
 
-    # Build per-week dollar burn for the projection walk.  Include all
+    # Build per-week dollar burn for the projection walk. Include all
     # capacity periods (past, current, and future) so the current week's
-    # planned rate applies to its remaining days.  Overhead roles are excluded
-    # — their cost is already netted out of promisable_budget upstream.
+    # planned rate applies to its remaining days. Overhead roles ARE
+    # included — overhead-team time spends the budget down too, so the
+    # cash-runway line must reflect it. (Feature finish markers are
+    # computed separately above against delivery-only burn — they are
+    # not affected by this loop.)
     proj_week_burns: dict[date, float] = {}
     for cp in (capacity_periods or []):
-        if cp.get("role_category") == "overhead":
-            continue
         monday = cp.get("week_monday")
         if monday is None:
             continue
         proj_week_burns[monday] = proj_week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
 
     # Projection line: from today onward, burning at the capacity-planned rate
-    # for each week.  Weeks with no capacity override burn at 1.0 budget-day
-    # per business day (the full-team reference rate).  Weeks with overrides
+    # for each week. Weeks with no capacity override burn at 1.0 budget-day
+    # per business day (the full-team reference rate). Weeks with overrides
     # burn faster or slower in proportion: burn_fraction = week_dollar_burn /
-    # daily_burn.  budget_exhaustion is the calendar date when remaining hits 0.
+    # total_daily_burn. budget_exhaustion is the calendar date when remaining hits 0.
     # Offsets are calendar days from project start, inlined here because
     # _days_offset is defined later (after chart_end is known).
     projection_points: list[tuple[int, float]] = [((as_of - start).days, today_days)]
@@ -1114,8 +1140,8 @@ def agile_burndown_chart_data(
         current_proj += timedelta(days=1)
         if current_proj.weekday() < 5:  # business day
             monday = get_week_monday(current_proj)
-            if monday in proj_week_burns and daily_burn > 0:
-                burn_fraction = proj_week_burns[monday] / daily_burn
+            if monday in proj_week_burns and total_daily_burn > 0:
+                burn_fraction = proj_week_burns[monday] / total_daily_burn
             else:
                 burn_fraction = 1.0
             remaining = max(0.0, remaining - burn_fraction)
@@ -1171,9 +1197,10 @@ def agile_burndown_chart_data(
             continue
         week_burns[monday] = week_burns.get(monday, 0.0) + cp["day_rate"] * cp["team_size"]
 
-    if bd_elapsed > 0 and week_burns and daily_burn > 0:
+    if bd_elapsed > 0 and week_burns and total_daily_burn > 0:
         # Build the per-business-day modelled burn (in days-of-runway,
-        # i.e. each day's $ burn divided by full-team daily_burn).
+        # i.e. each day's $ burn divided by the combined reference rate
+        # — same denominator the projection line uses).
         per_day_burn_days: list[float] = []
         for offset in range(0, _days_offset(as_of)):
             day = start + timedelta(days=offset)
@@ -1181,8 +1208,8 @@ def agile_burndown_chart_data(
                 per_day_burn_days.append(0.0)
                 continue
             monday = get_week_monday(day)
-            week_dollar_burn = week_burns.get(monday, daily_burn)
-            per_day_burn_days.append(week_dollar_burn / daily_burn)
+            week_dollar_burn = week_burns.get(monday, total_daily_burn)
+            per_day_burn_days.append(week_dollar_burn / total_daily_burn)
         modelled_total = sum(per_day_burn_days)
         if modelled_total > 0 and consumed_days > 0:
             scale = consumed_days / modelled_total
@@ -1208,7 +1235,32 @@ def agile_burndown_chart_data(
         plan_burn_per_bd = (initial_days / bd_to_end) if bd_to_end > 0 else 0.0
         plan_points = _stepped_polyline(0, _days_offset(end), initial_days, plan_burn_per_bd)
 
-    # Optional overhead-team baseline: a faint diagonal showing the linear
+    # Marker Y interpolation. Each scope-finish marker is plotted as a
+    # vertical at its date; the circle on the line drops onto the
+    # projection at that date. Project the marker's calendar offset onto
+    # the (offset, days_remaining) projection_points and linearly
+    # interpolate. Returns None if the marker date is past
+    # budget_exhaustion (line is already at zero — no circle drawn).
+    def _interp_projection_y(target_offset: int | None) -> float | None:
+        if target_offset is None or not projection_points:
+            return None
+        if target_offset <= projection_points[0][0]:
+            return projection_points[0][1]
+        if target_offset >= projection_points[-1][0]:
+            # Past the line's last point — projection is already zero.
+            return None if projection_points[-1][1] <= 0 else projection_points[-1][1]
+        for (x0, y0), (x1, y1) in zip(projection_points, projection_points[1:]):
+            if x0 <= target_offset <= x1:
+                if x1 == x0:
+                    return y0
+                return y0 + (y1 - y0) * (target_offset - x0) / (x1 - x0)
+        return None
+
+    y_planned_cost_finish = _interp_projection_y(_days_offset(planned_cost_finish))
+    y_inefficiency_finish = _interp_projection_y(_days_offset(inefficiency_finish))
+    y_pace_finish = _interp_projection_y(_days_offset(pace_finish))
+    y_ratio_finish = _interp_projection_y(_days_offset(ratio_finish))
+
     return {
         # Raw data (dates and figures, for tooltips / sentence rendering)
         "start_date": start,
@@ -1234,7 +1286,14 @@ def agile_burndown_chart_data(
         "open_risk_days": (open_risk / daily_burn) if daily_burn > 0 else 0.0,
         "remaining_dollars": remaining_dollars_value,
         "open_risk": open_risk,
+        # `daily_burn` is the delivery-only rate, kept under the legacy key
+        # so existing tooltips/sentence rendering ("$X/day" framing of
+        # feature work) keep working unchanged. The line itself uses
+        # `total_daily_burn` (also returned) for the cash-runway slope.
         "daily_burn": daily_burn,
+        "delivery_daily_burn": delivery_daily_burn,
+        "total_daily_burn": total_daily_burn,
+        "liquid_budget": liquid_budget,
         # Pre-computed offsets for SVG rendering. Each value is "calendar
         # days from project start" — divide by total_calendar_days to get
         # a 0..1 fraction along the X-axis. Y-axis fractions are days /
@@ -1248,6 +1307,14 @@ def agile_burndown_chart_data(
         "x_pace_finish": _days_offset(pace_finish),
         "x_ratio_finish": _days_offset(ratio_finish),
         "x_budget_exhaustion": _days_offset(budget_exhaustion),
+        # Y-fractions for each marker: where the projection line sits at
+        # the marker's date, in the same days-remaining unit as the rest
+        # of the chart. Templates use these to drop a circle onto the
+        # cash-runway line. None when the marker is past exhaustion.
+        "y_planned_cost_finish": y_planned_cost_finish,
+        "y_inefficiency_finish": y_inefficiency_finish,
+        "y_pace_finish": y_pace_finish,
+        "y_ratio_finish": y_ratio_finish,
         # Stepped polyline points: each is (calendar_offset_days,
         # days_remaining). Flat across weekends, descend on weekdays —
         # honouring "1 budget day per business day" while plotting against

@@ -87,8 +87,8 @@ they read as a single overhead block.
 
 | Rate | Formula | Used for |
 |---|---|---|
-| `delivery_daily_burn` (alias `daily_burn`) | `team_size × default_day_rate` | Q4b feature runway: `feature_runway_days`, burndown Y-axis, "how many days of feature work can we still fund?" |
-| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team_size × default_overhead_rate` (flat, mirrors delivery formula) | Q3a `expected_spend` and Q4a `total_runway_days`: "is invoiced spend tracking the planned pace?" and "when does the project literally run out of money?" |
+| `delivery_daily_burn` (alias `daily_burn`) | `team_size × default_day_rate` | Q4b feature runway (`feature_runway_days`) and burndown **scope-finish marker dates** ("when does feature delivery land?"). |
+| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team_size × default_overhead_rate` (flat, mirrors delivery formula) | Q3a `expected_spend`, Q4a `total_runway_days`, **and the burndown chart line itself** ("when does the project literally run out of money?"). |
 
 `actual_spend` is whole-of-project invoicing — it naturally includes
 overhead-team time. So `expected_spend = total_daily_burn × elapsed_days`
@@ -195,6 +195,37 @@ question being asked.**
 When realised risks are referenced in sub-rows or modals (e.g.
 "realised-risk share of past spend: 17.2d"), frame them as *context
 about past spend*, never as a fresh deterministic deduction line.
+
+---
+
+## 3a. Burndown chart — line vs markers
+
+The agile-dashboard burndown chart deliberately mixes two lenses on a
+single picture, because a status meeting needs both at once. Keeping
+them separate avoids the previous mis-framing where the line answered
+"feature runway" while looking like "cash runway".
+
+* **The line answers Q4a — "when does the project literally run out of
+  money?"** Y-axis is `liquid_budget / total_daily_burn` in days, and
+  the forward projection burns at the combined delivery + overhead rate
+  using all capacity periods (no role filter). The X-axis date where the
+  projection meets zero is `budget_exhaustion`.
+
+* **The markers answer Q3 — "when does scope finish?"** `planned_cost`,
+  `+inefficiency`, `+pace`, and `+ratio` are date-only verticals. Each
+  date is computed at `delivery_daily_burn` against
+  `remaining_dollars` (feature scope) — overhead is reserved separately
+  and does not move feature delivery. The circle on the line at the
+  marker's X is purely informative: it shows where cash sits at that
+  date, so the meeting can read both questions at once.
+
+Why not deduct overhead from the line's starting value (the previous
+behaviour)? It conflates the two questions. With overhead pre-
+subtracted, the line hit zero at `feature_runway_days` instead of
+`total_runway_days`, and the reader saw "the project ran out of money"
+when the project still had cash for overhead-team time. Capacity changes
+to overhead headcount also failed to move the line, even though they
+materially change cash runway.
 
 ---
 

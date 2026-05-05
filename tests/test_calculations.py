@@ -1220,10 +1220,23 @@ def _minimal_project(start="2025-01-06", as_of="2025-04-28", team_size=10):
     }
 
 
-def _minimal_summary(daily_burn=10_000.0, accessible=200_000.0, total=500_000.0):
+def _minimal_summary(daily_burn=10_000.0, accessible=200_000.0, total=500_000.0,
+                     liquid=None, total_daily_burn=None):
+    # Burndown line is now sized off `liquid_budget / total_daily_burn`;
+    # marker date math still uses delivery `daily_burn`. Tests written
+    # against the old "accessible / daily_burn = today_days" semantics
+    # translate cleanly: pass the same numeric value as `liquid` and the
+    # exhaustion arithmetic stays put.
+    if liquid is None:
+        liquid = accessible
+    if total_daily_burn is None:
+        total_daily_burn = daily_burn
     return {
         "daily_burn": daily_burn,
+        "delivery_daily_burn": daily_burn,
+        "total_daily_burn": total_daily_burn,
         "accessible_budget": accessible,
+        "liquid_budget": liquid,
         "total_budget": total,
         "overhead_dollars": 50_000.0,
         "actual_spend": 250_000.0,
@@ -1289,8 +1302,11 @@ class TestAgileBurndownCapacityProjection:
         baseline_exhaustion = add_business_days(date(2025, 4, 28), 5)
         assert result["budget_exhaustion"] < baseline_exhaustion
 
-    def test_overhead_capacity_excluded_from_projection(self):
-        # Overhead-role capacity periods must not affect the projection slope.
+    def test_overhead_capacity_included_in_projection(self):
+        # The chart line tracks cash runway, so overhead-team capacity DOES
+        # contribute to the slope. A future week with heavy overhead headcount
+        # must drain liquid budget faster, pulling exhaustion earlier than the
+        # no-capacity baseline.
         project = _minimal_project(team_size=10)
         summary = _minimal_summary(daily_burn=10_000.0, accessible=50_000.0)
         overhead_cap = [
@@ -1304,7 +1320,61 @@ class TestAgileBurndownCapacityProjection:
         result_overhead = agile_burndown_chart_data(project, summary, capacity_periods=overhead_cap)
         result_none = agile_burndown_chart_data(project, summary, capacity_periods=[])
         assert result_overhead is not None and result_none is not None
-        assert result_overhead["budget_exhaustion"] == result_none["budget_exhaustion"]
+        assert result_overhead["budget_exhaustion"] < result_none["budget_exhaustion"]
+
+    def test_marker_dates_use_delivery_only_burn(self):
+        # Feature finish dates must NOT shift when overhead headcount is
+        # changed — they're computed from delivery-only burn against
+        # remaining feature scope.
+        project = _minimal_project(team_size=10)
+        base = _minimal_summary(daily_burn=10_000.0)
+        # Same delivery rate, different total rates (i.e. different overhead
+        # contribution). The planned_cost_finish marker should be identical.
+        base_with_overhead = dict(base)
+        base_with_overhead["total_daily_burn"] = 12_000.0  # +$2k/day overhead
+        result_low = agile_burndown_chart_data(project, base, capacity_periods=[])
+        result_high = agile_burndown_chart_data(project, base_with_overhead, capacity_periods=[])
+        assert result_low is not None and result_high is not None
+        assert result_low["planned_cost_finish"] == result_high["planned_cost_finish"]
+        assert result_low["planned_cost_days"] == result_high["planned_cost_days"]
+        # But the line's exhaustion DOES shift (more burn → empties sooner).
+        assert result_high["budget_exhaustion"] < result_low["budget_exhaustion"]
+
+    def test_initial_days_is_total_budget_over_total_burn(self):
+        # The Y-axis starting value is full-pot cash divided by combined
+        # delivery + overhead burn — no overhead pre-subtraction.
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=10_000.0, total=500_000.0)
+        summary["total_daily_burn"] = 12_500.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["initial_days"] == pytest.approx(500_000.0 / 12_500.0)
+
+    def test_today_days_is_liquid_over_total_burn(self):
+        # The "today" anchor is liquid budget at total burn, not promisable
+        # at delivery burn.
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=10_000.0)
+        summary["liquid_budget"] = 240_000.0
+        summary["total_daily_burn"] = 12_000.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["today_days"] == pytest.approx(240_000.0 / 12_000.0)
+
+    def test_marker_y_interpolated_onto_projection_line(self):
+        # Each marker should expose a y_* value that sits on the projection
+        # line at the marker's date. None is allowed when the marker falls
+        # past budget exhaustion.
+        project = _minimal_project()
+        summary = _minimal_summary(daily_burn=10_000.0, accessible=200_000.0)
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        for key in ("y_planned_cost_finish", "y_inefficiency_finish",
+                    "y_pace_finish", "y_ratio_finish"):
+            assert key in result
+            y = result[key]
+            if y is not None:
+                assert 0.0 <= y <= result["initial_days"] + 1e-6
 
 
 # ── parse_date ─────────────────────────────────────────────────────────────
