@@ -598,6 +598,32 @@ class TestCapacityPlanSummary:
         # 2 people for 5 days in the first week (within 2-week window)
         assert result["two_week_by_role"].get("Developer", 0) == pytest.approx(10.0)
 
+    def test_none_end_date_falls_back_to_52_weeks(self):
+        # When end_date is None the function projects 52 weeks forward.
+        # With default team_size=1 and a 52-week window of ~260 business days,
+        # total_person_days should be substantial (not zero).
+        as_of = date(2024, 1, 15)
+        result = capacity_plan_summary(
+            as_of_date=as_of,
+            end_date=None,
+            capacity_periods=[],
+            default_team_size=1,
+            default_daily_burn=1_000.0,
+        )
+        assert result["total_person_days"] > 250  # 52 weeks × ~5 bd × 1 person
+
+    def test_end_date_equal_to_as_of_falls_back_to_52_weeks(self):
+        # end_date <= as_of_date also triggers the 52-week fallback.
+        as_of = date(2024, 1, 15)
+        result = capacity_plan_summary(
+            as_of_date=as_of,
+            end_date=as_of,  # same date → would yield zero without fallback
+            capacity_periods=[],
+            default_team_size=2,
+            default_daily_burn=2_000.0,
+        )
+        assert result["total_person_days"] > 250 * 2  # > 52 weeks at 2 people
+
 
 # ── capacity_budget_summary ────────────────────────────────────────────────
 
@@ -850,6 +876,21 @@ class TestFixedPriceProjectSummary:
         features = [_feat(1, 10, 100), _feat(2, 30, 0)]  # 10/40 = 25%
         result = fixed_price_project_summary(self._project(), features, [], default_day_rate=1_000.0)
         assert result["overall_completion"] == pytest.approx(25.0)
+
+    def test_no_milestones_gives_zero_total_budget(self):
+        # A fixed-price project with no milestones yet should return 0 total_budget.
+        result = fixed_price_project_summary(self._project(), [], [], default_day_rate=1_000.0)
+        assert result["total_budget"] == 0.0
+        assert result["next_milestone"] is None
+        assert result["paid_count"] == 0
+
+    def test_margin_is_negative_when_spend_exceeds_paid(self):
+        # Spending before any milestone is invoiced → negative current margin.
+        result = fixed_price_project_summary(
+            self._project(actual_spend=5_000), [], [], default_day_rate=1_000.0
+        )
+        assert result["margin"] == pytest.approx(-5_000.0)
+        assert result["projected_margin"] == pytest.approx(-5_000.0)
 
 
 
@@ -1497,6 +1538,17 @@ class TestBurndownProjectionFinishes:
         project = _minimal_project(start="")
         summary = _minimal_summary()
         assert agile_burndown_chart_data(project, summary, capacity_periods=[]) is None
+
+    def test_all_scope_complete_gives_zero_planned_cost_days(self):
+        # When remaining_dollars == 0, all scope is done.
+        # planned_cost_days must be 0 and planned_cost_finish == as_of.
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["remaining_dollars"] = 0.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["planned_cost_days"] == pytest.approx(0.0)
+        assert result["planned_cost_finish"] == date(2025, 4, 28)
 
 
 # ── spend decomposition identity ─────────────────────────────────────────────
