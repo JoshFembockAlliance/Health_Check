@@ -35,12 +35,12 @@ The agile burndown answers "is there budget runway for remaining work?". The fix
 
 ### General
 ### Demo Projects
-- [ ] **Demo Projects**
+- [x] **Demo Projects**
 Create a demo project dev dataset that contains a few items for each project type. The idea of this database is to keep it small and only change it infrequently for use in testing when new features are developed without impacting current projects during testing. If this is overly complex, make a note of why here and move on instead of picking it up. Ensure the note contains enough details tha the causes can be addressed to achieve the desired outcome some other way. 
 
-- [ ] Make sure test coverage is up-to-date and accounts for new features like the decision register, burndown chart projections, spend decomposition (`earned_value + realised_risk + unrealised_spend = actual_spend`), and the budget-model change in [DESIGN_RULES §1](DESIGN_RULES.md).
-- [ ] Ensure that project import and export are still robust and account for new features like decision register.
-- [ ] **Save-on-blur form-association sweep.** Standardise inline-edit forms across the codebase on the HTML5 `form="..."` association pattern — single `<form>` element per row with inputs in different cells referencing it by `id`. This avoids the stale-data bug we hit on milestones (where two separate forms held duplicated hidden inputs and editing one stole the other's stale state).
+- [x] Make sure test coverage is up-to-date and accounts for new features like the decision register, burndown chart projections, spend decomposition (`earned_value + realised_risk + unrealised_spend = actual_spend`), and the budget-model change in [DESIGN_RULES §1](DESIGN_RULES.md).
+- [x] Ensure that project import and export are still robust and account for new features like decision register.
+- [x] **Save-on-blur form-association sweep.** Standardise inline-edit forms across the codebase on the HTML5 `form="..."` association pattern — single `<form>` element per row with inputs in different cells referencing it by `id`. This avoids the stale-data bug we hit on milestones (where two separate forms held duplicated hidden inputs and editing one stole the other's stale state).
   - **Reference pattern** (already migrated): `templates/milestones.html` lines 47-65. The `<form id="mil-{{ m.id }}">` sits outside the table cells; inputs in different `<td>` elements use `form="mil-{{ m.id }}"` to associate.
   - **Migrate**: `templates/feature_detail.html` deliverables autosave (~lines 278-307). The current `autoSave(tr)` function scans `tr.querySelectorAll('input')` and POSTs to `/api/p/${PID}/deliverables/${delId}/update` — works, but the row's HTML uses implicit forms and won't catch the same multi-form-stale-state class of bug if extended. Refactor to one `<form>` per deliverable row with the form-association pattern, then simplify `autoSave` to `new FormData(form)`.
   - **Leave as-is**: `templates/risks.html` inline-status (`data-action="inline-status"`) and inline-realised (`data-action="inline-realised"`) are single-field PATCH-style updates — the form-association pattern adds nothing for single-field cases. Only worth migrating if those grow to multi-field inline edits.
