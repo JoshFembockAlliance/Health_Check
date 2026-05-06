@@ -419,6 +419,8 @@ def _agile_dashboard(request: Request, project: dict):
     adj_rows = list(db.execute(
         "SELECT * FROM budget_adjustments WHERE project_id = ? ORDER BY date", [project_id]
     ).fetchall())
+    # Positional mapping assumes the legacy 4-column schema (id, amount, date, description).
+    # Fall back to the ORM path for any schema that has extra columns.
     adjustments = [
         {"id": r[0], "amount": r[1], "date": r[2], "description": r[3]} for r in adj_rows
     ] if adj_rows and len(adj_rows[0]) == 4 else [dict(r) for r in db["budget_adjustments"].rows_where("project_id = ?", [project_id])]
@@ -496,6 +498,9 @@ def _agile_dashboard(request: Request, project: dict):
 
     total_feature_days = sum(f["total_days"] for f in features if f["total_days"] > 0)
     feature_burn_pct = summary["feature_expected_burn_pct"]
+    # Scale the health target up for started features so they aren't unfairly
+    # penalised when unstarted features hold budget but contribute 0% completion.
+    # e.g. 100 total days, 50 started, 30% burn → started target = 60%.
     if started_total_days > 0 and total_feature_days > 0:
         started_adjusted_target = min(
             100.0,
@@ -572,6 +577,7 @@ def _agile_dashboard(request: Request, project: dict):
             sticky_notes.append(note_dict)
             continue
         ndue = parse_date(nr[4])
+        # Surface overdue notes and anything due within the next two weeks.
         if aof and ndue and (ndue <= aof or ndue <= aof + timedelta(days=14)):
             dated_notes.append(note_dict)
     dated_notes.sort(key=lambda n: n["due_date"] or "9999-99-99")
@@ -656,6 +662,7 @@ def _fixed_price_dashboard(request: Request, project: dict):
             sticky_notes.append(note_dict)
             continue
         ndue = parse_date(nr[4])
+        # Surface overdue notes and anything due within the next two weeks.
         if aof and ndue and (ndue <= aof or ndue <= aof + timedelta(days=14)):
             dated_notes.append(note_dict)
     dated_notes.sort(key=lambda n: n["due_date"] or "9999-99-99")
