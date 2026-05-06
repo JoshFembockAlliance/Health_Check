@@ -13,24 +13,17 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 ## Enhancements to Existing
 
 ### General
-- [x] ** Show unrealised overhead UI cleanup**
-When not toggled on, metrics on the completion bar are still being pushed to the right, the fill-in simply isn't visible. Toggled off should be the same as not represented at all. Also, move the toggle for it to right under spend categories above the legend items so that it doesn't appear in between legend items and look cluttered. 
-
-- [x] **E2E test review**
-I have noticed that the E2E tests are leaving new risks behind after finishing, make sure that the tests are self-contained and don't leave clutter behind. Using a specific project or specific testing-mode with a test-specific database for testing to avoid running tests in the in-use version of data would sidestep this risk but follow conventions to implement whatever the cleanest fix to the general problem may be. 
-
 
 ### Agile Project Dashboard Items
-- [x] **Net Accessible Budget Modal - Unrealised Spend**
-The modal lists a few items that unrealised spend could go toward but doesn't provide a solid metric for if it's a healthy amount of value to have in-flight at the time of the review. Because an agile sprint typically only includes enough items to finish them out during a single sprint, a healthy amount of in-flight unrealised spend would typically be less than at worst one sprint (typically 2 working weeks) of burn. I think that this is worth calculating and using in the discussion the modal facilitates. More than that is unhealthy and should be discussed and accounted for. 
+
+
+
 
 ### Fixed Price Project Dashboard Items - ignore for now
 - [ ] **Burndown chart for fixed-price projects - projections** 
 The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
 
 ### Settings
-- [x] **Project Symbols** 
-Remove the really basic symbols like triangle, dot, diamond and circle from symbol selection. Add a few that are tech-industry relevant, evoking finances, industry, etc. 
 
 ### Features, Requirements & Deliverables
 
