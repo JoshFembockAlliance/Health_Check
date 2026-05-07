@@ -606,3 +606,57 @@ def test_expanded_scope_toggle_on_feature(page: Page):
             document.body.appendChild(f);
             f.submit();
         }}""")
+
+
+# ── Settings — Budget Adjustments ─────────────────────────────────────────────
+
+def test_add_and_delete_budget_adjustment(page: Page):
+    """Can add a budget adjustment in Settings and delete it via confirm dialog."""
+    page.goto(f"{P1}/settings")
+    page.locator("details:has(form[action='/p/1/settings/adjustments/add']) summary").click()
+    form = page.locator("form[action='/p/1/settings/adjustments/add']")
+    form.locator("input[name='date']").fill("2025-03-01")
+    form.locator("input[name='amount']").fill("50000")
+    form.locator("input[name='description']").fill("E2E Test Adjustment")
+    form.locator("button[type='submit']").click()
+
+    expect(page.locator("td", has_text="E2E Test Adjustment").first).to_be_visible()
+
+    delete_btn = page.locator(
+        "form[action*='/p/1/settings/adjustments/'][action*='/delete'] button"
+    ).last
+    delete_btn.click()
+    page.locator("#confirm-ok").click()
+    page.wait_for_load_state("networkidle")
+
+    expect(page.locator("td", has_text="E2E Test Adjustment")).not_to_be_visible()
+
+
+# ── Dashboard hero-card modals ─────────────────────────────────────────────────
+
+def test_dashboard_budget_days_modal(page: Page):
+    """Clicking the Budget Days hero card opens its modal; Escape closes it."""
+    page.goto(f"{P1}/")
+    hero = page.locator("#hero-budget-days")
+    expect(hero).to_be_visible()
+    modal = page.locator("#budget-days-modal")
+
+    hero.click()
+    expect(modal).to_be_visible()
+
+    page.keyboard.press("Escape")
+    expect(modal).not_to_be_visible()
+
+
+def test_dashboard_overall_completion_modal(page: Page):
+    """Clicking the Overall Completion hero card opens its modal; close button works."""
+    page.goto(f"{P1}/")
+    hero = page.locator("#hero-overall-completion")
+    expect(hero).to_be_visible()
+    modal = page.locator("#overall-completion-modal")
+
+    hero.click()
+    expect(modal).to_be_visible()
+
+    modal.locator("button[aria-label='Close']").click()
+    expect(modal).not_to_be_visible()
