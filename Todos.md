@@ -56,6 +56,27 @@ Create a demo project dev dataset that contains a few items for each project typ
 ### Project snapshot comparison — Medium Priority
 - [ ] Being able to use the import feature to populate data not for the project itself but for a comparison report between two different project dates where differences between dashboard metrics (not at the granularity of individual deliverable deltas because it would be hard to account for new deliverables but maybe overall completion percentages of features) new risks, etc are included and shown to the user to answer the question of "what has changed since the last time we exported the project" at a glance. The import feature may not be required for this if a deep copy of report-relevant information could be made for the snapshot comparison purposes.
 
+#### Planning Activity
+
+**What we know:**
+- The export route (`GET /p/{project_id}/export`, `main.py:1997`) produces a ZIP of 16 CSVs matching all project-scoped DB tables (`EXPORT_TABLES` list). This ZIP is already a complete point-in-time snapshot — nothing new needed on the export side.
+- `agile_project_summary()` (`calculations.py:285`) accepts raw dicts (project, features list, adjustments, etc.) — not live DB handles — so it can be called with data parsed from a historical ZIP entirely in-memory, without writing to the DB.
+- The import route (`main.py:2039`) already contains logic to parse this ZIP format into in-memory dicts with ID remapping. The parsing half of that code is the clearest path to loading a snapshot for comparison; the write phase just needs to be replaced by a call to `agile_project_summary()`.
+- `build_feature_data(project_id)` makes live DB queries; for snapshot comparison we'd reconstruct an equivalent enriched feature list from the ZIP's `features`, `requirements`, and `deliverables` CSVs manually (the import code already does exactly this).
+- The most natural comparison granularity (per the TODO description) is top-level dashboard metrics: `liquid_budget`, `overall_completion`, `feature_runway_days` / `budget_days_remaining`, and `open_risk_dollars`. Feature-level % deltas may also be valuable but are harder to reconcile if features were added/removed between snapshots.
+- There is no existing snapshot, clone, or copy feature in the codebase.
+- A per-project route (e.g., `GET /p/{id}/compare` + `POST /p/{id}/compare`) fits the existing routing pattern best. The Settings page is the natural entry point — it already hosts export/import — a "Compare with past snapshot" card alongside the import card would be discoverable and consistent.
+- For a stateless approach (no DB changes), the user uploads an old export ZIP, the server parses it in-memory, computes metrics for both snapshot and current state, and renders a comparison — no new tables needed.
+
+**Open questions:**
+- **Storage strategy:** Should snapshots always be uploaded at compare-time (stateless — user keeps their own old ZIPs), or stored in the DB with a label/date for later retrieval? DB storage is more ergonomic ("compare against snapshot from 3 months ago") but requires a new table and potentially large BLOBs.
+- **Comparison granularity:** Metric-level deltas only (hero cards), or also feature-by-feature completion % changes? Feature-level is useful but reconciliation by name is fragile when features are added or renamed between snapshots.
+- **Structural change communication:** If the snapshot has features/risks that no longer exist (or new ones have been added), how should the UI communicate this? E.g., "3 new features since snapshot" or "2 risks resolved" as annotations on the comparison report?
+- **UI layout:** Side-by-side columns (then vs now)? A diff table (metric | snapshot | current | delta)? Or inline delta badges on the existing dashboard hero cards?
+- **Entry point:** A card within the Settings page, or a dedicated "Compare" tab in the top nav?
+- **Fixed-price project support:** Key metrics differ (margin, milestone invoicing progress). Does comparison reuse `agile_project_summary()` or need a `fixed_price_project_summary()` equivalent?
+- **Project identity validation:** What if the user accidentally uploads a ZIP from a different project? Should we validate the project name or warn if it doesn't match?
+
 ### Inter-Dashboard — single card per project — High Priority
 - [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. **Plan**: [`plans/inter-dashboard-card.md`](plans/inter-dashboard-card.md).
 
