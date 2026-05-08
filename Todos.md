@@ -130,13 +130,13 @@ Review all user interface elements across the different pages. Ensure that each 
   1. Escape key closes each modal (browser-default for `<dialog>` — confirm not blocked by other handlers).
   2. Focus traps inside the modal while open (Tab cycles within, doesn't leak to background page).
   3. Initial focus on open lands sensibly — probably on the close button or the first interactive element. Currently we don't set this explicitly.
-  4. Screen reader announces the modal as a dialog with its title (e.g. "Budget Days Remaining — Detail").
+  4. Screen reader announces the modal as a dialog with its title (e.g. "Budget Days Remaining — Detail"). ✅ Fixed 08/05/2026 — added `aria-labelledby` to all four `<dialog>` elements pointing to `id`s on their title `<strong>` nodes.
   5. Click-on-backdrop closes (we have an `e.target === modal` handler — verify it doesn't fire from inside-card clicks).
   6. Keyboard-only path: focusing the hero card and pressing Enter/Space opens the modal (we have a `keydown` handler — verify it works).
-  7. Returning focus to the trigger card after closing.
+  7. Returning focus to the trigger card after closing. ✅ Fixed 08/05/2026 — added `modal.addEventListener('close', () => card.focus())` to all four modal IIFEs.
 - **Reference rule**: [DESIGN_RULES §6](DESIGN_RULES.md) describes the modal pattern; if any of the above fail, update the rule with the corrected guidance and fix the existing modals.
 
-Last Addressed: 19/04/2026
+Last Addressed: 08/05/2026
 
 ### Readme Review
 Check that the readme is up to date. Ensure any recent changes that require revisions to the document have been adjusted for. If there have been significant changes, synchronise the readme with the true current state. If the Readme is getting crowded, consider adding one or more purpose-specific multiple documents and linking them to essentially maintain a multi-page readme in a way that is friendly with GitHub. If you update screenshots, ensure mock data is in use instead of actual data as it could contain sensitive customer information.

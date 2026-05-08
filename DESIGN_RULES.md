@@ -310,7 +310,12 @@ Pattern (template in `dashboard_agile.html`'s Budget Days modal):
   hint in the label, `cursor: pointer`, and an `aria-haspopup="dialog"`
   reference to the modal id.
 - Modal is a `<dialog>` element; opened via `showModal()`, closed via
-  backdrop click or ✕ button.
+  backdrop click or ✕ button. The `<dialog>` must carry `aria-labelledby`
+  pointing to the `id` on the title `<strong>` inside it — required so
+  screen readers announce the dialog name on open.
+- The JS IIFE must include `modal.addEventListener('close', () => card.focus())`
+  so keyboard/AT users return to the triggering card after closing (Escape,
+  backdrop click, or ✕ button all fire the `close` event).
 - Each question is its own `<p>` paragraph with an uppercase muted label and
   the answer in plain prose.
 - Numeric deltas in the answer are colour-coded (green for surplus, red for
