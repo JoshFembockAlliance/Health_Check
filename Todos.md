@@ -140,7 +140,7 @@ Last Addressed: 08/05/2026
 
 ### Readme Review
 Check that the readme is up to date. Ensure any recent changes that require revisions to the document have been adjusted for. If there have been significant changes, synchronise the readme with the true current state. If the Readme is getting crowded, consider adding one or more purpose-specific multiple documents and linking them to essentially maintain a multi-page readme in a way that is friendly with GitHub. If you update screenshots, ensure mock data is in use instead of actual data as it could contain sensitive customer information.
-Last Addressed: 19/04/2026
+Last Addressed: 08/05/2026
 
 ### Design-Rules Review
 Re-read [DESIGN_RULES.md](DESIGN_RULES.md) and prune or update rules whose underlying decisions have changed. Add new rules for non-obvious decisions reached since last addressed. Don't let it become an exhaustive style guide — keep it focused on the things you'd want a fresh pair of eyes to know before touching the dashboard.
