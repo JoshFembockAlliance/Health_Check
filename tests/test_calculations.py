@@ -1184,23 +1184,10 @@ class TestTotalRunwayDays:
         )
         assert result["total_runway_days"] == pytest.approx(150_000.0 / 2_800.0)
 
-    def test_total_runway_equals_feature_runway_when_no_overhead(self):
-        # With no overhead reservations and no overhead-team headcount,
-        # total_runway should differ from feature_runway only because
-        # liquid > promisable when overhead_dollars > 0. With both at zero
-        # they'd match if delivery burn == total burn (no overhead team).
-        proj = self._make()
-        result = agile_project_summary(proj, [], [], default_day_rate=1_000.0)
-        # liquid = promisable = 150k; delivery_burn = total_burn = 2k
-        assert result["total_runway_days"] == pytest.approx(result["feature_runway_days"])
-
-    def test_total_runway_can_differ_from_feature_runway(self):
-        # The two runway figures answer different questions and can land
-        # on different values. liquid=$150k, overhead_dollars=$10k,
-        # overhead_burn=$200/day → total_burn=2.2k/day.
-        # total_runway = 150k / 2.2k = 68.18d,
-        # feature_runway = 140k / 2.2k = 63.64d. They diverge whenever
-        # promisable_budget < liquid_budget (i.e. there are overhead costs).
+    def test_total_runway_equals_feature_runway_when_no_fixed_overheads(self):
+        # The two lenses diverge only when fixed_overhead_dollars > 0.
+        # An overhead team adds to total_daily_burn (denominator) but does NOT
+        # reduce the feature numerator — counting them twice would double-count.
         proj = self._make()
         oht = {
             "total_dollars": 10_000.0, "realised_dollars": 0.0,
@@ -1208,8 +1195,25 @@ class TestTotalRunwayDays:
             "headcount": 0, "by_role": {},
             "default_rate": 200.0, "default_headcount": 1,
         }
+        result = agile_project_summary(proj, [], [], default_day_rate=1_000.0, overhead_team=oht)
+        # Both use liquid as numerator when no fixed overheads; denominators match too.
+        assert result["total_runway_days"] == pytest.approx(result["feature_runway_days"])
+
+    def test_total_runway_can_differ_from_feature_runway(self):
+        # The lenses diverge when fixed_overhead_dollars > 0.
+        # liquid=$150k, fixed_overhead=$10k, overhead_burn=$200/day → total_burn=2.2k/day.
+        # total_runway = 150k / 2.2k = 68.18d,
+        # feature_runway = (150k − 10k) / 2.2k = 140k / 2.2k = 63.64d.
+        proj = self._make()
+        oht = {
+            "total_dollars": 0.0, "realised_dollars": 0.0,
+            "remaining_dollars": 0.0, "daily_burn": 0.0,
+            "headcount": 0, "by_role": {},
+            "default_rate": 200.0, "default_headcount": 1,
+        }
         result = agile_project_summary(
-            proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
+            proj, [], [], default_day_rate=1_000.0,
+            fixed_overhead_dollars=10_000.0, overhead_team=oht,
         )
         assert result["total_runway_days"] == pytest.approx(150_000.0 / 2_200.0)
         assert result["feature_runway_days"] == pytest.approx(140_000.0 / 2_200.0)

@@ -445,16 +445,16 @@ def agile_project_summary(
     # liquidity view, so it sits against total_budget, not liquid_budget.
     unallocated_budget = total_budget - allocated_dollars - overhead_dollars - realised_risk_dollars
 
-    # Two runway figures, one per forecast question. Both divide by
-    # total_daily_burn — overhead roles are active and spending regardless
-    # of whether they contribute to feature delivery, so the denominator
-    # always reflects full project burn:
-    #   feature_runway_days → Q4b: "How many days does the project run
-    #     on the freely-committable budget?" Promisable budget (liquid
-    #     minus pre-committed overheads) at the full combined rate.
-    #   total_runway_days   → Q4a: "When does the project literally run
-    #     out of money?" Liquid budget at the full combined rate.
-    feature_runway_days = promisable_budget / total_daily_burn if total_daily_burn else 0
+    # Two runway figures, both dividing by total_daily_burn (overhead roles
+    # are active and spending throughout, so the denominator always reflects
+    # full project burn). They differ only in the numerator:
+    #   feature_runway_days → Q4b: liquid minus fixed (non-team) overheads.
+    #     Fixed overheads are pre-committed dollar amounts that can't be
+    #     redirected; the overhead *team* is NOT pre-committed here — they
+    #     already appear in total_daily_burn, so deducting them from the
+    #     numerator too would double-count their cost.
+    #   total_runway_days   → Q4a: liquid budget — when does the money run out?
+    feature_runway_days = (liquid_budget - fixed_overhead_dollars) / total_daily_burn if total_daily_burn else 0
     total_runway_days = liquid_budget / total_daily_burn if total_daily_burn else 0
 
     return {
