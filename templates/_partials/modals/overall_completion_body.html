@@ -1,0 +1,97 @@
+{# Overall Completion — sentence-form detail content. Included from:
+   - dashboard_agile.html (inside a <dialog>)
+   - dashboard_agile_report.html (as a flowed <section>)
+   Requires: s, p, pid, earned_value, unrealised_spend in context. #}
+{% set tb = s.total_budget %}
+{% set ev = earned_value %}
+{% set rv = s.realised_risk_dollars %}
+{% set uv = unrealised_spend %}
+{% set as_ = s.actual_spend %}
+{% set ab = s.accessible_budget %}
+{% set rd = s.remaining_dollars %}
+{% set or_ = s.open_risk_dollars %}
+{% set target_value = s.allocated_dollars * s.feature_expected_burn_pct / 100 %}
+{% set delivery_variance = ev - target_value %}
+{% set feature_buffer = ab - rd %}
+{% set total_demand = rd + or_ %}
+{% set overall_buffer = ab - total_demand %}
+{% set risk_free_accessible = [ab - or_, 0] | max %}
+{% set categorised_efficiency = ((ev + rv) / as_ * 100) if as_ > 0 else 0 %}
+{% set feature_efficiency_ratio = (ev / as_) if as_ > 0 else 0 %}
+
+{% if tb <= 0 %}
+<p>Total budget is zero — set an initial budget in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to see meaningful answers here.</p>
+{% else %}
+
+<div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+    {# (a) What the bar shows — orient the room before reading it. #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What does the bar show?</span>
+        The bar is the full <strong>{{ tb | currency }}</strong> budget. The green fill on the left is feature delivery — the spend that has produced features, valued at planned rates. The plan-zone tint extends to the end of the feature budget so you can see how much of the allocated work is still to come. The right-anchored blocks are money gone <em>without</em> delivery to show: pre-committed overheads, unrealised spend, and realised risks. The orange overlay marks the open-risk exposure that could erode the buffer. The gap in the middle is accessible budget — what's not yet spoken for.
+    </p>
+
+    {# (b) Delivery vs on-track target, with $/% variance and the
+       feature-efficiency ratio.  Surfaced here (not "also worth
+       knowing") because it's load-bearing for beat 4 of the meeting
+       script: how much is each $1 actually producing? #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Are we ahead or behind on delivery?</span>
+        {% if s.allocated_dollars <= 0 %}
+        No features have been allocated a budget yet, so there's no delivery target to compare against.
+        {% else %}
+        By {{ s.elapsed_days }} business days elapsed, the on-track target says <strong>{{ s.feature_expected_burn_pct | pct }}</strong> of feature work should be delivered; actual completion is <strong>{{ s.overall_completion | pct }}</strong> —
+        {% set gap = s.feature_expected_burn_pct - s.overall_completion %}
+        {% if gap > 0.05 %}
+        <strong style="color:var(--bad);">{{ gap | round(1) }}% behind</strong>.
+        {% elif gap < -0.05 %}
+        <strong style="color:var(--good);">{{ (gap * -1) | round(1) }}% ahead</strong>.
+        {% else %}
+        <strong style="color:var(--good);">on target</strong>.
+        {% endif %}
+        In dollar terms, target delivery is <strong>{{ target_value | currency }}</strong> at planned rates; actual is <strong>{{ ev | currency }}</strong> —
+        {% if delivery_variance >= 0 %}
+        <strong style="color:var(--good);">{{ delivery_variance | currency }} ahead</strong>.
+        {% else %}
+        <strong style="color:var(--bad);">{{ (delivery_variance * -1) | currency }} behind</strong>.
+        {% endif %}
+        {% if as_ > 0 %}
+        Every $1 paid has produced about <strong{% if feature_efficiency_ratio < 0.7 %} style="color:var(--bad);"{% elif feature_efficiency_ratio >= 0.95 %} style="color:var(--good);"{% endif %}>${{ '%.2f' % feature_efficiency_ratio }}</strong> of feature value at planned rates — below 1.0 means delivered features are worth less in plan-priced dollars than the cash spent producing them.
+        {% endif %}
+        {% endif %}
+    </p>
+
+    {# (c) Accessible budget vs combined demand (remaining features
+       + open risks).  Q4 + Q5 from the old version merged. #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Does accessible budget cover what's left?</span>
+        {% if rd <= 0 and or_ <= 0 %}
+        All allocated feature work is complete and there is no open-risk exposure — the accessible budget of <strong>{{ ab | currency }}</strong> is free for new scope or contingency.
+        {% elif rd <= 0 %}
+        Features are complete, but open risks represent <strong>{{ or_ | currency }}</strong> of forward exposure against <strong>{{ ab | currency }}</strong> accessible —
+        {% set rb = ab - or_ %}
+        {% if rb >= 0 %}
+        <strong style="color:var(--good);">{{ rb | currency }} of risk-free runway</strong> in the worst case.
+        {% else %}
+        <strong style="color:var(--bad);">{{ (rb * -1) | currency }} short</strong> if all open risks land.
+        {% endif %}
+        {% elif or_ <= 0 %}
+        Remaining features need <strong>{{ rd | currency }}</strong>; accessible budget is <strong>{{ ab | currency }}</strong> —
+        {% if feature_buffer >= 0 %}
+        <strong style="color:var(--good);">{{ feature_buffer | currency }} buffer</strong>. No open-risk exposure to weigh against it.
+        {% else %}
+        <strong style="color:var(--bad);">{{ (feature_buffer * -1) | currency }} shortfall</strong>.
+        {% endif %}
+        {% else %}
+        Combined demand: <strong>{{ rd | currency }}</strong> remaining features + <strong>{{ or_ | currency }}</strong> open-risk exposure = <strong>{{ total_demand | currency }}</strong>. Against <strong>{{ ab | currency }}</strong> accessible, that's
+        {% if overall_buffer >= 0 %}
+        <strong style="color:var(--good);">{{ overall_buffer | currency }} of headroom</strong>.
+        {% else %}
+        <strong style="color:var(--bad);">{{ (overall_buffer * -1) | currency }} short</strong>.
+        {% endif %}
+        Risk-free (no open risks land): <strong>{{ feature_buffer | currency }}</strong> buffer against features alone.
+        {% endif %}
+    </p>
+
+</div>
+{% endif %}

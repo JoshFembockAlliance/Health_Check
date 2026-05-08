@@ -1,0 +1,159 @@
+{# Net Accessible Budget — sentence-form detail content. Included from:
+   - dashboard_agile.html (inside a <dialog>)
+   - dashboard_agile_report.html (as a flowed <section>)
+   Requires: s, p, pid, earned_value, unrealised_spend, spend_delta_pct in context. #}
+{% set tb_n = s.total_budget %}
+{% set as_n = s.actual_spend %}
+{% set ev_n = earned_value %}
+{% set rv_n = s.realised_risk_dollars %}
+{% set ov_n = s.overhead_team_dollars_realised %}
+{% set uv_n = unrealised_spend %}
+{% set ab_n = s.accessible_budget %}
+{% set oh_n = s.overhead_dollars %}
+{% set or_n = s.open_risk_dollars %}
+{% set rd_n = s.remaining_dollars %}
+{% set ev_pct = (ev_n / as_n * 100) if as_n > 0 else 0 %}
+{% set rv_pct = (rv_n / as_n * 100) if as_n > 0 else 0 %}
+{% set ov_pct = (ov_n / as_n * 100) if as_n > 0 else 0 %}
+{% set uv_pct = (uv_n / as_n * 100) if as_n > 0 else 0 %}
+{% set categorised_pct = ev_pct + rv_pct %}
+
+{% if tb_n <= 0 %}
+<p>Total budget is zero — set an initial budget in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to see meaningful answers here.</p>
+{% else %}
+
+<div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+    {# Display-only promisable: liquid - fixed overheads (only the
+       truly pre-committed portion).  Matches the card. #}
+    {% set display_promisable = s.liquid_budget - s.fixed_overhead_dollars %}
+
+    {# Section 1 — Liquid budget.  How total → liquid via spend. #}
+    {% if rv_n > as_n %}
+    <p style="margin:0; padding:6px 8px; border:1px solid oklch(from var(--warn) l c h / 0.55); background:oklch(from var(--warn) l c h / 0.10); border-radius:4px;">
+        <span style="color:var(--warn); font-weight:700;">⚠</span>
+        Realised risk impact ({{ rv_n | currency }}) currently exceeds actual spend ({{ as_n | currency }}). Realised risk is a categorisation of past spend, not an additional deduction — when it exceeds spend, the team time hasn't been logged yet. Treat the breakdown below as approximate until that's reconciled.
+    </p>
+    {% endif %}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Liquid budget — what's in the account</span>
+        Of the <strong>{{ tb_n | currency }}</strong> total budget, <strong style="color:var(--text-strong);">{{ s.liquid_budget | currency }}</strong> is liquid — total minus what's already been invoiced ({{ as_n | currency }}). This is the cash-in-account figure.
+        {% if as_n > 0 %}
+        That spend breaks down as:
+        {% endif %}
+    </p>
+    {% if as_n > 0 %}
+    <ul style="margin:0; padding-left:20px; line-height:1.55;">
+        <li><strong style="color:var(--good);">Feature delivery — {{ ev_n | currency }}</strong> ({{ ev_pct | round(0) | int }}%): paid team time that produced delivered features at planned rates.</li>
+        {% if rv_n > 0 %}
+        <li><strong style="color:var(--bad);">Realised risk — {{ rv_n | currency }}</strong> ({{ rv_pct | round(0) | int }}%): spend on non-feature work the team explicitly took on to absorb a risk that landed.</li>
+        {% endif %}
+        {% if ov_n > 0 %}
+        <li><strong>Overhead team — {{ ov_n | currency }}</strong> ({{ ov_pct | round(0) | int }}%): invoiced time from overhead-team members (BAs, facilitators, SMEs) accrued to date. Explained spend — we know where it went — but not counted as earned feature value.</li>
+        {% endif %}
+        {% if uv_n > 0 %}
+        <li><strong>Unexplained — {{ uv_n | currency }}</strong> ({{ uv_pct | round(0) | int }}%): paid time with no attribution — not features, not categorised risk, not overhead. Work in flight, rework, exploration. The signal worth investigating in a status meeting.</li>
+        {% endif %}
+    </ul>
+    {% endif %}
+
+    {# Section 2 — Promisable budget.  How liquid → promisable via
+       truly pre-committed costs (fixed overheads only).  Overhead-
+       team members are NOT deducted: they invoice over time the
+       same way the delivery team does — they're part of forward
+       team demand, not a pre-commitment. #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Promisable budget — what's still uncommitted</span>
+        {% if s.fixed_overhead_dollars > 0 %}
+        <strong style="color:var(--text-strong);">{{ display_promisable | currency }}</strong> is promisable — liquid minus <strong>{{ s.fixed_overhead_dollars | currency }}</strong> of fixed overheads (PM retainer, tooling, etc.) that are pre-committed regardless of project work. Overhead-team members (BAs, designers, SMEs, facilitators) are not deducted here because they invoice over time the same way the delivery team does — they're part of forward team demand, not a pre-commitment.
+        {% else %}
+        <strong style="color:var(--text-strong);">{{ display_promisable | currency }}</strong> is promisable — equal to liquid because no fixed overheads are configured. (If you add a PM retainer or tooling line in Settings, that amount would be deducted here.)
+        {% endif %}
+        {% if rd_n > 0 %}
+        {% set delivery_buffer_n = display_promisable - rd_n %}
+        Remaining feature work needs <strong>{{ rd_n | currency }}</strong> to complete, leaving
+        {% if delivery_buffer_n >= 0 %}
+        <strong style="color:var(--good);">{{ delivery_buffer_n | currency }} of buffer</strong> for unplanned work or risk absorption.
+        {% else %}
+        a <strong style="color:var(--bad);">{{ (delivery_buffer_n * -1) | currency }} shortfall</strong> against the work still to deliver.
+        {% endif %}
+        {% else %}
+        All allocated feature work is complete — the entire promisable budget is free for new scope, contingency, or absorption of open risks.
+        {% endif %}
+    </p>
+
+    {% if uv_n > 0 and s.daily_burn > 0 %}
+    {% set sprint_burn = s.daily_burn * 10 %}
+    {% set uv_sprint_ratio = uv_n / sprint_burn %}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is the unexplained amount healthy?</span>
+        In an agile project, a healthy ceiling for in-flight unrealised spend is roughly one sprint of burn — work started in a sprint should close out within the same sprint. At the current burn rate, one sprint (10 working days) costs approximately <strong>{{ sprint_burn | currency }}</strong>.
+        {% if uv_sprint_ratio <= 1.0 %}
+        At <strong style="color:var(--good);">{{ uv_n | currency }}</strong> ({{ (uv_sprint_ratio * 100) | round(0) | int }}% of one sprint), the in-flight amount is within the healthy range — most work-in-progress should close out before the next sprint ends.
+        {% else %}
+        At <strong style="color:var(--warn);">{{ uv_n | currency }}</strong> ({{ uv_sprint_ratio | round(1) }}× one sprint's burn), the in-flight amount exceeds the healthy threshold. Possible causes: work spanning multiple sprints, items stalled mid-completion, or logged time not yet attributed to delivered features or categorised risks. Worth raising in the meeting.
+        {% endif %}
+    </p>
+    {% endif %}
+
+    {# Q4 — pace of spend vs plan (spend delta) #}
+    {% if as_n > 0 %}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How does spend pace compare to plan?</span>
+        Expected spend by now is <strong>{{ s.expected_spend | currency }}</strong> ({{ s.elapsed_days }} business days × <strong>{{ s.total_daily_burn | currency }}/day</strong> combined burn — <strong>{{ s.delivery_daily_burn | currency }}/day</strong> delivery {% if s.overhead_daily_burn > 0 %}+ <strong>{{ s.overhead_daily_burn | currency }}/day</strong> overhead-team{% endif %}). Actual is <strong>{{ as_n | currency }}</strong>, a delta of
+        {% if s.burn_delta > 0 %}
+        <strong style="color:var(--bad);">+{{ s.burn_delta | currency }}</strong> — over-burning by <strong>{{ '%+.1f' % spend_delta_pct }}%</strong> of actual spend.
+        {% elif s.burn_delta < 0 %}
+        <strong style="color:var(--good);">−{{ (s.burn_delta * -1) | currency }}</strong> — under-burning by <strong>{{ '%+.1f' % spend_delta_pct }}%</strong> of actual spend.
+        {% else %}
+        <strong>0</strong> — spend pace matches plan exactly.
+        {% endif %}
+        Pace is distinct from productivity: a healthy under-burn often reflects reduced team availability (sick leave, holidays, partial weeks), not a problem. Pair this with the feature-delivery share above to read the story — under-burn with strong delivery is fine; over-burn with weak delivery is the worst combination.
+    </p>
+    {% endif %}
+
+    {# Q5 — forward exposure (open risks) #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">What's exposed but not yet committed?</span>
+        {% if or_n <= 0 %}
+        No open risks are recorded — the accessible budget figure has no forward what-ifs hanging over it.
+        {% else %}
+        Open risks could absorb up to <strong style="color:var(--warn);">{{ or_n | currency }}</strong> ({{ (or_n / tb_n * 100) | round(1) }}% of total budget) if every one of them lands at full impact. This is forward-looking exposure — not yet spent and not deducted from the headline accessible figure — but it's what could erode the buffer between now and project end. The meeting question this raises: which of these risks are we actively mitigating, and which are accepted?
+        {% endif %}
+    </p>
+
+    {# Q6 — synthesis: where to focus #}
+    <div style="border-top:1px solid var(--border); padding-top:12px;">
+        <p style="margin:0;">
+            <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Where should this meeting focus?</span>
+            {% set focal_points = [] %}
+            {% if as_n > 0 and uv_pct >= 25 %}
+                {% set _ = focal_points.append(("Unexplained spend is a sizeable share (" ~ (uv_pct | round(0) | int) ~ "%). Walk through who has been on what to attribute this time — features-in-flight should drop the share once they complete.")) %}
+            {% endif %}
+            {% if as_n > 0 and rv_pct >= 25 %}
+                {% set _ = focal_points.append(("A meaningful share of spend (" ~ (rv_pct | round(0) | int) ~ "%) has gone on realised risks. Review the realised-risk register to make sure the categorisation reflects reality and to surface root causes.")) %}
+            {% endif %}
+            {% if as_n > 0 and s.burn_delta > 0 and spend_delta_pct > 5 %}
+                {% set _ = focal_points.append(("Burn pace is " ~ ('%+.1f' % spend_delta_pct) ~ "% ahead of plan. Worth confirming this is a temporary push (e.g. a deadline) and not a sustained over-run that erodes runway.")) %}
+            {% endif %}
+            {% if rd_n > 0 and (ab_n - rd_n) < 0 %}
+                {% set _ = focal_points.append(("Accessible budget is below remaining feature cost — the project cannot finish current scope without a budget, scope, or timeline pivot.")) %}
+            {% endif %}
+            {% if or_n > 0 and (ab_n - rd_n - or_n) < 0 %}
+                {% set _ = focal_points.append(("Combined demand from features plus open-risk exposure exceeds accessible budget. Mitigation or risk-acceptance decisions are needed before the buffer thins further.")) %}
+            {% endif %}
+            {% if focal_points %}
+            </p>
+            <ul style="margin:6px 0 0; padding-left:20px;">
+                {% for fp in focal_points %}
+                <li style="margin-bottom:4px;">{{ fp }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            Nothing in the budget picture is significantly out of balance: spend is attributable to either feature delivery or known risk handling, pace is close to plan, and forward exposure is within the accessible buffer. Use the rest of the meeting to confirm the team's read aligns with this — surprises usually live in the conversation, not the dashboard.
+            </p>
+            {% endif %}
+    </div>
+</div>
+
+{% endif %}

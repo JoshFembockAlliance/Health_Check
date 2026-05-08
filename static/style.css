@@ -1252,3 +1252,202 @@ input:focus, select:focus, textarea:focus {
      screen at print time; the toggles themselves aren't useful on paper. */
   #hero-burndown .label label { display: none !important; }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Report-mode page (agile dashboard /p/{id}/report)
+   Self-contained print document; no sidebar/topbar shell.
+   ────────────────────────────────────────────────────────────────── */
+
+.report-page {
+  background: #f5f5f7;
+  color: var(--text);
+  font-family: 'Public Sans', system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.report-content {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 40px 64px;
+  background: white;
+  min-height: 100vh;
+  box-shadow: 0 0 24px rgba(0,0,0,0.04);
+}
+
+.report-cover {
+  border-bottom: 2px solid var(--border-strong);
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+}
+
+.report-cover-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.report-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.report-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-strong);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.report-description {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin: 16px 0 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.report-meta div { display: flex; flex-direction: column; gap: 2px; }
+.report-meta dt {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.report-meta dd { margin: 0; font-weight: 500; color: var(--text-strong); }
+
+.report-section {
+  margin: 28px 0;
+  break-inside: avoid;
+}
+
+.report-section h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin: 0 0 12px;
+}
+
+.report-section-lead {
+  font-size: 13px;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.report-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px 16px;
+}
+
+.report-stat {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: white;
+}
+
+.report-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.report-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-family: 'Geist Mono', monospace;
+  line-height: 1.2;
+}
+
+.report-stat-sub {
+  font-size: 10.5px;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+.report-feature-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.report-feature-table th,
+.report-feature-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-feature-table th {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1.5px solid var(--border-strong);
+}
+
+.report-feature-table .num {
+  text-align: right;
+  font-family: 'Geist Mono', monospace;
+}
+
+.report-notes-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.report-notes-list li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; }
+
+@media print {
+  /* @page directives only meaningful for the report page; keep them
+     here so the legacy print path on other pages is unaffected (the
+     existing top-level @page rule near line 1125 still applies). */
+  .report-page { background: white; }
+  .report-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .report-print-trigger { display: none !important; }
+
+  /* Force background colours through (chips, hero-card primary blocks
+     embedded in modal partials, status chips). */
+  .report-page * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .report-page .report-section { break-inside: avoid; margin: 16px 0; }
+  .report-page .report-stat-grid { grid-template-columns: repeat(4, 1fr); gap: 6px 10px; }
+  .report-page .report-stat { padding: 6px 8px; }
+  .report-page .report-stat-value { font-size: 14px; }
+  .report-page .report-feature-table { font-size: 10.5px; }
+  .report-page .report-feature-table th, .report-page .report-feature-table td { padding: 4px 6px; }
+
+  /* Tighter typography for printed prose. */
+  .report-page p, .report-page li { font-size: 11.5px !important; line-height: 1.45 !important; }
+  .report-page h2 { font-size: 11.5px !important; }
+  .report-page .report-title { font-size: 20px; }
+  .report-page .report-cover { padding-bottom: 10px; margin-bottom: 14px; }
+}
+

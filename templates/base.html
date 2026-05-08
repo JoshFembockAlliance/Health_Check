@@ -92,10 +92,17 @@
                     {% endif %}
                 </div>
                 <div class="top-actions">
+                    {% if active_page == 'dashboard' and active_project and active_project.project_type != 'fixed_price' %}
+                    <a class="btn" href="/p/{{ active_project_id }}/report" target="_blank" title="Open print-ready report">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><rect x="4" y="9" width="16" height="9" rx="1"/><path d="M6 18v4h12v-4"/></svg>
+                        PDF
+                    </a>
+                    {% else %}
                     <button class="btn" onclick="window.print()" title="Export PDF">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><rect x="4" y="9" width="16" height="9" rx="1"/><path d="M6 18v4h12v-4"/></svg>
                         PDF
                     </button>
+                    {% endif %}
                 </div>
             </div>
             {% if active_project %}

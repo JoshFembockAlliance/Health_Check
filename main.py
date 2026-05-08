@@ -413,6 +413,12 @@ def dashboard(request: Request, project_id: int):
 
 
 def _agile_dashboard(request: Request, project: dict):
+    return templates.TemplateResponse(
+        request, "dashboard_agile.html", _agile_dashboard_context(request, project)
+    )
+
+
+def _agile_dashboard_context(request: Request, project: dict) -> dict:
     project_id = project["id"]
     db = get_db()
     features, project, roles, default_rate = build_feature_data(project_id)
@@ -608,7 +614,17 @@ def _agile_dashboard(request: Request, project: dict):
         "burndown": burndown,
     }
     ctx.update(shell_context(project_id))
-    return templates.TemplateResponse(request, "dashboard_agile.html", ctx)
+    return ctx
+
+
+@app.get("/p/{project_id}/report")
+def agile_report(request: Request, project_id: int):
+    project = get_project(project_id)
+    if is_fixed_price(project):
+        return RedirectResponse(f"/p/{project_id}/", status_code=303)
+    ctx = _agile_dashboard_context(request, project)
+    ctx["report_generated_at"] = _date.today().isoformat()
+    return templates.TemplateResponse(request, "dashboard_agile_report.html", ctx)
 
 
 def _fixed_price_dashboard(request: Request, project: dict):
@@ -2238,3 +2254,4 @@ async def import_csv(project_id: int, file: UploadFile = File(...)):
 
     init_db()
     return RedirectResponse(f"/p/{project_id}/settings", status_code=303)
+

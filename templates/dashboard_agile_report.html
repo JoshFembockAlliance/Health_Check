@@ -1,0 +1,195 @@
+{# Agile dashboard — report-mode (PDF) view.
+
+   Self-contained: does NOT extend base.html. Renders the dashboard's
+   key headline numbers plus the four sentence-form modal bodies as
+   flowed sections, so the printed PDF carries the prose that would
+   otherwise only appear when the user clicks each hero card. Auto-
+   triggers window.print() on load (cancellable). #}
+{% set p = project %}
+{% set s = summary %}
+{% set rs = risk_summary %}
+{% set pid = project.id %}
+
+{# Computed variables that the modal-body partials require — kept in
+   parity with the equivalents at the top of dashboard_agile.html. #}
+{% set days_color = 'var(--bad)' if s.total_budget_days_remaining < 20 else ('var(--warn)' if s.total_budget_days_remaining < 60 else 'var(--good)') %}
+{% set earned_value = s.allocated_dollars * s.overall_completion / 100 %}
+{% set unrealised_spend = [s.actual_spend - earned_value - s.realised_risk_dollars - s.overhead_team_dollars_realised, 0] | max %}
+{% set spend_delta_pct = (s.burn_delta / s.actual_spend * 100) if s.actual_spend > 0 else 0 %}
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-density="balanced" data-accent="{{ p.accent if p.accent else 'cyan' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Report · {{ p.name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/style.css?v={{ css_version }}">
+</head>
+<body class="report-page">
+
+<main class="report-content">
+
+    <header class="report-cover">
+        <div class="report-cover-row">
+            <div>
+                <div class="report-eyebrow">Project Status Report</div>
+                <h1 class="report-title">{{ p.name }}</h1>
+                {% if p.description %}<p class="report-description">{{ p.description }}</p>{% endif %}
+            </div>
+            <button type="button" class="btn btn-primary report-print-trigger" onclick="window.print()">
+                Print / Save as PDF
+            </button>
+        </div>
+        <dl class="report-meta">
+            <div><dt>Generated</dt><dd>{{ report_generated_at }}</dd></div>
+            {% if p.as_of_date %}<div><dt>As of</dt><dd>{{ p.as_of_date }}</dd></div>{% endif %}
+            {% if p.start_date %}<div><dt>Started</dt><dd>{{ p.start_date }}</dd></div>{% endif %}
+            {% if p.end_date %}<div><dt>End date</dt><dd>{{ p.end_date }}</dd></div>{% endif %}
+            <div><dt>Team</dt><dd>{{ '%g' % p.team_size }} delivery</dd></div>
+            {% if s.elapsed_days %}<div><dt>Elapsed</dt><dd>{{ s.elapsed_days }} business days</dd></div>{% endif %}
+        </dl>
+    </header>
+
+    {# ── Snapshot — the headline numbers from the three hero cards, ── #}
+    {# ── rendered as a flat grid for paper. ── #}
+    <section class="report-section report-snapshot">
+        <h2>Snapshot</h2>
+        <div class="report-stat-grid">
+            <div class="report-stat">
+                <div class="report-stat-label">Promisable budget</div>
+                <div class="report-stat-value">{{ s.promisable_budget | currency }}</div>
+                <div class="report-stat-sub muted">of {{ s.total_budget | currency }} total</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Liquid budget</div>
+                <div class="report-stat-value">{{ s.liquid_budget | currency }}</div>
+                <div class="report-stat-sub muted">cash in account</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Overall completion</div>
+                <div class="report-stat-value">{{ s.overall_completion | pct }}</div>
+                <div class="report-stat-sub muted">target {{ s.feature_expected_burn_pct | pct }}</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Feature runway</div>
+                <div class="report-stat-value" style="color: {{ days_color }};">{{ s.feature_runway_days | days }}d</div>
+                <div class="report-stat-sub muted">at {{ s.delivery_daily_burn | currency }}/day delivery</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Total runway</div>
+                <div class="report-stat-value">{{ s.total_runway_days | days }}d</div>
+                <div class="report-stat-sub muted">at {{ s.total_daily_burn | currency }}/day combined</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Spend vs plan</div>
+                <div class="report-stat-value" style="color: {{ 'var(--bad)' if s.burn_delta > 0 else ('var(--good)' if s.burn_delta < 0 else 'var(--text)') }};">
+                    {% if s.burn_delta > 0 %}+{% elif s.burn_delta < 0 %}−{% endif %}{{ (s.burn_delta if s.burn_delta >= 0 else (s.burn_delta * -1)) | currency }}
+                </div>
+                <div class="report-stat-sub muted">{{ s.actual_spend | currency }} actual vs {{ s.expected_spend | currency }} planned</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Open risk exposure</div>
+                <div class="report-stat-value" style="color: {{ 'var(--warn)' if rs.open_impact_dollars > 0 else 'var(--text)' }};">{{ rs.open_impact_dollars | currency }}</div>
+                <div class="report-stat-sub muted">{{ rs.open_count }} open · {{ rs.open_impact_days | days }}d</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-label">Realised risk impact</div>
+                <div class="report-stat-value">{{ rs.effective_impact_dollars | currency }}</div>
+                <div class="report-stat-sub muted">{{ rs.done_count }} closed · {{ rs.effective_impact_days | days }}d absorbed</div>
+            </div>
+        </div>
+    </section>
+
+    {# ── Budget detail (Net Accessible) ── #}
+    <section class="report-section">
+        <h2>Budget</h2>
+        <p class="report-section-lead muted">How the {{ s.total_budget | currency }} pot is being used — what's already invoiced, what's pre-committed, and what remains promisable.</p>
+        {% include "_partials/modals/net_accessible_body.html" %}
+    </section>
+
+    {# ── Runway / Budget Days Remaining ── #}
+    <section class="report-section">
+        <h2>Runway</h2>
+        <p class="report-section-lead muted">How many days of feature work the budget still funds, and whether that's enough to clear remaining scope and the project end date.</p>
+        {% include "_partials/modals/budget_days_body.html" %}
+    </section>
+
+    {# ── Overall Completion ── #}
+    <section class="report-section">
+        <h2>Overall Completion</h2>
+        <p class="report-section-lead muted">How much of the allocated feature work has been delivered, against the on-track target for elapsed business days.</p>
+        {% include "_partials/modals/overall_completion_body.html" %}
+    </section>
+
+    {# ── Burndown — narrative form (the SVG chart is dashboard-only). ── #}
+    {% if burndown %}
+    <section class="report-section">
+        <h2>Budget Burndown</h2>
+        <p class="report-section-lead muted">When the budget runs out at current pace, when scope finishes, and which lever (pace or productivity) is moving the date.</p>
+        {% include "_partials/modals/burndown_body.html" %}
+    </section>
+    {% endif %}
+
+    {# ── Feature health ── #}
+    {% if features %}
+    <section class="report-section">
+        <h2>Feature health</h2>
+        <table class="report-feature-table">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Status</th>
+                    <th class="num">Allocated</th>
+                    <th class="num">Spent</th>
+                    <th class="num">Remaining</th>
+                    <th class="num">Completion</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in features %}
+                {% if f.total_dollars > 0 %}
+                {% set f_color = 'var(--good)' if f.health == 'on_track' else ('var(--warn)' if f.health == 'at_risk' else 'var(--bad)') %}
+                <tr>
+                    <td>{{ f.name }}</td>
+                    <td><span style="color: {{ f_color }}; font-weight:600;">{% if f.health == 'on_track' %}On track{% elif f.health == 'at_risk' %}At risk{% else %}Behind{% endif %}</span></td>
+                    <td class="num">{{ f.total_dollars | currency }}</td>
+                    <td class="num">{{ (f.total_dollars - f.remaining_dollars) | currency }}</td>
+                    <td class="num">{{ f.remaining_dollars | currency }}</td>
+                    <td class="num">{{ f.weighted_completion | pct }}</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    {# ── PM notes (sticky + due-soon) ── #}
+    {% if dashboard_notes %}
+    <section class="report-section">
+        <h2>PM notes</h2>
+        <ul class="report-notes-list">
+        {% for n in dashboard_notes %}
+            <li>
+                <strong>{{ n.name }}</strong>
+                {% if n.status == 'sticky' %}<span class="chip chip-info" style="margin-left:6px;">Sticky</span>{% elif n.due_date %}<span class="muted tiny" style="margin-left:6px;">due {{ n.due_date }}</span>{% endif %}
+                {% if n.description %}<div class="muted rich-content">{{ n.description | render_rich | safe }}</div>{% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+</main>
+
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 250);
+});
+</script>
+</body>
+</html>

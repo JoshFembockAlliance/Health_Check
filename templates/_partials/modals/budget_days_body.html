@@ -1,0 +1,134 @@
+{# Budget Days Remaining — sentence-form detail content. Included from:
+   - dashboard_agile.html (inside a <dialog>)
+   - dashboard_agile_report.html (as a flowed <section>)
+   Requires: s, p, pid, days_to_end, days_color in context. #}
+{% set burn = s.daily_burn %}
+{% set runway_days = s.total_budget_days_remaining %}
+{% set feature_days = (s.remaining_dollars / burn) if burn > 0 else 0 %}
+{% set open_risk_days = (s.open_risk_dollars / burn) if burn > 0 else 0 %}
+{% set realised_risk_days = (s.realised_risk_dollars / burn) if burn > 0 else 0 %}
+{# Forward demand against the runway is features + open risks only.
+   Realised risks are PAST spend — they've already eaten into the runway
+   via actual_spend, so adding them as future demand would double-count. #}
+{% set risk_days = open_risk_days %}
+{% set risk_demand = feature_days + risk_days %}
+{% set unallocated_days = (s.unallocated_budget / burn) if burn > 0 else 0 %}
+{% set overhead_days = (s.overhead_dollars / burn) if burn > 0 else 0 %}
+
+{% if burn <= 0 %}
+<p>Daily burn rate is zero — set a team size and at least one role rate in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to see day-based answers.</p>
+{% else %}
+
+<div style="display:flex; flex-direction:column; gap:14px; line-height:1.55; font-size:14px;">
+
+    {# Q1 — Feature-work runway (default headline) #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">How many days of feature work can we still fund? (Feature)</span>
+        At the delivery-team burn rate of <strong>{{ s.delivery_daily_burn | currency }}/day</strong> for the
+        <strong>{{ '%g' % p.team_size }}-person</strong> delivery team,
+        {% if s.overhead_dollars > 0 %}
+        the promisable budget of <strong>{{ s.promisable_budget | currency }}</strong> — what's left after reserving
+        <strong>{{ s.overhead_dollars | currency }}</strong> for overheads{% if s.overhead_team_dollars > 0 %} (including <strong>{{ s.overhead_team_dollars | currency }}</strong> for overhead team members, who burn the budget over the project lifetime but never produce earned value){% endif %} — funds
+        {% else %}
+        the promisable budget of <strong>{{ s.promisable_budget | currency }}</strong> funds
+        {% endif %}
+        <strong style="color:{{ days_color }};">{{ s.feature_runway_days | days }}d</strong>
+        of team-on-feature work.
+    </p>
+
+    {# Q1b — Total-budget runway (alternative headline, includes overhead burn) #}
+    {% if s.total_runway_days != s.feature_runway_days %}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">When does the project literally run out of money? (Total)</span>
+        At the combined burn rate of <strong>{{ s.total_daily_burn | currency }}/day</strong>
+        ({{ s.delivery_daily_burn | currency }} delivery + {{ s.overhead_daily_burn | currency }} overhead-team), the liquid budget of <strong>{{ s.liquid_budget | currency }}</strong> lasts
+        <strong>{{ s.total_runway_days | days }}d</strong>.
+        This differs from the feature-work answer above because feature runway divides promisable budget by delivery-only burn (it asks "how long can features keep moving?"); total runway divides liquid budget by everything burning (it asks "when's the account empty?"). Toggle the lens chip on the headline card to switch.
+    </p>
+    {% endif %}
+
+    {# Q2 — vs end date #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is this enough to reach the project end date?</span>
+        {% if days_to_end is none %}
+        No project end date is set, so runway can't be compared to a deadline. Set one in <a class="link" href="/p/{{ pid }}/settings">Settings</a> to enable this comparison.
+        {% else %}
+        {% set end_delta = runway_days - days_to_end %}
+        The project end date is <strong>{{ days_to_end }} working days</strong> away (Mon–Fri, weekends excluded — same basis as the budget-days figure).
+        {% if end_delta >= 0 %}
+        The budget covers that with <strong style="color:var(--good);">{{ end_delta | days }}d to spare</strong>.
+        {% else %}
+        The budget falls <strong style="color:var(--bad);">{{ (end_delta * -1) | days }}d short</strong> of reaching it.
+        {% endif %}
+        {% endif %}
+    </p>
+
+    {# Q3 — vs feature work, before risks #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is this enough to see out the remaining features (before risks)?</span>
+        {% if s.remaining_dollars <= 0 %}
+        All allocated feature work is complete — there is no remaining feature demand to weigh against the budget.
+        {% else %}
+        {% set feature_buffer = runway_days - feature_days %}
+        The remaining features are estimated to need <strong>{{ feature_days | days }}d</strong> of full-team effort.
+        {% if feature_buffer >= 0 %}
+        That leaves <strong style="color:var(--good);">{{ feature_buffer | days }}d of buffer</strong> against the {{ runway_days | days }}d of budget runway, before any risk allowance.
+        {% else %}
+        That <strong style="color:var(--bad);">exceeds the {{ runway_days | days }}d of budget runway by {{ (feature_buffer * -1) | days }}d</strong>, before any risk allowance.
+        {% endif %}
+        {% endif %}
+    </p>
+
+    {# Q4 — vs feature work + open risks. Realised risks are past
+       spend; they've already eaten into the runway via actual_spend
+       and don't appear here as future demand. #}
+    <p style="margin:0;">
+        <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Is there enough budget to complete all remaining features after accounting for risks?</span>
+        {% if open_risk_days <= 0 %}
+        No open risk exposure is recorded, so feature delivery is the only forward demand against the budget. (See the prior line for that comparison.{% if realised_risk_days > 0 %} Realised risks of <strong>{{ realised_risk_days | days }}d</strong> are already netted out of the runway via past spend.{% endif %})
+        {% elif s.remaining_dollars <= 0 %}
+        Features are complete, but open risks still represent <strong>{{ open_risk_days | days }}d</strong> of forward exposure —
+        {% set risk_only_buffer = runway_days - open_risk_days %}
+        {% if risk_only_buffer >= 0 %}
+        <strong style="color:var(--good);">{{ risk_only_buffer | days }}d within</strong> the {{ runway_days | days }}d runway.
+        {% else %}
+        <strong style="color:var(--bad);">{{ (risk_only_buffer * -1) | days }}d beyond</strong> the {{ runway_days | days }}d runway.
+        {% endif %}
+        {% else %}
+        {% set risk_buffer = runway_days - risk_demand %}
+        Together, the <strong>{{ feature_days | days }}d</strong> to finish features and the
+        <strong>{{ open_risk_days | days }}d</strong> of open-risk exposure
+        total <strong>{{ risk_demand | days }}d</strong> of forward demand —
+        {% if risk_buffer >= 0 %}
+        <strong style="color:var(--good);">{{ risk_buffer | days }}d within</strong> the {{ runway_days | days }}d of runway.
+        {% else %}
+        <strong style="color:var(--bad);">{{ (risk_buffer * -1) | days }}d beyond</strong> the {{ runway_days | days }}d of runway.
+        {% endif %}
+        {% if realised_risk_days > 0 %}
+        <span class="muted" style="display:block; margin-top:4px; font-size:13px;">(Realised risks of <strong>{{ realised_risk_days | days }}d</strong> are already part of past spend and netted out of the runway — not added as forward demand.)</span>
+        {% endif %}
+        {% endif %}
+    </p>
+
+    {% if s.unallocated_budget > 0 or s.overhead_dollars > 0 %}
+    <div style="border-top:1px solid var(--border); padding-top:12px; display:flex; flex-direction:column; gap:10px;">
+        <div class="muted tiny" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Also worth knowing</div>
+
+        {% if s.unallocated_budget > 0 %}
+        <p style="margin:0;">
+            <strong>{{ s.unallocated_budget | currency }}</strong>
+            (≈<strong>{{ unallocated_days | days }}d</strong>) of the runway is not yet earmarked for any feature, overhead, or realised risk — extra capacity to absorb scope additions or risk realisation without eating into committed work.
+        </p>
+        {% endif %}
+
+        {% if s.overhead_dollars > 0 %}
+        <p style="margin:0;">
+            Overheads of <strong>{{ s.overhead_dollars | currency }}</strong>
+            (≈<strong>{{ overhead_days | days }}d</strong>) are <em>already excluded</em> from the {{ runway_days | days }} runway above — those days are pre-committed to non-feature work (PM oversight, ceremonies, support) and cannot be redirected to feature delivery. The headline reflects only what the team can actually spend on features.
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}
