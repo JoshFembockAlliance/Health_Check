@@ -38,6 +38,12 @@ Click any feature to drill into its requirements and individual deliverables. Ea
 
 ---
 
+### Milestones *(Fixed-price projects only)*
+
+For **Fixed Price with Milestones** projects, this tab replaces the budget-vs-spend framing with a milestone-invoicing framing. Each milestone has a contract value, an invoiced date, and a paid date. The sum of all milestone values defines the project's total contract budget — there is no separate initial-budget field for fixed-price projects. The Dashboard shows earned value and invoiced value side by side against the contract total so you can see at a glance whether you are earning faster or slower than you are invoicing.
+
+---
+
 ### Capacity Planning
 
 ![The Capacity Planning tab for recording team composition week by week](./readme_screenshots/Capacity.png)
@@ -62,6 +68,12 @@ Capture reminders, action items, and anything you need to stay on top of. Notes 
 
 ---
 
+### Decision Register
+
+Record the pivots, acknowledged limitations, and scope adjustments that shaped how the project was built. Each decision captures a title, type (Pivot / Limitation / Scope Adjustment), date, description, and expected outcome. Decisions can be linked to one or more features so anyone reading the feature list can see the reasoning behind it. The register is a documentation tool — it doesn't alter Dashboard numbers, but it creates an auditable trail of why things were done a particular way.
+
+---
+
 ### Settings
 
 ![The Settings tab for configuring project details, roles, and health thresholds](./readme_screenshots/Settings.png)
@@ -81,6 +93,8 @@ The Dashboard is a read-only summary — you never type directly into it. Everyt
 **Risks adjust your accessible budget.** A risk that has been closed and realised (it actually happened) has its impact deducted from your remaining budget on the Dashboard. Risks that are still open show as a warning overlay on the progress bars, so you can see your worst-case exposure at a glance.
 
 **PM Notes surface what's urgent.** Any note marked Sticky, or any note with a due date in the next two weeks, appears as a card on the Dashboard. If there are more than three, the Dashboard shows a count so nothing gets buried.
+
+**Decisions don't change the numbers — they explain them.** The Decision Register is a documentation layer. Recording a pivot or a scope adjustment there doesn't alter Dashboard metrics; it creates a shared record so the team knows why a particular call was made.
 
 ---
 
@@ -160,4 +174,4 @@ Once the app is open in your browser, follow these steps to get your project con
 - **Budget Adjustments** — If your budget changes mid-project, record it in Settings rather than overwriting the original figure. This preserves a history of how the budget evolved.
 - **Burn rate** — The amount of budget consumed each working day, calculated as your team size multiplied by the default role's day rate. Adjust this by updating Capacity Planning when your team changes.
 - **Health indicators** — Each feature on the Dashboard is colour-coded: green (on track), amber (at risk), or red (behind). The thresholds are configurable in Settings — by default, a feature is "on track" if its completion % matches or exceeds the expected spend %, and "at risk" if it falls within 80% of that target.
-- **Accessible budget** — Your remaining budget after deducting realised risk impacts and any fixed overhead costs (such as software licences or a PM retainer) that you have recorded in Settings.
+- **Accessible budget** — Your remaining budget after actual spend (which already includes any realised risk handling) and pre-committed overhead costs (such as software licences or a PM retainer recorded in Settings, and any overhead team members still to invoice). The hero cards on the Dashboard offer two lenses: *liquid* (raw cash remaining) and *promisable* (what can still be committed to feature delivery without overdrawing overhead reservations).
