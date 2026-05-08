@@ -1018,8 +1018,9 @@ def agile_burndown_chart_data(
     allocated = summary["allocated_dollars"]
     overall_completion = summary["overall_completion"]
     realised_risk = summary["realised_risk_dollars"]
+    overhead_realised = summary.get("overhead_team_dollars_realised", 0.0)
     earned_value = allocated * overall_completion / 100
-    unrealised_spend = max(0.0, actual_spend - earned_value - realised_risk)
+    unrealised_spend = max(0.0, actual_spend - earned_value - realised_risk - overhead_realised)
     remaining_dollars_value = summary["remaining_dollars"]
     open_risk = summary["open_risk_dollars"]
 

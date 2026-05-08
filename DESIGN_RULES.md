@@ -132,26 +132,30 @@ that didn't produce features still belongs on the right.
 
 ## 2. Spend decomposition
 
-`actual_spend` decomposes into exactly three buckets, summing to itself with
+`actual_spend` decomposes into exactly four buckets, summing to itself with
 no double-count:
 
 ```
-actual_spend = earned_value + realised_risk_dollars + unrealised_spend
+actual_spend = earned_value + realised_risk_dollars + overhead_team_realised + unrealised_spend
 
-earned_value     = allocated_dollars × overall_completion / 100
-unrealised_spend = max(0, actual_spend − earned_value − realised_risk_dollars)
+earned_value           = allocated_dollars × overall_completion / 100
+overhead_team_realised = overhead_team.realised_dollars (linearly accrued by as_of_date)
+unrealised_spend       = max(0, actual_spend − earned_value − realised_risk_dollars − overhead_team_realised)
 ```
 
 - **Earned value** — spend that produced delivered features.
 - **Realised risk** — spend on risk handling (team time on a realised risk).
-- **Unrealised spend** — paid time not yet visible as features or
-  categorised risk impact (work in flight, rework, exploration, non-feature
-  work).
+- **Overhead team (realised)** — invoiced time from overhead-team members
+  (BAs, facilitators, SMEs). Explained spend — we know where it went — but
+  not counted as earned feature value.
+- **Unrealised spend** ("Unexplained") — paid time with no attribution: not
+  features, not categorised risk, not overhead. Work in flight, rework,
+  exploration. The signal worth investigating in a status meeting.
 
-When `earned_value + realised_risk > actual_spend` (favourable variance),
-`unrealised_spend = 0` and the surplus is reported as `favourable_variance`.
-The bar doesn't extend past the spent zone in this case; the legend chip
-reports the surplus.
+When `earned_value + realised_risk + overhead_team_realised > actual_spend`
+(favourable variance), `unrealised_spend = 0` and the surplus is reported as
+`favourable_variance`. The bar doesn't extend past the spent zone in this
+case; the legend chip reports the surplus.
 
 Any new visualisation involving spend MUST use this decomposition. Don't
 invent a new "Spent" block that overlaps with earned value — that

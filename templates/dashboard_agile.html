@@ -39,11 +39,11 @@
 {% set days_color = 'var(--bad)' if s.total_budget_days_remaining < 20 else ('var(--warn)' if s.total_budget_days_remaining < 60 else 'var(--good)') %}
 
 {# Spend decomposition — used by both Net Accessible Budget and Overall
-   Completion. Three buckets sum to actual_spend, no double-count. See
-   DESIGN_RULES §1. The Net Accessible Budget card surfaces these as the
+   Completion. Four buckets sum to actual_spend, no double-count. See
+   DESIGN_RULES §2. The Net Accessible Budget card surfaces these as the
    "where did the spend go?" breakdown for the Q2 status-meeting beat. #}
 {% set earned_value = s.allocated_dollars * s.overall_completion / 100 %}
-{% set unrealised_spend = [s.actual_spend - earned_value - s.realised_risk_dollars, 0] | max %}
+{% set unrealised_spend = [s.actual_spend - earned_value - s.realised_risk_dollars - s.overhead_team_dollars_realised, 0] | max %}
 {% set favourable_variance = [earned_value + s.realised_risk_dollars - s.actual_spend, 0] | max %}
 {% set spend_delta_pct = (s.burn_delta / s.actual_spend * 100) if s.actual_spend > 0 else 0 %}
 
@@ -98,10 +98,10 @@
         {% endif %}
         <div class="sub-row">
             {# Section A — how total budget became liquid: the spend
-               decomposition.  Three buckets summing to actual_spend.
+               decomposition.  Four buckets summing to actual_spend.
                These are the deductions that explain Total → Liquid. #}
             {% if s.actual_spend > 0 %}
-            <div class="row" title="Total spend logged against the project. Sub-rows below break it into the three categories of where the money has gone.">
+            <div class="row" title="Total spend logged against the project. Sub-rows below break it into the four categories of where the money has gone.">
                 <span class="lbl">Spent to date</span><span class="val">− {{ s.actual_spend | currency }}</span>
             </div>
             <div class="row" style="opacity:0.85;" title="Spend that produced delivered features, valued at planned rates.">
@@ -112,8 +112,13 @@
                 <span class="lbl" style="padding-left:14px;">↳ Realised risk</span><span class="val">{{ s.realised_risk_dollars | currency }} <span class="muted tiny" style="font-size:10px;">({{ (s.realised_risk_dollars / s.actual_spend * 100) | round(0) | int }}%)</span></span>
             </div>
             {% endif %}
+            {% if s.overhead_team_dollars_realised > 0 %}
+            <div class="row" style="opacity:0.85;" title="Invoiced time from overhead-team members (BAs, facilitators, SMEs) accrued to date. Explained spend — we know where it went — but not counted as earned feature value.">
+                <span class="lbl" style="padding-left:14px;">↳ Overhead team</span><span class="val">{{ s.overhead_team_dollars_realised | currency }} <span class="muted tiny" style="font-size:10px;">({{ (s.overhead_team_dollars_realised / s.actual_spend * 100) | round(0) | int }}%)</span></span>
+            </div>
+            {% endif %}
             {% if unrealised_spend > 0 %}
-            <div class="row" style="opacity:0.85;" title="Paid time not yet visible as feature delivery or categorised risk impact — work in flight, rework, exploration, or non-feature work. The 'apparent inefficiency' line for the meeting.">
+            <div class="row" style="opacity:0.85;" title="Paid time not yet visible as feature delivery, categorised risk, or overhead-team work — work in flight, rework, exploration. The signal worth investigating in a status meeting.">
                 <span class="lbl" style="padding-left:14px;">↳ Unexplained</span><span class="val">{{ unrealised_spend | currency }} <span class="muted tiny" style="font-size:10px;">({{ (unrealised_spend / s.actual_spend * 100) | round(0) | int }}%)</span></span>
             </div>
             {% endif %}
@@ -1181,6 +1186,7 @@
 {% set as_n = s.actual_spend %}
 {% set ev_n = earned_value %}
 {% set rv_n = s.realised_risk_dollars %}
+{% set ov_n = s.overhead_team_dollars_realised %}
 {% set uv_n = unrealised_spend %}
 {% set ab_n = s.accessible_budget %}
 {% set oh_n = s.overhead_dollars %}
@@ -1188,6 +1194,7 @@
 {% set rd_n = s.remaining_dollars %}
 {% set ev_pct = (ev_n / as_n * 100) if as_n > 0 else 0 %}
 {% set rv_pct = (rv_n / as_n * 100) if as_n > 0 else 0 %}
+{% set ov_pct = (ov_n / as_n * 100) if as_n > 0 else 0 %}
 {% set uv_pct = (uv_n / as_n * 100) if as_n > 0 else 0 %}
 {% set categorised_pct = ev_pct + rv_pct %}
 <dialog id="net-accessible-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
@@ -1218,7 +1225,7 @@
                 <span class="muted tiny" style="display:block; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; margin-bottom:4px;">Liquid budget — what's in the account</span>
                 Of the <strong>{{ tb_n | currency }}</strong> total budget, <strong style="color:var(--text-strong);">{{ s.liquid_budget | currency }}</strong> is liquid — total minus what's already been invoiced ({{ as_n | currency }}). This is the cash-in-account figure.
                 {% if as_n > 0 %}
-                That spend has gone in three directions:
+                That spend breaks down as:
                 {% endif %}
             </p>
             {% if as_n > 0 %}
@@ -1227,8 +1234,11 @@
                 {% if rv_n > 0 %}
                 <li><strong style="color:var(--bad);">Realised risk — {{ rv_n | currency }}</strong> ({{ rv_pct | round(0) | int }}%): spend on non-feature work the team explicitly took on to absorb a risk that landed.</li>
                 {% endif %}
+                {% if ov_n > 0 %}
+                <li><strong>Overhead team — {{ ov_n | currency }}</strong> ({{ ov_pct | round(0) | int }}%): invoiced time from overhead-team members (BAs, facilitators, SMEs) accrued to date. Explained spend — we know where it went — but not counted as earned feature value.</li>
+                {% endif %}
                 {% if uv_n > 0 %}
-                <li><strong>Unexplained — {{ uv_n | currency }}</strong> ({{ uv_pct | round(0) | int }}%): paid time not yet visible as features or categorised risk (work in flight, rework, exploration). The "apparent inefficiency" line for the meeting — high share usually means feature work is still in flight.</li>
+                <li><strong>Unexplained — {{ uv_n | currency }}</strong> ({{ uv_pct | round(0) | int }}%): paid time with no attribution — not features, not categorised risk, not overhead. Work in flight, rework, exploration. The signal worth investigating in a status meeting.</li>
                 {% endif %}
             </ul>
             {% endif %}

@@ -1607,6 +1607,22 @@ class TestSpendDecompositionIdentity:
         assert result["feature_efficiency_pct"] == pytest.approx(50.0)
         assert result["unrealised_ratio_pct"] == pytest.approx(50.0)
 
+    def test_overhead_team_realised_excluded_from_unrealised(self):
+        # actual=400k, earned=200k, risk=0, overhead_realised=100k
+        # → unrealised=100k, not 200k. overhead is explained spend.
+        # unrealised_ratio_pct = 100k/400k = 25%, not 50%.
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["actual_spend"] = 400_000.0
+        summary["allocated_dollars"] = 400_000.0
+        summary["overall_completion"] = 50.0
+        summary["realised_risk_dollars"] = 0.0
+        summary["overhead_team_dollars_realised"] = 100_000.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["feature_efficiency_pct"] == pytest.approx(50.0)
+        assert result["unrealised_ratio_pct"] == pytest.approx(25.0)
+
 
 # ── budget math (remaining_days, budget_dollars, remaining_dollars) ──────────
 
