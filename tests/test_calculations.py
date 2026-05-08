@@ -1197,9 +1197,10 @@ class TestTotalRunwayDays:
     def test_total_runway_can_differ_from_feature_runway(self):
         # The two runway figures answer different questions and can land
         # on different values. liquid=$150k, overhead_dollars=$10k,
-        # overhead_burn=$200/day → total_runway = 150k / 2.2k = 68.18d,
-        # feature_runway = 140k / 2k = 70d. They diverge whenever the
-        # overhead ratio differs between liquidity and burn.
+        # overhead_burn=$200/day → total_burn=2.2k/day.
+        # total_runway = 150k / 2.2k = 68.18d,
+        # feature_runway = 140k / 2.2k = 63.64d. They diverge whenever
+        # promisable_budget < liquid_budget (i.e. there are overhead costs).
         proj = self._make()
         oht = {
             "total_dollars": 10_000.0, "realised_dollars": 0.0,
@@ -1211,7 +1212,7 @@ class TestTotalRunwayDays:
             proj, [], [], default_day_rate=1_000.0, overhead_team=oht,
         )
         assert result["total_runway_days"] == pytest.approx(150_000.0 / 2_200.0)
-        assert result["feature_runway_days"] == pytest.approx(140_000.0 / 2_000.0)
+        assert result["feature_runway_days"] == pytest.approx(140_000.0 / 2_200.0)
         assert result["total_runway_days"] != result["feature_runway_days"]
 
     def test_total_runway_zero_when_burn_zero(self):

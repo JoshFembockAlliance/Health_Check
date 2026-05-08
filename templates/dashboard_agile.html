@@ -502,24 +502,26 @@
                 <span data-lens-label="feature" title="Feature work runway: how many days of feature work the team can still fund. Uses promisable budget at the delivery-only burn rate.">Feature work</span><span data-lens-label="total" title="Total budget runway: when the project literally runs out of money. Uses liquid budget at the combined (delivery + overhead) burn rate.">Total budget</span>
                 <span aria-hidden="true" style="opacity:0.55; margin-left:4px; font-weight:500;">›</span>
             </div>
+            {% if s.promisable_budget != s.liquid_budget %}
             <div class="lens-toggle" role="group" aria-label="Runway lens" style="display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border); border-radius:6px; font-size:10px; font-weight:600;">
-                <button type="button" data-lens-set="feature" aria-pressed="true" title="Days of feature work fundable (delivery burn against promisable budget)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Feature</button>
-                <button type="button" data-lens-set="total" aria-pressed="false" title="Days until the money literally runs out (combined burn against liquid budget)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Total</button>
+                <button type="button" data-lens-set="feature" aria-pressed="true" title="Days the project runs on freely-committable budget (full burn against promisable budget)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Feature</button>
+                <button type="button" data-lens-set="total" aria-pressed="false" title="Days until the money literally runs out (full burn against liquid budget)" style="padding:2px 8px; border:0; border-radius:4px; background:transparent; cursor:pointer; color:inherit;">Total</button>
             </div>
+            {% endif %}
         </div>
         <div class="value" style="color: {{ days_color }}">
             <span data-lens-value="feature">{{- s.feature_runway_days | days -}}</span><span data-lens-value="total">{{- s.total_runway_days | days -}}</span>
             {%- if days_to_end is not none %}<span class="hero-sub-value muted" style="font-size:0.45em; font-weight:500; margin-left:6px;" title="Working days from today to the project end date (Mon–Fri, weekends excluded). Apples-to-apples with the runway figure on the left.">of {{ days_to_end }} working days to end date</span>{% endif %}
         </div>
         <div class="sub-row">
-            <div class="row" title="Delivery-only daily burn. Overhead-team headcount is pre-committed as overhead and excluded from the runway denominator (its full $ has already been deducted from accessible budget upstream).">
+            <div class="row" title="Total daily burn (delivery + overhead team). Both lenses divide by this rate — overhead roles are active and spending throughout the project regardless of feature contribution.">
                 <span class="lbl">Daily burn</span><span class="val">{{ s.daily_burn | currency }}/day · {{ '%g' % p.team_size }} people</span>
             </div>
             {% if s.overhead_team_dollars > 0 %}
             <div class="row" style="opacity:0.7;" title="Delivery roles only — what feeds the runway calculation above.">
                 <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Delivery</span><span class="val tiny" style="font-size:11px;">{{ s.delivery_daily_burn | currency }}/day · {{ '%g' % s.delivery_team_size }} people</span>
             </div>
-            <div class="row" style="opacity:0.7;" title="Overhead team members — context only. Their full lifetime cost is already pre-committed as overhead, so they don't reduce the day-count denominator.">
+            <div class="row" style="opacity:0.7;" title="Overhead team members. Their full lifetime cost is pre-committed as overhead (deducted from promisable budget); their daily rate contributes to the combined burn rate used by both runway lenses.">
                 <span class="lbl tiny" style="font-size:11px; padding-left:14px;">↳ Overhead team</span><span class="val tiny" style="font-size:11px;">{{ s.overhead_daily_burn | currency }}/day · {{ s.overhead_team_headcount }} people</span>
             </div>
             {% endif %}

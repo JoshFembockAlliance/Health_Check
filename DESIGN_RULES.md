@@ -59,17 +59,18 @@ deducted.** Overhead-team time that has already been invoiced sits inside
 `actual_spend` (and therefore is already removed via `liquid_budget`).
 Subtracting the lifetime `overhead_team.total_dollars` would double-count
 the realised portion — shrinking `feature_runway_days` by
-`overhead_team.realised_dollars / delivery_daily_burn` business days and
+`overhead_team.realised_dollars / total_daily_burn` business days and
 making the burndown projection finish earlier than it should. Same
 reasoning as realised risks. Fixed overheads are typically separately
 invoiced (not in `actual_spend`), so they continue to be deducted at
 face value.
 
-**Overheads are subtracted from `promisable_budget` and from
-`feature_runway_days`.** They are pre-committed to non-feature work
+**Overheads are subtracted from `promisable_budget`** (and therefore
+reduce `feature_runway_days`). They are pre-committed to non-feature work
 (PM oversight, ceremonies, support) and cannot be redirected to feature
-delivery. Showing them as "available days the team can fund" misleads PMs
-into promising deliverable runway that was never deliverable.
+delivery. Both runway lenses divide by `total_daily_burn` — overhead roles
+are active and spending throughout the project regardless of feature
+contribution, so they belong in the denominator for both questions.
 
 **`overhead_dollars` decomposes into `fixed_overhead_dollars +
 overhead_team_dollars`.** Fixed overheads are manually-entered $ amounts in
@@ -87,8 +88,8 @@ they read as a single overhead block.
 
 | Rate | Formula | Used for |
 |---|---|---|
-| `delivery_daily_burn` (alias `daily_burn`) | `team_size × default_day_rate` | Q4b feature runway (`feature_runway_days`) and burndown **scope-finish marker dates** ("when does feature delivery land?"). |
-| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team_size × default_overhead_rate` (flat, mirrors delivery formula) | Q3a `expected_spend`, Q4a `total_runway_days`, **and the burndown chart line itself** ("when does the project literally run out of money?"). |
+| `delivery_daily_burn` (alias `daily_burn`) | `team_size × default_day_rate` | Burndown **scope-finish marker dates** ("when does feature delivery land?") and feature-pacing comparisons. |
+| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team_size × default_overhead_rate` (flat, mirrors delivery formula) | Q3a `expected_spend`, Q4a `total_runway_days`, Q4b `feature_runway_days`, **and the burndown chart line itself**. Both runway lenses use this rate — overhead roles are active and spending regardless of feature contribution. |
 
 `actual_spend` is whole-of-project invoicing — it naturally includes
 overhead-team time. So `expected_spend = total_daily_burn × elapsed_days`
