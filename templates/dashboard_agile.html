@@ -1010,10 +1010,10 @@
    the meeting can diagnose which axis is hurting (vs. lumping them
    into a single "trend" figure that hides which lever to pull). #}
 {% if burndown %}
-<dialog id="burndown-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+<dialog id="burndown-modal" aria-labelledby="burndown-modal-title" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget Burndown — Detail</strong>
+            <strong id="burndown-modal-title" style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget Burndown — Detail</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('burndown-modal').close()">✕</button>
         </div>
 
@@ -1035,10 +1035,10 @@
      5. Forward exposure from open risks (not committed yet).
      6. A synthesis line pointing at where the meeting should focus
         based on which of the above is most out of balance. #}
-<dialog id="net-accessible-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+<dialog id="net-accessible-modal" aria-labelledby="net-accessible-modal-title" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget — Detail</strong>
+            <strong id="net-accessible-modal-title" style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Budget — Detail</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('net-accessible-modal').close()">✕</button>
         </div>
         {% include "_partials/modals/net_accessible_body.html" %}
@@ -1046,10 +1046,10 @@
 </dialog>
 
 {# ── Budget Days Remaining — sentence-form detail modal ── #}
-<dialog id="budget-days-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+<dialog id="budget-days-modal" aria-labelledby="budget-days-modal-title" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Runway — Detail</strong>
+            <strong id="budget-days-modal-title" style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Runway — Detail</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('budget-days-modal').close()">✕</button>
         </div>
         {% include "_partials/modals/budget_days_body.html" %}
@@ -1062,10 +1062,10 @@
    produced, are we ahead/behind, will the remaining budget cover what's
    left. Realised risks appear in Q2 (decomposition of past spend) but NOT
    as a forward-demand line (per DESIGN_RULES §3). #}
-<dialog id="overall-completion-modal" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
+<dialog id="overall-completion-modal" aria-labelledby="overall-completion-modal-title" style="width:min(720px, 92vw); border:0; border-radius:10px; padding:0;">
     <div style="padding:20px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Overall Completion — Detail</strong>
+            <strong id="overall-completion-modal-title" style="font-size:14px; color:var(--text-strong); text-transform:uppercase; letter-spacing:0.04em;">Overall Completion — Detail</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="document.getElementById('overall-completion-modal').close()">✕</button>
         </div>
         {% include "_partials/modals/overall_completion_body.html" %}
@@ -1105,6 +1105,7 @@ function toggleStarted(projectId, featureId, btn) {
             if (modal.close) modal.close(); else modal.removeAttribute('open');
         }
     });
+    modal.addEventListener('close', () => card.focus());
 })();
 
 (function() {
@@ -1221,6 +1222,7 @@ function toggleStarted(projectId, featureId, btn) {
             if (modal.close) modal.close(); else modal.removeAttribute('open');
         }
     });
+    modal.addEventListener('close', () => card.focus());
 })();
 
 (function() {
@@ -1245,6 +1247,7 @@ function toggleStarted(projectId, featureId, btn) {
             if (modal.close) modal.close(); else modal.removeAttribute('open');
         }
     });
+    modal.addEventListener('close', () => card.focus());
 })();
 
 (function() {
@@ -1270,6 +1273,7 @@ function toggleStarted(projectId, featureId, btn) {
             if (modal.close) modal.close(); else modal.removeAttribute('open');
         }
     });
+    modal.addEventListener('close', () => card.focus());
 })();
 
 (function() {
