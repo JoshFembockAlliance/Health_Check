@@ -965,6 +965,19 @@ class TestProjectedOverheadTeamDollars:
         assert result["realised_dollars"] == pytest.approx(result["total_dollars"] * 0.25)
         assert result["remaining_dollars"] == pytest.approx(result["total_dollars"] * 0.75)
 
+    def test_current_burn_falls_back_when_as_of_week_beyond_project_end(self):
+        # as_of falls in the week AFTER project end; no day in [start, end)
+        # belongs to that as-of week, so current_burn never gets set in the loop.
+        # Fallback at lines 268-269: current_burn = default_rate × default_headcount.
+        proj = self._project(
+            start="2024-01-15", end="2024-01-19",  # Mon–Thu only (end is exclusive)
+            as_of="2024-01-22",                     # Monday of the NEXT week
+            overhead_team_size=1, default_overhead_role_id=2,
+        )
+        result = projected_overhead_team_dollars(proj, [], [self._overhead_role()])
+        assert result["daily_burn"] == pytest.approx(800.0)
+        assert result["headcount"] == 1
+
 
 # ── Agile project summary with overhead-team integration ───────────────────
 
@@ -1422,6 +1435,23 @@ class TestAgileBurndownCapacityProjection:
             if y is not None:
                 assert 0.0 <= y <= result["initial_days"] + 1e-6
 
+    def test_zero_rate_past_capacity_falls_back_to_actual_burn_rate(self):
+        # A past capacity period with day_rate=0 makes week_burns non-empty
+        # (truthy) but modelled_total=0, triggering the else fallback at
+        # lines 1226-1227. The actual_points should match the no-capacity path.
+        project = _minimal_project(start="2025-04-21", as_of="2025-04-28")
+        summary = _minimal_summary()
+        zero_rate = [{
+            "week_monday": date(2025, 4, 21),
+            "team_size": 1,
+            "day_rate": 0.0,
+            "role_category": "delivery",
+        }]
+        result_zero = agile_burndown_chart_data(project, summary, capacity_periods=zero_rate)
+        result_none = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result_zero is not None
+        assert result_zero["actual_points"] == result_none["actual_points"]
+
 
 # ── parse_date ─────────────────────────────────────────────────────────────
 
@@ -1461,6 +1491,9 @@ class TestAddBusinessDays:
 
     def test_five_days_spans_one_week(self):
         assert add_business_days(date(2024, 1, 15), 5) == date(2024, 1, 22)  # Mon → Mon
+
+    def test_none_start_returns_none(self):
+        assert add_business_days(None, 5) is None
 
 
 # ── remaining_days / budget_dollars / remaining_dollars ────────────────────
@@ -1554,6 +1587,18 @@ class TestBurndownProjectionFinishes:
         assert result is not None
         assert result["planned_cost_days"] == pytest.approx(0.0)
         assert result["planned_cost_finish"] == date(2025, 4, 28)
+
+    def test_zero_actual_spend_gives_inefficiency_factor_one(self):
+        # actual_spend=0 → condition `actual_spend > 0` is False → else branch
+        # → unrealised_ratio=0, inefficiency_factor=1.
+        project = _minimal_project()
+        summary = _minimal_summary()
+        summary["actual_spend"] = 0.0
+        summary["realised_risk_dollars"] = 0.0
+        result = agile_burndown_chart_data(project, summary, capacity_periods=[])
+        assert result is not None
+        assert result["inefficiency_factor"] == pytest.approx(1.0)
+        assert result["unrealised_ratio_pct"] == pytest.approx(0.0)
 
 
 # ── spend decomposition identity ─────────────────────────────────────────────
