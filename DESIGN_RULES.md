@@ -89,7 +89,18 @@ they read as a single overhead block.
 | Rate | Formula | Used for |
 |---|---|---|
 | `delivery_daily_burn` (alias `daily_burn`) | `team_size × default_day_rate` | Burndown **scope-finish marker dates** ("when does feature delivery land?") and feature-pacing comparisons. |
-| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team_size × default_overhead_rate` (flat, mirrors delivery formula) | Q3a `expected_spend`, Q4a `total_runway_days`, Q4b `feature_runway_days`, **and the burndown chart line itself**. Both runway lenses use this rate — overhead roles are active and spending regardless of feature contribution. |
+| `total_daily_burn` | `delivery_daily_burn + overhead_daily_burn` where `overhead_daily_burn = overhead_team.default_rate × overhead_team.default_headcount` (flat, project-level defaults; not derived from capacity periods) | Q3a `expected_spend`, Q4a `total_runway_days`, Q4b `feature_runway_days`, **and the burndown chart line itself**. Both runway lenses use this rate — overhead roles are active and spending regardless of feature contribution. |
+
+**`feature_runway_days` numerator is `liquid_budget − fixed_overhead_dollars`,
+not `promisable_budget`.** `promisable_budget` also subtracts
+`overhead_team.remaining_dollars`, but the overhead team is already
+incorporated into `total_daily_burn` (the denominator). Subtracting the
+remaining team commitment from the numerator *too* would double-count it —
+the burndown already "spends" that cost through the denominator on every
+future day. Only `fixed_overhead_dollars` (pre-committed dollar amounts, not
+in the burn rate) is deducted from the numerator.
+
+So: `feature_runway_days = (liquid_budget − fixed_overhead_dollars) / total_daily_burn`.
 
 `actual_spend` is whole-of-project invoicing — it naturally includes
 overhead-team time. So `expected_spend = total_daily_burn × elapsed_days`
@@ -362,10 +373,10 @@ without the date params).
 
 ## 9. Operational
 
-- **CSS cache busting**: any change to `static/style.css` must bump the
-  `?v=designN` parameter in `templates/base.html`. The browser caches
-  aggressively otherwise. Current version is in the `<link>` tag at the top
-  of `base.html`.
+- **CSS cache busting**: automated — `main.py` reads `os.path.getmtime('static/style.css')`
+  at startup and injects it as `css_version` into the Jinja globals.
+  `templates/base.html` renders `<link rel="stylesheet" href="/static/style.css?v={{ css_version }}">` .
+  No manual version bump needed; restarting the server picks up any mtime change.
 - **Tests**: `tests/test_calculations.py` is the contract for the budget
   model. Update it when changing the meaning of any field in
   `agile_project_summary` or `fixed_price_project_summary`.

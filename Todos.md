@@ -144,4 +144,4 @@ Last Addressed: 08/05/2026
 
 ### Design-Rules Review
 Re-read [DESIGN_RULES.md](DESIGN_RULES.md) and prune or update rules whose underlying decisions have changed. Add new rules for non-obvious decisions reached since last addressed. Don't let it become an exhaustive style guide — keep it focused on the things you'd want a fresh pair of eyes to know before touching the dashboard.
-Last Addressed: 27/04/2026
+Last Addressed: 09/05/2026
