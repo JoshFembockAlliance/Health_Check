@@ -950,7 +950,7 @@ def update_project(
 
 VALID_ACCENTS = {"cyan","indigo","emerald","mono","violet","rose","amber","forest","plum","slate","coral","teal","lime","ocean","wine"}
 VALID_THEMES = {"light", "dark"}
-VALID_ICONS = {"", "★", "✦", "⚡", "⚙", "✱", "❖", "⚖", "⚕", "⛏", "✏", "♾", "⚑", "⬡", "⌘", "∑", "Δ"}
+VALID_ICONS = {"", "★", "✦", "⚡", "⚙", "✱", "❖", "⚖", "⚕", "⛏", "✏", "♾", "⚑", "⬡", "⌘", "∑", "Δ", "⬆", "⊕", "◉", "⚒", "🚗", "🚙", "🏎", "🚌", "⛽", "🔑", "🏁", "🛞", "—"}
 
 @app.post("/p/{project_id}/settings/visual")
 def update_visual(
