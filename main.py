@@ -152,6 +152,16 @@ def _roles_as_dicts(project_id: int):
 
 
 def build_feature_data(project_id: int, feature_id: Optional[int] = None):
+    """Load and enrich the full feature hierarchy for a project.
+
+    Walks features → requirements → deliverables, applying
+    deliverable_summary / requirement_summary / feature_summary at each
+    level to compute budget $, remaining days/dollars, and
+    weighted completion.
+
+    Returns (enriched_features, project, roles, default_role_rate).
+    Pass feature_id to narrow to a single feature (used by the detail page).
+    """
     db = get_db()
     project = get_project(project_id)
     roles = _roles_as_dicts(project_id)
@@ -419,6 +429,12 @@ def _agile_dashboard(request: Request, project: dict):
 
 
 def _agile_dashboard_context(request: Request, project: dict) -> dict:
+    """Assemble all context for the agile dashboard template.
+
+    Pulls features, adjustments, overheads, risks, capacity, PM notes,
+    and burndown data then feeds them through agile_project_summary to
+    produce the hero-card metrics and lens values.
+    """
     project_id = project["id"]
     db = get_db()
     features, project, roles, default_rate = build_feature_data(project_id)
