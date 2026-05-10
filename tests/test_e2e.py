@@ -660,3 +660,63 @@ def test_dashboard_overall_completion_modal(page: Page):
 
     modal.locator("button[aria-label='Close']").click()
     expect(modal).not_to_be_visible()
+
+
+def test_dashboard_burndown_modal(page: Page):
+    """Clicking the Budget Burndown hero card (outside toggle buttons) opens its modal."""
+    page.goto(f"{P1}/")
+    card = page.locator("#hero-burndown")
+    expect(card).to_be_visible()
+    modal = page.locator("#burndown-modal")
+
+    # Click the label text — avoids the in-card toggle buttons which carry [data-burndown-toggle]
+    card.locator(".label > span").first.click()
+    expect(modal).to_be_visible()
+
+    modal.locator("button[aria-label='Close']").click()
+    expect(modal).not_to_be_visible()
+
+
+def test_dashboard_net_accessible_modal(page: Page):
+    """Clicking the Net Accessible Budget hero card opens its modal; Escape closes it."""
+    page.goto(f"{P1}/")
+    hero = page.locator("#hero-net-accessible")
+    expect(hero).to_be_visible()
+    modal = page.locator("#net-accessible-modal")
+
+    hero.locator(".label").click()
+    expect(modal).to_be_visible()
+
+    page.keyboard.press("Escape")
+    expect(modal).not_to_be_visible()
+
+
+def test_dashboard_modal_keyboard_enter_opens(page: Page):
+    """Pressing Enter while a hero card is focused opens its modal (keyboard a11y)."""
+    page.goto(f"{P1}/")
+    hero = page.locator("#hero-budget-days")
+    expect(hero).to_be_visible()
+    modal = page.locator("#budget-days-modal")
+
+    hero.focus()
+    page.keyboard.press("Enter")
+    expect(modal).to_be_visible()
+
+    modal.locator("button[aria-label='Close']").click()
+    expect(modal).not_to_be_visible()
+
+
+def test_dashboard_modal_focus_returns_after_close(page: Page):
+    """After a hero-card modal closes, focus returns to the triggering card."""
+    page.goto(f"{P1}/")
+    hero = page.locator("#hero-overall-completion")
+    expect(hero).to_be_visible()
+    modal = page.locator("#overall-completion-modal")
+
+    # Click the label text to avoid the strip toggles inside the card
+    hero.locator(".label").click()
+    expect(modal).to_be_visible()
+
+    modal.locator("button[aria-label='Close']").click()
+    expect(modal).not_to_be_visible()
+    expect(hero).to_be_focused()
