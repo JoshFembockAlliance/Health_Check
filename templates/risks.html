@@ -238,10 +238,10 @@
 <p class="muted">{% if filter_key != 'all' or date_from or date_to %}No risks match the current filter.{% else %}No risks tracked yet. Click <em>Add risk</em>.{% endif %}</p>
 {% endif %}
 
-<dialog id="risk-edit-modal" style="width:75vw; max-width:1200px;">
+<dialog id="risk-edit-modal" aria-labelledby="risk-modal-title" style="width:75vw; max-width:1200px;">
     <div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong);">Edit Risk</strong>
+            <strong id="risk-modal-title" style="font-size:14px; color:var(--text-strong);">Edit Risk</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="closeRiskModal()">✕</button>
         </div>
         <form id="risk-edit-form" method="post">
@@ -370,6 +370,10 @@
     const deleteBtn = document.getElementById('risk-modal-delete-btn');
 
     let modalDescQuill = null, modalResultantQuill = null;
+    let lastRiskTrigger = null;
+
+    modal.addEventListener('close', () => { if (lastRiskTrigger) lastRiskTrigger.focus(); });
+
     function ensureModalQuills() {
         if (modalDescQuill) return;
         modalDescQuill = makeQuill('#modal-desc-editor', 'Description, context, and impact notes…');
@@ -414,9 +418,10 @@
 
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-modal"]');
-        if (trigger) { e.preventDefault(); openModal(trigger.dataset.riskId); return; }
+        if (trigger) { e.preventDefault(); lastRiskTrigger = trigger; openModal(trigger.dataset.riskId); return; }
         const card = e.target.closest('.risk-card[data-risk-id]');
         if (card && !e.target.closest('button, input, select, a, form')) {
+            lastRiskTrigger = card;
             openModal(card.dataset.riskId);
         }
     });

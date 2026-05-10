@@ -141,10 +141,10 @@
 <p class="muted">{% if filter_key != 'all' %}No decisions match the current filter.{% else %}No decisions logged yet. Click <em>Add decision</em> to record the first pivot, limitation, or scope adjustment.{% endif %}</p>
 {% endif %}
 
-<dialog id="decision-edit-modal" style="width:75vw; max-width:900px;">
+<dialog id="decision-edit-modal" aria-labelledby="decision-modal-title" style="width:75vw; max-width:900px;">
     <div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <strong style="font-size:14px; color:var(--text-strong);">Edit Decision</strong>
+            <strong id="decision-modal-title" style="font-size:14px; color:var(--text-strong);">Edit Decision</strong>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" onclick="closeDecisionModal()">✕</button>
         </div>
         <form id="decision-edit-form" method="post">
@@ -249,6 +249,10 @@
     const deleteBtn = document.getElementById('decision-modal-delete-btn');
 
     let modalDescQuill = null;
+    let lastDecisionTrigger = null;
+
+    modal.addEventListener('close', () => { if (lastDecisionTrigger) lastDecisionTrigger.focus(); });
+
     function ensureModalQuill() {
         if (modalDescQuill) return;
         modalDescQuill = makeQuill('#modal-decision-desc-editor', 'Why was this decision made?');
@@ -287,9 +291,10 @@
 
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-decision-modal"]');
-        if (trigger) { e.preventDefault(); openDecisionModal(trigger.dataset.decisionId); return; }
+        if (trigger) { e.preventDefault(); lastDecisionTrigger = trigger; openDecisionModal(trigger.dataset.decisionId); return; }
         const card = e.target.closest('.decision-card[data-decision-id]');
         if (card && !e.target.closest('button, input, select, a, form')) {
+            lastDecisionTrigger = card;
             openDecisionModal(card.dataset.decisionId);
         }
     });

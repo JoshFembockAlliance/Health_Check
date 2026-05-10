@@ -327,6 +327,14 @@ Pattern (template in `dashboard_agile.html`'s Budget Days modal):
 - The JS IIFE must include `modal.addEventListener('close', () => card.focus())`
   so keyboard/AT users return to the triggering card after closing (Escape,
   backdrop click, or ✕ button all fire the `close` event).
+- The ✕ close button must carry `autofocus` so initial focus lands there
+  reliably when `showModal()` is called — makes focus placement explicit rather
+  than relying on browser heuristics.
+- For edit modals opened from dynamic triggers (risk cards, decision cards):
+  store the triggering element in a `let lastTrigger` variable before calling
+  `showModal()`, then restore via `modal.addEventListener('close', ...)` the
+  same way. The trigger is whatever the user clicked: the title button
+  (`[data-action="open-*-modal"]`) or the card itself for body-click opens.
 - Each question is its own `<p>` paragraph with an uppercase muted label and
   the answer in plain prose.
 - Numeric deltas in the answer are colour-coded (green for surplus, red for
