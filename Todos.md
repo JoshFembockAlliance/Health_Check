@@ -80,6 +80,27 @@ Create a demo project dev dataset that contains a few items for each project typ
 ### Inter-Dashboard — single card per project — High Priority
 - [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. **Plan**: [`plans/inter-dashboard-card.md`](plans/inter-dashboard-card.md).
 
+#### Planning Activity
+
+A detailed implementation plan already lives at [`plans/inter-dashboard-card.md`](plans/inter-dashboard-card.md). The notes below capture the current code state and open decisions that still need to be resolved before starting.
+
+**What we know:**
+- `cross_project_dashboard()` at `main.py:336` is minimal — it calls `shell_context(None)` and renders `templates/cross_project.html`, which currently shows a placeholder table. The template needs to be replaced with a card grid.
+- `shell_context` (main.py:303) already calls `_project_shell_meta` → `build_feature_data` for every project on every request (for the sidebar). The cross-project route adding a second `build_feature_data` call per project would double the work; consider restructuring so features are fetched once and passed through.
+- `agile_project_summary()` (calculations.py:285) takes `(project, features, adjustments, default_day_rate)`. For the cross-project route the extra inputs are: budget `adjustments` (a DB query per project) and the project's overhead/risk rollup. The existing agile dashboard route (`main.py:420–644`) shows exactly what to gather for each project.
+- `fixed_price_project_summary()` (calculations.py:619) exists and returns `overall_completion`, `margin`, `projected_margin`, and `next_milestone`. The FP card should show these instead of the agile trio (accessible budget / overall completion / budget days remaining).
+- `is_fixed_price(project)` (main.py:246) makes type detection easy — the route can branch per project.
+- Hero card CSS (`.hero-grid`, `.hero-card`) is already in `static/style.css` — reuse it directly.
+- The plan file notes a "no data yet" empty state for projects with zero features; `_project_shell_meta` already short-circuits on this check so the pattern is established.
+
+**Open questions:**
+- **FP card layout**: The plan says the trio is "Net Accessible Budget, Overall Completion, Budget Days Remaining" — but those are agile-only metrics. Fixed-price cards need different fields. Decide before starting: should FP cards show (margin, projected margin, next milestone), or just overall completion + a "fixed price" badge, or something else?
+- **Double `build_feature_data` call**: Is it acceptable to call `build_feature_data` twice per project per request (once in `shell_context`, once in the cross-project route), or should we restructure to pass the enriched data through? For a small number of projects this is fine; for > ~10 it becomes noticeable.
+- **Adjustments fetch per project**: `agile_project_summary` needs budget adjustments. Currently each agile dashboard route fetches these inline. The cross-project route will need a small helper to fetch them for any project — or a restructured `agile_project_summary` that reads from the DB itself.
+- **`as_of_date` awareness**: Each project's metrics are computed relative to its own `project["as_of_date"]`, not today. Should each card show the "as of" date so the reader knows the data currency? Worth deciding before building the template.
+- **Card sort order**: Natural DB insertion order, alphabetical, or by health (worst first)? Easy to change later but worth deciding to match user expectation from day one.
+- **Empty portfolio state**: The existing template already handles "no projects" with a text prompt. Should the card grid route reuse that same empty state, or show a dedicated "no projects" card?
+
 ### Distinct Project Types — Medium Priority, do not pick up or plan yet
 Every project has to strike a balance between Scope, Price, and Timeline. There are different types of project that a Project Manager might be working on to optimise for one or more of these, typically one must be left flexible or the project can't manoeuvre when issues arise. Plan and add one of the following that has not been implemented and then check it off. Not all project types should be added at once; in fact initially I'd like to add Fixed Price and see how this changes platform architecture.
 
