@@ -80,6 +80,30 @@ Create a demo project dev dataset that contains a few items for each project typ
 ### Inter-Dashboard — single card per project — High Priority
 - [ ] A Project card should highlight the data covered by the top 3 hero cards on the project dashboard but for each project. **Plan**: [`plans/inter-dashboard-card.md`](plans/inter-dashboard-card.md).
 
+#### Planning Activity
+
+A detailed plan already exists in [`plans/inter-dashboard-card.md`](plans/inter-dashboard-card.md) covering the agile path. This activity supplements it with findings from a codebase review and surfaces open questions the plan leaves unanswered.
+
+**What we know:**
+
+- `cross_project_dashboard()` at `main.py:336` is a 4-line stub: it calls `shell_context(None)` and renders `cross_project.html`. The template already shows a simple table of projects — that table is the placeholder to replace with a card grid.
+- `shell_context(None)` at `main.py:303` already calls `_project_shell_meta(project_id)` for every project, which itself calls `build_feature_data(project_id)` — so the page already makes N×features DB queries every load. Adding metric computation per project compounds this but is not a new problem; fixing it is a performance concern, not a blocker.
+- There are two project types (`is_fixed_price()` at `main.py:246`). The existing plan file only addresses agile projects. Fixed-price projects have a different metric set and require an additional data fetch (`_fetch_milestones_data` + `milestones_summary`).
+- Agile card metrics (from `agile_project_summary`): **Net Accessible Budget**, **Overall Completion %**, **Budget Days Remaining**.
+- Fixed-price card metrics (from `fixed_price_project_summary` at `calculations.py:619`): **Margin** (paid − actual_spend), **Overall Completion %**, **Next Milestone** (first unpaid milestone name + value). `overall_completion` uses the same weighted-days formula as agile so the bar reads on the same scale.
+- `projects_list` in `shell_context` includes `id`, `name`, `description`, `completion`, `status`, `icon` but NOT `project_type`. To branch on type in the template the route either needs to re-fetch the raw project row or `shell_context` needs to pass `project_type` through.
+- Adding `project_type` to the `projects_list` dict in `shell_context` (one extra `pr.get("project_type", ...)` per row) is the least invasive fix and benefits the sidebar too.
+- The existing `.hero-grid` / `.hero-card` CSS classes can be reused; a wrapper `<div class="hero-grid">` per project card inside the grid is the natural structure.
+- `build_feature_data` is already called by `_project_shell_meta` — passing its result through would let the route avoid a second call, but `_project_shell_meta` doesn't currently return it; refactoring that function is optional and can be deferred.
+
+**Open questions:**
+
+- **Fixed-price card layout**: Should fixed-price project cards show the same three slots as agile (with different labels/values), or a distinct fixed-price card shape? Keeping one template partial with type-conditional content is simpler; two distinct partials is cleaner but more template churn.
+- **What metric fills the third slot for fixed-price?**: Next Milestone name + value is informative but long; margin (a dollar figure) or projected_margin may be more comparable to the agile "accessible budget". Decide before coding the template.
+- **Performance**: Avoid double-calling `build_feature_data` (once via `_project_shell_meta` in `shell_context`, once for metric computation). Options: (a) refactor `_project_shell_meta` to return the enriched features and cache them in `shell_context`; (b) skip the `_project_shell_meta` call and compute completion inside the inter-dashboard route, replacing the sidebar's separate call; (c) accept the double-call for now (safe for small portfolios).
+- **Error isolation per project**: If one project's DB is inconsistent (no features, bad data), should the card show a graceful "no data" state or should the error propagate and break the whole page? A per-project try/except with a fallback "unavailable" card state is safer.
+- **Card ordering**: DB insertion order (current behaviour via `db["projects"].rows`)? Or sorted by completion, risk exposure, or alphabetically? This should be decided before building the template so the route orders the list correctly from the start.
+
 ### Distinct Project Types — Medium Priority, do not pick up or plan yet
 Every project has to strike a balance between Scope, Price, and Timeline. There are different types of project that a Project Manager might be working on to optimise for one or more of these, typically one must be left flexible or the project can't manoeuvre when issues arise. Plan and add one of the following that has not been implemented and then check it off. Not all project types should be added at once; in fact initially I'd like to add Fixed Price and see how this changes platform architecture.
 
