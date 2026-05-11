@@ -1103,12 +1103,18 @@ def delete_overhead(project_id: int, overhead_id: int):
 @app.get("/p/{project_id}/features")
 def features_list(request: Request, project_id: int):
     features, project, roles, default_rate = build_feature_data(project_id)
+    if is_fixed_price(project):
+        milestones_raw, _, _ = _fetch_milestones_data(project_id)
+        effective_budget = sum(m["value"] for m in milestones_raw)
+    else:
+        effective_budget = project["initial_budget"]
     ctx = {
         "request": request,
         "active": "features",
         "active_page": "features",
         "features": features,
         "project": project,
+        "effective_budget": effective_budget,
     }
     ctx.update(shell_context(project_id))
     return templates.TemplateResponse(request, "features.html", ctx)

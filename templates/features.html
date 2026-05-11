@@ -7,9 +7,9 @@
     <div>
         <div class="page-title">Features</div>
         <div class="page-sub">
-            Project budget: {{ project.initial_budget | currency }} ·
+            Project budget: {{ effective_budget | currency }} ·
             Allocated: {{ features | sum(attribute='total_dollars') | currency }} ·
-            Unallocated: {{ (project.initial_budget - features | sum(attribute='total_dollars')) | currency }}
+            Unallocated: {{ (effective_budget - features | sum(attribute='total_dollars')) | currency }}
         </div>
     </div>
     <div class="page-actions">
