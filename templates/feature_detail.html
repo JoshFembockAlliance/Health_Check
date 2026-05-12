@@ -138,8 +138,8 @@
                         <input form="del-{{ d.id }}" type="number" name="percent_complete" value="{{ d.percent_complete }}" min="0" max="100" class="inline-percent" data-id="{{ d.id }}" aria-label="Percent complete for {{ d.name }}">
                     </div>
                 </td>
-                <td class="cell-num">{{ d.remaining_days | days }}</td>
-                <td class="cell-num">{{ d.remaining_dollars | currency }}</td>
+                <td class="cell-num" data-field="rem-days" data-raw="{{ d.remaining_days }}">{{ d.remaining_days | days }}</td>
+                <td class="cell-num" data-field="rem-dollars" data-raw="{{ d.remaining_dollars }}">{{ d.remaining_dollars | currency }}</td>
                 <td class="cell-actions">
                     <button form="del-{{ d.id }}" type="submit" class="btn btn-sm btn-icon" aria-label="Save deliverable {{ d.name }}" title="Save">✓</button>
                     <button form="del-{{ d.id }}" type="submit" formaction="/p/{{ pid }}/deliverables/{{ d.id }}/delete" class="btn btn-danger-ghost btn-sm btn-icon"
@@ -167,8 +167,8 @@
                 <td colspan="3">Subtotal</td>
                 <td class="cell-num">{{ req.total_days | days }}</td>
                 <td class="cell-num">{{ req.weighted_completion | pct }}</td>
-                <td class="cell-num">{{ req.remaining_days | days }}</td>
-                <td class="cell-num">{{ req.remaining_dollars | currency }}</td>
+                <td class="cell-num" data-field="req-rem-days">{{ req.remaining_days | days }}</td>
+                <td class="cell-num" data-field="req-rem-dollars">{{ req.remaining_dollars | currency }}</td>
                 <td></td>
                 <td></td>
             </tr>
@@ -331,6 +331,24 @@ function autoSave(tr) {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: new URLSearchParams(new FormData(form)).toString(),
+    }).then(r => r.json()).then(data => {
+        if (!data.ok) return;
+        // Update this row's remaining cells
+        const remDaysTd = tr.querySelector('[data-field="rem-days"]');
+        const remDollarsTd = tr.querySelector('[data-field="rem-dollars"]');
+        if (remDaysTd) { remDaysTd.textContent = data.fmt_remaining_days; remDaysTd.dataset.raw = data.remaining_days; }
+        if (remDollarsTd) { remDollarsTd.textContent = data.fmt_remaining_dollars; remDollarsTd.dataset.raw = data.remaining_dollars; }
+        // Re-sum the requirement subtotal row
+        const table = tr.closest('table');
+        if (!table) return;
+        const remDaysCells = table.querySelectorAll('tbody [data-field="rem-days"]');
+        const remDollarsCells = table.querySelectorAll('tbody [data-field="rem-dollars"]');
+        const totalDays = Array.from(remDaysCells).reduce((s, td) => s + (parseFloat(td.dataset.raw) || 0), 0);
+        const totalDollars = Array.from(remDollarsCells).reduce((s, td) => s + (parseFloat(td.dataset.raw) || 0), 0);
+        const footDays = table.querySelector('tfoot [data-field="req-rem-days"]');
+        const footDollars = table.querySelector('tfoot [data-field="req-rem-dollars"]');
+        if (footDays) footDays.textContent = totalDays.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (footDollars) footDollars.textContent = '$' + Math.round(totalDollars).toLocaleString();
     }).catch(() => {});
 }
 
