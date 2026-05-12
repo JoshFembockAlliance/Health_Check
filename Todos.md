@@ -12,16 +12,27 @@ When promoting an inline TODO to a plan file: create `plans/<short-name>.md`, mo
 
 ## Enhancements to Existing
 
-### General
+### Features, Requirements, and Deliverables
+- [ ] **Deliverables legibility enhancement** 
+Make the deliverables a text box. If multiple lines are required to fit the deliverable in a way that's readable then allow that.  Change 'remaining days' to be 2 decimal places so it can be accurate and instead of the full word remaining change it to Rem. Days. Do the same for Remaining $. THe full word remaining wastes a lot of horizontal space on the line and I want to fit more of the deliverables text.
+- [ ] Save on blur for deliverables is great, can we also somehow trigger a refresh of the associated derived numbers on the line so that remaining days and dollars are updated as we go without the need for a page refresh?
+- [ ] An option to filter out 100% complete features with the intention of seeing what is left to complete when going through the feature list (so not hiding features with no estimates yet, just stuff that's actually finished)
 
-### Agile Project Dashboard Items
 
 
-### Fixed Price Project Dashboard Items
+
+### Agile Project Items
+
+## Fixed Price Project Items 
+
+## FP Dashboard Items
 -[ ] For Fixed Price projects, in the Dashboard, I'd like to be able to expand Milestones that are in-progress (as in, any percentage of linked features have been started) and see a list of deliverables that are still incomplete. That way I can know that I need to either address them or mark them off as done. 
 
 - [ ] **Burndown chart for fixed-price projects - projections** 
 The agile burndown answers "is there budget runway for remaining work?". The fixed-price equivalent question is "are we earning value at the rate needed to hit each milestone before it's invoiced?". Different math (milestones-driven), same shape of question. Worth a separate visualisation on the fixed-price dashboard, sized similarly to the agile burndown.
+
+
+
 
 ### Settings
 
