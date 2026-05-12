@@ -1353,14 +1353,27 @@ def api_update_deliverable(
     role_id: Optional[int] = Form(None),
 ):
     db = get_db()
+    clamped_pct = max(0, min(100, percent_complete))
     db["deliverables"].update(del_id, {
         "name": name,
         "budget_days": budget_days,
-        "percent_complete": max(0, min(100, percent_complete)),
+        "percent_complete": clamped_pct,
         "priority": priority,
         "role_id": role_id if role_id else None,
     })
-    return JSONResponse({"ok": True})
+    project = db["projects"].get(project_id)
+    roles = _roles_as_dicts(project_id)
+    default_rate = get_role_rate(project.get("default_role_id"), roles, 0)
+    rate = get_role_rate(role_id, roles, default_rate)
+    rem_days = budget_days * (1 - clamped_pct / 100)
+    rem_dollars = rem_days * rate
+    return JSONResponse({
+        "ok": True,
+        "remaining_days": rem_days,
+        "remaining_dollars": rem_dollars,
+        "fmt_remaining_days": fmt_days(rem_days),
+        "fmt_remaining_dollars": fmt_currency(rem_dollars),
+    })
 
 
 @app.post("/p/{project_id}/deliverables/{del_id}/delete")
