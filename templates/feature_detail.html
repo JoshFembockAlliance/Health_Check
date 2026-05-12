@@ -104,8 +104,8 @@
                 <th>Role</th>
                 <th class="right">Budget (days)</th>
                 <th class="right">% Done</th>
-                <th class="right">Remaining days</th>
-                <th class="right">Remaining $</th>
+                <th class="right">Rem. Days</th>
+                <th class="right">Rem. $</th>
                 <th class="center">Exp. scope</th>
                 <th></th>
             </tr>
@@ -114,7 +114,7 @@
             {% for d in req.deliverables %}
             <form id="del-{{ d.id }}" method="post" action="/p/{{ pid }}/deliverables/{{ d.id }}/update"></form>
             <tr data-del-id="{{ d.id }}">
-                <td><input form="del-{{ d.id }}" type="text" name="name" value="{{ d.name }}" aria-label="Deliverable name"></td>
+                <td><textarea form="del-{{ d.id }}" name="name" rows="2" class="del-name-input" aria-label="Deliverable name">{{ d.name }}</textarea></td>
                 <td>
                     <select form="del-{{ d.id }}" name="priority" aria-label="Priority for {{ d.name }}"
                             class="priority-select {% if d.priority == 'Must Have' %}priority-must{% elif d.priority == 'Should Have' %}priority-should{% else %}priority-could{% endif %}">
@@ -335,7 +335,7 @@ function autoSave(tr) {
 }
 
 document.querySelectorAll('tr[data-del-id]').forEach(tr => {
-    tr.querySelectorAll('input').forEach(inp => { inp.addEventListener('blur', () => autoSave(tr)); });
+    tr.querySelectorAll('input, textarea').forEach(inp => { inp.addEventListener('blur', () => autoSave(tr)); });
     tr.querySelectorAll('select').forEach(sel => { sel.addEventListener('change', () => autoSave(tr)); });
 });
 
