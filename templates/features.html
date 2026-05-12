@@ -12,7 +12,12 @@
             Unallocated: {{ (effective_budget - features | sum(attribute='total_dollars')) | currency }}
         </div>
     </div>
-    <div class="page-actions">
+    <div class="page-actions" style="display:flex; gap:8px; align-items:center;">
+        <label class="btn btn-ghost" style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+            <input type="checkbox" id="hide-complete-toggle" style="cursor:pointer;">
+            Hide complete
+            <span id="hide-complete-count" class="chip" style="display:none;"></span>
+        </label>
         <button class="btn btn-primary" onclick="document.getElementById('add-feature-dialog').showModal()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
             Add feature
@@ -38,7 +43,7 @@
         </thead>
         <tbody>
             {% for f in features %}
-            <tr>
+            <tr data-done="{{ 'true' if f.weighted_completion >= 100 and f.total_days > 0 else 'false' }}">
                 <td><a href="/p/{{ pid }}/features/{{ f.id }}" style="color: var(--text-strong); font-weight: 500;">{{ f.name }}</a></td>
                 <td class="cell-num">{{ f.total_days | days }}</td>
                 <td class="cell-num">{{ f.total_dollars | currency }}</td>
@@ -114,5 +119,33 @@ document.querySelectorAll('.pill-toggle-scope[data-type="feature"]').forEach(btn
             });
     });
 });
+
+// Hide-complete filter
+(function () {
+    const toggle = document.getElementById('hide-complete-toggle');
+    const countBadge = document.getElementById('hide-complete-count');
+    if (!toggle) return;
+    const rows = Array.from(document.querySelectorAll('tbody tr[data-done]'));
+    const doneRows = rows.filter(r => r.dataset.done === 'true');
+
+    function applyFilter(hide) {
+        doneRows.forEach(r => { r.style.display = hide ? 'none' : ''; });
+        if (hide && doneRows.length > 0) {
+            countBadge.textContent = doneRows.length;
+            countBadge.style.display = '';
+        } else {
+            countBadge.style.display = 'none';
+        }
+        localStorage.setItem('features-hide-complete', hide ? '1' : '0');
+    }
+
+    toggle.addEventListener('change', () => applyFilter(toggle.checked));
+
+    // Restore preference
+    if (localStorage.getItem('features-hide-complete') === '1') {
+        toggle.checked = true;
+        applyFilter(true);
+    }
+})();
 </script>
 {% endblock %}
