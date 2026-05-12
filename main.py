@@ -62,7 +62,7 @@ def fmt_pct(value):
 def fmt_days(value):
     if value is None:
         return "0"
-    return f"{value:,.1f}"
+    return f"{value:,.2f}"
 
 
 def fmt_age_days(iso_date_str):

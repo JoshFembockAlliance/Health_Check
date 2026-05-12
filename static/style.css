@@ -944,6 +944,13 @@ input:focus, select:focus, textarea:focus {
 }
 .data-table .cell-actions { text-align: right; white-space: nowrap; }
 .data-table .cell-actions .btn { margin-left: 4px; }
+.del-name-input {
+  width: 100%; min-width: 140px; resize: vertical;
+  font-family: inherit; font-size: 13px;
+  color: var(--text-strong); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 5px 8px; line-height: 1.4; box-sizing: border-box;
+}
 
 /* ===================== FEATURE HEALTH ROW ===================== */
 .feat-row { display: flex; flex-direction: column; gap: 2px; }
